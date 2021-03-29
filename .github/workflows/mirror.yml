@@ -1,0 +1,24 @@
+name: 'mirror'
+on:
+  push:
+    branches:
+        - __mirror
+  schedule:
+    # Run everyday at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    name: mirror
+    steps:
+      - name: mirror
+        id: mirror
+        uses: bridgelightcloud/github-mirror-action@v3
+        with:
+          origin: git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
