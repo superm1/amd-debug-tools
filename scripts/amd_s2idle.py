@@ -4,6 +4,7 @@
 import argparse
 import logging
 import os
+import platform
 import subprocess
 import sys
 from datetime import datetime
@@ -80,17 +81,6 @@ class MissingAmdPmc(S0i3Failure):
             "\n"
             "\tIf CONFIG_AMD_PMC is enabled but the amd-pmc driver isn't loading\n"
             "\tthen you may have found a bug and should report it."
-        )
-
-
-class KernelTooOld(S0i3Failure):
-    def __init__(self):
-        super().__init__()
-        self.description = "Kernel too old"
-        self.explanation = (
-            "\tThis tool uses interfaces and known patches that have been\n"
-            "\tlanded in newer kernel versions than you are using. Upgrade\n"
-            "\tto a newer kernel to utilize the tool."
         )
 
 
@@ -221,22 +211,11 @@ class S0i3Validator:
         return found
 
     def check_kernel_version(self):
-        """Validate and log the kernel version used"""
-        import platform
-        from packaging import version
-
-        v = platform.uname().release
-        if version.parse(v.split("-")[0]) >= version.parse("6.0"):
-            self.log("✅ Kernel {version}".format(version=v), colors.OK)
-            return True
-        self.failures += [KernelTooOld()]
+        """Log the kernel version used"""
         self.log(
-            "❌ Kernel {version} is too old for accurately reporting with this tool".format(
-                version=v
-            ),
-            colors.FAIL,
+            "○ Kernel {version}".format(version=platform.uname().release), colors.OK
         )
-        return False
+        return True
 
     def check_cpu_vendor(self):
         p = os.path.join("/", "proc", "cpuinfo")
