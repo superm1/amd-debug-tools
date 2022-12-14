@@ -592,7 +592,11 @@ class S0i3Validator:
 def parse_args():
     parser = argparse.ArgumentParser(description="Test for common s2idle problems")
     parser.add_argument("--offline", action="store_true", help="Analyze shared logs")
-    parser.add_argument("--log", default="s2idle_report.txt", help="Log file (default s2idle_report.txt)")
+    parser.add_argument(
+        "--log",
+        default="s2idle_report.txt",
+        help="Log file (default s2idle_report.txt)",
+    )
     parser.add_argument(
         "--duration",
         default="10",
