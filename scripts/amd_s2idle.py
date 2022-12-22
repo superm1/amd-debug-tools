@@ -84,6 +84,23 @@ class MissingAmdPmc(S0i3Failure):
         )
 
 
+class AcpiBiosError(S0i3Failure):
+    def __init__(self, errors):
+        super().__init__()
+        self.description = "ACPI BIOS Errors detected"
+        self.explanation = (
+            "\tWhen running a firmware component utilized for s2idle\n"
+            "\tthe ACPI interpreter in the Linux kernel encountered some\n"
+            "\tproblems. This usually means it's a bug in the system BIOS\n"
+            "\tthat should be fixed the system manufacturer.\n"
+            "\n"
+            "\tYou may have problems with certain devices after resume or high\n"
+            "\tpower consumption when this error occurs.\n"
+        )
+        for error in errors:
+            self.explanation += "\t%s" % error
+
+
 class VendorWrong(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -443,6 +460,8 @@ class S0i3Validator:
                 self.wakeup_irqs += [irq]
         elif "SMU idlemask s0i3" in line:
             self.idle_masks += [line.split()[-1]]
+        elif "ACPI BIOS Error" in line or "ACPI Error" in line:
+            self.acpi_errors += [line]
 
     def analyze_kernel_log(self):
         self.total_sleep = 0
@@ -453,6 +472,7 @@ class S0i3Validator:
         self.upep_microsoft = False
         self.wakeup_irqs = []
         self.idle_masks = []
+        self.acpi_errors = []
         if self.offline:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
@@ -505,6 +525,9 @@ class S0i3Validator:
                 self.log("○ Used AMD uPEP GUID", colors.OK)
         else:
             self.log("❌ uPEP GUID not executed", colors.FAIL)
+        if self.acpi_errors:
+            self.log("❌ ACPI BIOS errors found", colors.FAIL)
+            self.failures += [AcpiBiosError(self.acpi_errors)]
 
     def analyze_results(self):
         self.log(headers.LastCycleResults, colors.HEADER)
@@ -615,6 +638,7 @@ if __name__ == "__main__":
             sys.exit("{log} is missing".format(log=args.log))
         app = S0i3Validator("/dev/null")
         app.check_offline(args.log)
+        app.get_failure_report()
     else:
         print("Logs will be saved to {log}".format(log=args.log))
         app = S0i3Validator(args.log)
