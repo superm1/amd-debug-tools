@@ -180,7 +180,7 @@ class S0i3Validator:
             logging.info(message)
         print_color(message, color)
 
-    def __init__(self, log):
+    def __init__(self, log, acpidump):
         # for saving a log file for analysis
         logging.basicConfig(
             format="%(asctime)s %(levelname)s:\t%(message)s",
@@ -188,6 +188,9 @@ class S0i3Validator:
             filemode="w",
             level=logging.DEBUG,
         )
+
+        # capture all DSDT/SSDT or just one with _AEI
+        self.acpidump = acpidump
 
         # for analyzing devices
         try:
@@ -527,14 +530,16 @@ class S0i3Validator:
         base = os.path.join("/", "sys", "firmware", "acpi", "tables")
         for root, dirs, files in os.walk(base, topdown=False):
             for fname in files:
-                if not "DSDT" in fname and not "SSDT" in fname:
-                    continue
                 target = os.path.join(root, fname)
-                # If later decide to only get table that includes _AEI
-                # with open(target, "rb") as f:
-                #     s = f.read()
-                #     if s.find(b"_AEI") >= 0:
-                #         match = True
+                # capture all DSDT/SSDT when run with --acpidump
+                if self.acpidump:
+                    if not "DSDT" in fname and not "SSDT" in fname:
+                        continue
+                else:
+                    with open(target, "rb") as f:
+                        s = f.read()
+                        if s.find(b"_AEI") < 0:
+                            continue
                 try:
                     d = tempfile.mkdtemp()
                     prefix = os.path.join(d, "acpi")
@@ -792,6 +797,11 @@ def parse_args():
     parser.add_argument(
         "--count", default="1", help="Number of times to run s2idle (default 1)"
     )
+    parser.add_argument(
+        "--acpidump",
+        action="store_true",
+        help="Include and extract full ACPI dump in report",
+    )
     return parser.parse_args()
 
 
@@ -805,7 +815,7 @@ if __name__ == "__main__":
         app.get_failure_report()
     else:
         print("Logs will be saved to {log}".format(log=args.log))
-        app = S0i3Validator(args.log)
+        app = S0i3Validator(args.log, args.acpidump)
         test = app.prerequisites()
         if test:
             app.test_suspend(int(args.duration), int(args.count))
