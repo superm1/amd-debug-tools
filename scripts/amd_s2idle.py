@@ -810,7 +810,7 @@ if __name__ == "__main__":
     if args.offline:
         if not os.path.exists(args.log):
             sys.exit("{log} is missing".format(log=args.log))
-        app = S0i3Validator("/dev/null")
+        app = S0i3Validator("/dev/null", False)
         app.check_offline(args.log)
         app.get_failure_report()
     else:
