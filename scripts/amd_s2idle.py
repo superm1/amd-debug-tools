@@ -5,6 +5,7 @@ import argparse
 import logging
 import os
 import platform
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -569,6 +570,10 @@ class S0i3Validator:
             self.idle_masks += [line.split()[-1]]
         elif "ACPI BIOS Error" in line or "ACPI Error" in line:
             self.acpi_errors += [line]
+        elif re.search("GPIO.*is active", line):
+            self.active_gpios += re.findall(
+                r"\d+", re.search("GPIO.*is active", line).group()
+            )
 
     def analyze_kernel_log(self):
         self.total_sleep = 0
@@ -580,6 +585,7 @@ class S0i3Validator:
         self.wakeup_irqs = []
         self.idle_masks = []
         self.acpi_errors = []
+        self.active_gpios = []
         if self.offline:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
@@ -607,6 +613,8 @@ class S0i3Validator:
                 "○ Hardware sleep cycle count: {count}".format(count=self.cycle_count),
                 colors.OK,
             )
+        if self.active_gpios:
+            self.log("○ GPIOs active: %s" % self.active_gpios, colors.OK)
         if self.wakeup_irqs:
             self.log("○ Wakeups triggered from IRQs: %s" % self.wakeup_irqs, colors.OK)
         if self.idle_masks:
