@@ -123,6 +123,26 @@ class AcpiNvmeStorageD3Enable(S0i3Failure):
         self.url = "https://bugzilla.kernel.org/show_bug.cgi?id=216440"
 
 
+class DevSlpHostIssue(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "AHCI controller doesn't support DevSlp"
+        self.explanation = (
+            "\tThe AHCI controller is not configured to support DevSlp.\n"
+            "\tThis must be enabled in BIOS for s2idle in Linux.\n"
+        )
+
+
+class DevSlpDiskIssue(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "SATA disk doesn't support DevSlp"
+        self.explanation = (
+            "\tThe SATA disk does not support DevSlp.\n"
+            "\ts2idle in Linux requires SATA disks that support this feature.\n"
+        )
+
+
 class SleepModeWrong(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -136,6 +156,14 @@ class SleepModeWrong(S0i3Failure):
             "\tIf the BIOS is configured for S3 and you manually select s2idle\n"
             "\tin /sys/power/mem_sleep, the system will not enter the deepest hardware state."
         )
+
+
+def _check_ahci_devslp(line):
+    return "sds" in line and "sadm" in line
+
+
+def _check_ata_devslp(line):
+    return "Features" in line and "Dev-Sleep" in line
 
 
 class S0i3Validator:
@@ -291,30 +319,93 @@ class S0i3Validator:
         self.log("✅ System is configured for s2idle", colors.OK)
         return True
 
-    def check_nvme(self):
-        found = False
+    def check_storage(self):
+        has_nvme = False
+        has_sata = False
+        valid_nvme = False
+        valid_sata = False
+        valid_ahci = False
+
         if self.offline:
             for line in self.offline:
-                if headers.NvmeSimpleSuspend in line:
-                    found = True
+                if "nvme0" in line:
+                    has_nvme = True
+                if "SATA link up" in line:
+                    has_sata = True
+                if has_nvme and headers.NvmeSimpleSuspend in line:
+                    valid_nvme = True
+                if has_sata and _check_ahci_devslp(line):
+                    valid_ahci = True
+                if has_sata and _check_ata_devslp(line):
+                    valid_sata = True
                 # re-entrant; don't re-run
                 if "✅ NVME" in line:
-                    return
-        else:
-            for entry in self.journal:
-                if not "nvme" in entry["MESSAGE"]:
-                    continue
-                if headers.NvmeSimpleSuspend in entry["MESSAGE"]:
-                    found = True
+                    return True
+                if "✅ AHCI" in line:
+                    return True
+                if "✅ SATA" in line:
+                    return True
 
-        if found:
-            message = "✅ NVME is configured for s2idle in BIOS"
-            self.log(message, colors.OK)
         else:
-            message = "❌ NVME is not configured for s2idle in BIOS"
-            self.log(message, colors.FAIL)
-            self.failures += [AcpiNvmeStorageD3Enable()]
-        return found
+            for device in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
+                has_nvme = True
+                break
+            for device in self.pyudev.list_devices(subsystem="ata", DRIVER="nvme"):
+                has_sata = True
+                break
+
+            if has_nvme:
+                for entry in self.journal:
+                    if not "nvme" in entry["MESSAGE"]:
+                        continue
+                    if headers.NvmeSimpleSuspend in entry["MESSAGE"]:
+                        valid_nvme = True
+                        break
+            if has_sata:
+                # Test AHCI
+                for entry in self.journal:
+                    if not "ahci" in entry["MESSAGE"]:
+                        continue
+                    if not "flags" in entry["MESSAGE"]:
+                        continue
+                    if _check_ahci_devslp(entry["MESSAGE"]):
+                        valid_ahci = True
+                        break
+                # Test SATA
+                for entry in self.journal:
+                    if not "ata" in entry["MESSAGE"]:
+                        continue
+                    if _check_ata_devslp(entry["MESSAGE"]):
+                        valid_sata = True
+                        break
+        if has_nvme:
+            if valid_nvme:
+                message = "✅ NVME is configured for s2idle in BIOS"
+                self.log(message, colors.OK)
+            else:
+                message = "❌ NVME is not configured for s2idle in BIOS"
+                self.log(message, colors.FAIL)
+                self.failures += [AcpiNvmeStorageD3Enable()]
+        if has_sata:
+            if valid_sata:
+                message = "✅ SATA supports DevSlp feature"
+            else:
+                message = "❌ SATA does not support DevSlp feature"
+                self.log(message, colors.FAIL)
+                self.failures += [DevSlpDiskIssue()]
+
+            if valid_ahci:
+                message = "✅ AHCI is configured for DevSlp in BIOS"
+            else:
+                message = "❌ AHCI is not configured for DevSlp in BIOS"
+                self.log(message, colors.FAIL)
+                self.failures += [DevSlpHostIssue()]
+
+        return (
+            (valid_nvme or not has_nvme)
+            and (valid_sata or not has_sata)
+            and (valid_ahci or not has_sata)
+        )
 
     def check_amd_pmc(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_pmc"):
@@ -420,7 +511,7 @@ class S0i3Validator:
             self.check_amd_pmc,
             self.check_amdgpu,
             self.check_sleep_mode,
-            self.check_nvme,
+            self.check_storage,
             self.check_pinctrl_amd,
         ]
         result = True
@@ -616,7 +707,7 @@ class S0i3Validator:
             self.offline = r.readlines()
         checks = [
             self.replay_checks,
-            self.check_nvme,
+            self.check_storage,
             self.check_fadt,
             self.analyze_kernel_log,
             self.check_hw_sleep,
