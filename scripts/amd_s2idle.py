@@ -8,7 +8,6 @@ import platform
 import subprocess
 import sys
 from datetime import datetime
-from systemd import journal
 
 
 class colors:
@@ -176,11 +175,16 @@ class S0i3Validator:
             self.pyudev = Context()
 
         # for analyzing systemd's journal
-        self.journal = journal.Reader()
-        self.journal.this_boot()
-        self.journal.log_level(journal.LOG_INFO)
-        self.journal.add_match(_TRANSPORT="kernel")
-        self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
+        try:
+            from systemd import journal
+
+            self.journal = journal.Reader()
+            self.journal.this_boot()
+            self.journal.log_level(journal.LOG_INFO)
+            self.journal.add_match(_TRANSPORT="kernel")
+            self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
+        except ImportError:
+            self.journal = False
 
         # we only want kernel messages from our triggered suspend
         self.last_suspend = datetime.now()
@@ -232,6 +236,14 @@ class S0i3Validator:
         self.log(
             "○ Kernel {version}".format(version=platform.uname().release), colors.OK
         )
+        return True
+
+    def check_systemd(self):
+        if not self.journal:
+            self.log(
+                "❌ systemd daemon or systemd python module is missing", colors.FAIL
+            )
+            sys.exit(1)
         return True
 
     def check_cpu_vendor(self):
@@ -401,6 +413,7 @@ class S0i3Validator:
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
             self.check_system_vendor,
+            self.check_systemd,
             self.check_cpu_vendor,
             self.check_fadt,
             self.check_kernel_version,
