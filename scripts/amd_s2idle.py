@@ -521,6 +521,9 @@ class S0i3Validator:
         if not self.iasl:
             self.log(headers.MissingIasl, colors.WARNING)
             return True
+        if os.geteuid() != 0:
+            logging.debug("Unable to capture ACPI tables without root")
+            return True
         base = os.path.join("/", "sys", "firmware", "acpi", "tables")
         for root, dirs, files in os.walk(base, topdown=False):
             for fname in files:
