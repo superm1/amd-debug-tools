@@ -6,8 +6,10 @@ import logging
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 
 
@@ -29,6 +31,7 @@ class headers:
     RootError = "Run as root to test suspend"
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
+    MissingIasl = "ACPI extraction tool iasl is missing"
 
 
 def read_file(fn):
@@ -178,6 +181,14 @@ class S0i3Validator:
         print_color(message, color)
 
     def __init__(self, log):
+        # for saving a log file for analysis
+        logging.basicConfig(
+            format="%(asctime)s %(levelname)s:\t%(message)s",
+            filename=log,
+            filemode="w",
+            level=logging.DEBUG,
+        )
+
         # for analyzing devices
         try:
             import distro
@@ -203,6 +214,16 @@ class S0i3Validator:
 
             self.pyudev = Context()
 
+        try:
+            self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
+        except:
+            if self.distro == "ubuntu" or self.distro == "debian":
+                installer = ["apt", "install", "acpica-tools"]
+                self.log("%s: attempting to install" % headers.MissingIasl, colors.OK)
+            if installer:
+                subprocess.check_call(installer)
+            self.iasl = False
+
         # for analyzing systemd's journal
         try:
             from systemd import journal
@@ -217,14 +238,6 @@ class S0i3Validator:
 
         # we only want kernel messages from our triggered suspend
         self.last_suspend = datetime.now()
-
-        # for saving a log file for analysis
-        logging.basicConfig(
-            format="%(asctime)s %(levelname)s:\t%(message)s",
-            filename=log,
-            filemode="w",
-            level=logging.DEBUG,
-        )
 
         # failure reasons to display at the end
         self.failures = []
@@ -504,6 +517,38 @@ class S0i3Validator:
             self.log("○ Did not reach hardware sleep state", colors.FAIL)
         return result
 
+    def capture_acpi(self):
+        if not self.iasl:
+            self.log(headers.MissingIasl, colors.WARNING)
+            return True
+        base = os.path.join("/", "sys", "firmware", "acpi", "tables")
+        for root, dirs, files in os.walk(base, topdown=False):
+            for fname in files:
+                if not "DSDT" in fname and not "SSDT" in fname:
+                    continue
+                target = os.path.join(root, fname)
+                # If later decide to only get table that includes _AEI
+                # with open(target, "rb") as f:
+                #     s = f.read()
+                #     if s.find(b"_AEI") >= 0:
+                #         match = True
+                try:
+                    d = tempfile.mkdtemp()
+                    prefix = os.path.join(d, "acpi")
+                    subprocess.check_call(
+                        ["iasl", "-p", prefix, "-d", target],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    with open("%s.dsl" % prefix, "r") as f:
+                        for line in f.readlines():
+                            logging.debug(line.rstrip())
+                except subprocess.CalledProcessError as e:
+                    self.log("Failed to capture ACPI table: %s" % e.output)
+                finally:
+                    shutil.rmtree(d)
+        return True
+
     def prerequisites(self):
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
@@ -517,6 +562,7 @@ class S0i3Validator:
             self.check_sleep_mode,
             self.check_storage,
             self.check_pinctrl_amd,
+            self.capture_acpi,
         ]
         result = True
         for check in checks:
