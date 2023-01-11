@@ -544,7 +544,7 @@ class S0i3Validator:
                         for line in f.readlines():
                             logging.debug(line.rstrip())
                 except subprocess.CalledProcessError as e:
-                    self.log("Failed to capture ACPI table: %s" % e.output)
+                    self.log("Failed to capture ACPI table: %s" % e.output, colors.FAIL)
                 finally:
                     shutil.rmtree(d)
         return True
