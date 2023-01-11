@@ -288,21 +288,24 @@ class S0i3Validator:
 
     def check_system_vendor(self):
         p = os.path.join("/", "sys", "class", "dmi", "id")
-        vendor = read_file(os.path.join(p, "sys_vendor"))
-        product = read_file(os.path.join(p, "product_name"))
-        family = read_file(os.path.join(p, "product_family"))
-        version = read_file(os.path.join(p, "bios_release"))
-        date = read_file(os.path.join(p, "bios_date"))
-        self.log(
-            "○ {vendor} {product} ({family}) running BIOS {version} released {date}".format(
-                vendor=vendor,
-                product=product,
-                family=family,
-                version=version,
-                date=date,
-            ),
-            colors.OK,
-        )
+        try:
+            vendor = read_file(os.path.join(p, "sys_vendor"))
+            product = read_file(os.path.join(p, "product_name"))
+            family = read_file(os.path.join(p, "product_family"))
+            version = read_file(os.path.join(p, "bios_release"))
+            date = read_file(os.path.join(p, "bios_date"))
+            self.log(
+                "○ {vendor} {product} ({family}) running BIOS {version} released {date}".format(
+                    vendor=vendor,
+                    product=product,
+                    family=family,
+                    version=version,
+                    date=date,
+                ),
+                colors.OK,
+            )
+        except FileNotFoundError:
+            pass
         return True
 
     def check_sleep_mode(self):
