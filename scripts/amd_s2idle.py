@@ -348,7 +348,7 @@ class S0i3Validator:
 
         if self.offline:
             for line in self.offline:
-                if "nvme0" in line:
+                if "nvme" in line:
                     has_nvme = True
                 if "SATA link up" in line:
                     has_sata = True
@@ -370,7 +370,7 @@ class S0i3Validator:
             for device in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
                 has_nvme = True
                 break
-            for device in self.pyudev.list_devices(subsystem="ata", DRIVER="nvme"):
+            for device in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
                 has_sata = True
                 break
 
