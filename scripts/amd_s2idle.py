@@ -367,6 +367,11 @@ class S0i3Validator:
                     return True
 
         else:
+            if not self.journal:
+                message = "Unable to test storage without systemd"
+                self.log(message, colors.WARNING)
+                return True
+
             for device in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
                 has_nvme = True
                 break
@@ -644,11 +649,16 @@ class S0i3Validator:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
         else:
-            self.journal.seek_realtime(self.last_suspend)
-            for entry in self.journal:
-                line = entry["MESSAGE"]
-                self._analyze_kernel_log_line(line)
-                logging.debug(line)
+            if self.journal:
+                self.journal.seek_realtime(self.last_suspend)
+                for entry in self.journal:
+                    self._analyze_kernel_log_line(entry["MESSAGE"])
+                    logging.debug(entry["MESSAGE"])
+            else:
+                message = "Unable to analyze kernel log without systemd"
+                self.log(message, colors.WARNING)
+                return
+
         if self.total_sleep:
             self.log(
                 "○ Kernel suspended for total of {:2.4f} seconds".format(
