@@ -597,6 +597,28 @@ class S0i3Validator:
                     shutil.rmtree(d)
         return True
 
+    def capture_disabled_pins(self):
+        base = os.path.join("/", "sys", "module", "gpiolib_acpi", "parameters")
+        for parameter in ["ignore_wake", "ignore_interrupt"]:
+            f = os.path.join(base, parameter)
+            if not os.path.exists(f):
+                continue
+            with open(f, "r") as r:
+                d = r.read().rstrip()
+                if d == "(null)":
+                    logging.debug("%s is not configured" % (f))
+                else:
+                    logging.debug("%s is configured to %s" % (f, d))
+        if not self.journal:
+            message = "Unable to validate disabled pins without systemd"
+            self.log(message, colors.WARNING)
+            return True
+        self.journal.seek_head()
+        for entry in self.journal:
+            if re.search("Ignoring.* on pin", entry["MESSAGE"]):
+                self.log("○ %s" % entry["MESSAGE"], colors.OK)
+        return True
+
     def prerequisites(self):
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
@@ -605,6 +627,7 @@ class S0i3Validator:
             self.check_cpu_vendor,
             self.check_fadt,
             self.check_kernel_version,
+            self.capture_disabled_pins,
             self.check_amd_pmc,
             self.check_amdgpu,
             self.check_sleep_mode,
