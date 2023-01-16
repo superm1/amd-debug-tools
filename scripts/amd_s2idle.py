@@ -162,6 +162,22 @@ class SleepModeWrong(S0i3Failure):
         )
 
 
+class FadtWrong(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = (
+            "The kernel didn't emit a message that low power idle was supported"
+        )
+        self.explanation = (
+            "\tLow power idle is a bit documented in the FADT to indicate that\n"
+            "\tlow power idle is supported.\n"
+            "\tOnly newer kernels support emitting this message, so if you run on\n"
+            "\tan older kernel you may get a false negative.\n"
+            "\tWhen launched as root this script will try to directly introspect the\n"
+            "\tACPI tables to confirm this."
+        )
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -273,12 +289,23 @@ class S0i3Validator:
                 ):
                     found = True
                     break
+        # try to look at FACP directly if not found (older kernel compat)
+        if not found:
+            if os.geteuid() == 0:
+                import struct
+
+                logging.debug("Fetching low power idle bit directly from FADT")
+                target = os.path.join("/", "sys", "firmware", "acpi", "tables", "FACP")
+                with open(target, "rb") as r:
+                    r.seek(0x70)
+                    found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
         if found:
             message = "✅ ACPI FADT supports Low-power S0 idle"
             self.log(message, colors.OK)
         else:
             message = "❌ ACPI FADT doesn't support Low-power S0 idle"
             self.log(message, colors.FAIL)
+            self.failures += [FadtWrong()]
         return found
 
     def check_kernel_version(self):
