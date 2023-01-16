@@ -261,6 +261,11 @@ class S0i3Validator:
                 if "✅ ACPI FADT supports Low-power S0 idle" in line:
                     return
         else:
+            if not self.journal:
+                message = "Unable to test storage without systemd"
+                self.log(message, colors.WARNING)
+                return True
+            self.journal.seek_head()
             for entry in self.journal:
                 if (
                     "Low-power S0 idle used by default for system suspend"
@@ -380,6 +385,7 @@ class S0i3Validator:
                 break
 
             if has_nvme:
+                self.journal.seek_head()
                 for entry in self.journal:
                     if not "nvme" in entry["MESSAGE"]:
                         continue
@@ -388,6 +394,7 @@ class S0i3Validator:
                         break
             if has_sata:
                 # Test AHCI
+                self.journal.seek_head()
                 for entry in self.journal:
                     if not "ahci" in entry["MESSAGE"]:
                         continue
@@ -397,6 +404,7 @@ class S0i3Validator:
                         valid_ahci = True
                         break
                 # Test SATA
+                self.journal.seek_head()
                 for entry in self.journal:
                     if not "ata" in entry["MESSAGE"]:
                         continue
