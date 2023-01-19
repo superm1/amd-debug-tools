@@ -236,9 +236,12 @@ class S0i3Validator:
         try:
             self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
         except:
+            installer = False
             if self.distro == "ubuntu" or self.distro == "debian":
                 installer = ["apt", "install", "acpica-tools"]
                 self.log("%s: attempting to install" % headers.MissingIasl, colors.OK)
+            elif self.distro == "fedora":
+                installer = ["dnf", "install", "-y", "/usr/bin/iasl"]
             if installer:
                 subprocess.check_call(installer)
             self.iasl = False
