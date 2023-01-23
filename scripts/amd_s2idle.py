@@ -622,6 +622,16 @@ class S0i3Validator:
                 self.log("○ %s" % entry["MESSAGE"], colors.OK)
         return True
 
+    def capture_full_dmesg(self):
+        if not self.journal:
+            message = "Unable to analyze kernel log without systemd"
+            self.log(message, colors.WARNING)
+            return
+
+        self.journal.seek_head()
+        for entry in self.journal:
+            logging.debug(entry["MESSAGE"])
+
     def prerequisites(self):
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
@@ -644,6 +654,7 @@ class S0i3Validator:
                 result = False
         if not result:
             self.log(headers.BrokenPrerequisites, colors.UNDERLINE)
+            self.capture_full_dmesg()
         return result
 
     def toggle_debugging(self, enable):
