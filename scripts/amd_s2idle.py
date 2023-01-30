@@ -267,6 +267,9 @@ class S0i3Validator:
         # for analyzing offline reports
         self.offline = None
 
+        # for comparing GPEs before/after sleep
+        self.gpes = {}
+
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
         """Check the kernel emitted a message specific to 6.0 or later indicating FADT had a bit set."""
@@ -508,6 +511,26 @@ class S0i3Validator:
         self.log("❌ GPU driver `amdgpu` not loaded", colors.FAIL)
         self.failures += [MissingAmdgpu()]
         return False
+
+    def capture_gpes(self):
+        base = os.path.join("/", "sys", "firmware", "acpi", "interrupts")
+        for root, dirs, files in os.walk(base, topdown=False):
+            for fname in files:
+                if not fname.startswith("gpe"):
+                    continue
+                target = os.path.join(root, fname)
+                val = 0
+                with open(target, "r") as r:
+                    val = int(r.read().split()[0])
+                if fname not in self.gpes:
+                    self.gpes[fname] = val
+                elif self.gpes[fname] != val:
+                    self.log(
+                        "○ %s increased from %d to %d" % (fname, self.gpes[fname], val),
+                        colors.OK,
+                    )
+                else:
+                    logging.debug("%s did not change (%d)" % (fname, val))
 
     def check_wakeup_irq(self):
         p = os.path.join("/", "sys", "power", "pm_wakeup_irq")
@@ -787,6 +810,7 @@ class S0i3Validator:
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.check_hw_sleep,
+            self.capture_gpes,
         ]
         for check in checks:
             check()
@@ -802,6 +826,7 @@ class S0i3Validator:
         for device in self.pyudev.list_devices(subsystem="rtc"):
             wakealarm = os.path.join(device.sys_path, "wakealarm")
         self.toggle_debugging(True)
+        self.capture_gpes()
 
         for i in range(0, count):
             if count > 1:
