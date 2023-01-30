@@ -199,6 +199,22 @@ class Irq1Workaround(S0i3Failure):
         self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/platform/x86/amd/pmc.c?id=8e60615e8932167057b363c11a7835da7f007106"
 
 
+class KernelLockdown(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "Kernel lockdown engaged"
+        self.explanation = (
+            "\tKernel lockdown is a security feature that makes sure that processes can't tamper\n"
+            "\twith the security state of the kernel.\n"
+            "\tThis is generally a good security feature, but it will prevent the capture of some.\n"
+            "\tdebugging information\n"
+            "\n"
+            "\tPlease disable it and re-run this script for a more accurate report.\n"
+            "\tIf you didn't manually enable it, some Linux distributions enable it when UEFI secure\n"
+            "\tboot has been enabled. So you may want to manually disable it to capture debugging data.\n"
+        )
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -745,19 +761,34 @@ class S0i3Validator:
             self.capture_full_dmesg()
         return result
 
+    def check_lockdown(self):
+        fn = os.path.join("/", "sys", "kernel", "security", "lockdown")
+        lockdown = read_file(fn)
+        logging.debug("Lockdown: %s" % lockdown)
+        if lockdown.split()[0] != "[none]":
+            self.log(
+                "❌ Kernel lockdown is engaged, this script will have limited debugging",
+                colors.WARNING,
+            )
+            self.failures += [KernelLockdown()]
+
     def toggle_debugging(self, enable):
         fn = os.path.join("/", "sys", "power", "pm_debug_messages")
         setting = "1" if enable else "0"
         with open(fn, "w") as w:
             w.write(setting)
-        fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
-        setting = "+" if enable else "-"
-        with open(fn, "w") as w:
-            w.write("file drivers/acpi/x86/s2idle.c %sp" % setting)
-        with open(fn, "w") as w:
-            w.write("file drivers/pinctrl/pinctrl-amd.c %sp" % setting)
-        with open(fn, "w") as w:
-            w.write("file drivers/platform/x86/amd/pmc.c %sp" % setting)
+        try:
+            fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
+            setting = "+" if enable else "-"
+            with open(fn, "w") as w:
+                w.write("file drivers/acpi/x86/s2idle.c %sp" % setting)
+            with open(fn, "w") as w:
+                w.write("file drivers/pinctrl/pinctrl-amd.c %sp" % setting)
+            with open(fn, "w") as w:
+                w.write("file drivers/platform/x86/amd/pmc.c %sp" % setting)
+        except PermissionError:
+            # caught by lockdown test
+            pass
 
     def _analyze_kernel_log_line(self, line):
         if "Timekeeping suspended for" in line:
@@ -896,6 +927,7 @@ class S0i3Validator:
             self.check_wakeup_irq,
             self.check_hw_sleep,
             self.capture_gpes,
+            self.check_lockdown,
         ]
         for check in checks:
             check()
