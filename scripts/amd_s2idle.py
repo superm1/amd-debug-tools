@@ -32,6 +32,7 @@ class headers:
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
     MissingIasl = "ACPI extraction tool iasl is missing"
+    Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
 
 
 def read_file(fn):
@@ -178,6 +179,26 @@ class FadtWrong(S0i3Failure):
         )
 
 
+class Irq1Workaround(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "The wakeup showed an IRQ1 wakeup source, which might be a platform firmware bug"
+        self.explanation = (
+            "\tA number of Renoir, Lucienne, Cezanne, & Barcelo platforms have a platform firmware\n"
+            "\tbug where IRQ1 is triggered during s0i3 resume.\n"
+            "\tYou may have tripped up on this bug as IRQ1 was active during resume.\n"
+            "\tIf you didn't press a keyboard key to wakeup the system then this can be\n"
+            "\tthe cause of spurious wakeups.\n"
+            "\n"
+            "\tTo fix it, first try to upgrade to the latest firmware from your manufacturer.\n"
+            "\tIf you're already upgraded to the latest firmware you can use one of two workarounds:\n"
+            "\t 1. Manually disable wakeups from IRQ1 by running this command each boot:\n"
+            "\t\t echo 'disabled' | sudo tee /sys/bus/serio/devices/serio0/power/wakeup \n"
+            "\t 2. Use the below linked patch in your kernel."
+        )
+        self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/platform/x86/amd/pmc.c?id=8e60615e8932167057b363c11a7835da7f007106"
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -258,6 +279,30 @@ class S0i3Validator:
         except ImportError:
             self.journal = False
 
+        # for comparing SMU version
+        try:
+            from packaging import version
+        except ImportError:
+            self.log("packaging is missing, attempting to install", colors.FAIL)
+            if self.distro == "ubuntu" or self.distro == "debian":
+                installer = ["apt", "install", "python3-setuptools"]
+            else:
+                installer = [
+                    "python3",
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "setuptools",
+                ]
+            from packaging import version
+
+        self.cpu_family = ""
+        self.cpu_model = ""
+        self.cpu_model_string = ""
+        self.smu_version = ""
+        self.smu_program = ""
+
         # we only want kernel messages from our triggered suspend
         self.last_suspend = datetime.now()
 
@@ -331,15 +376,35 @@ class S0i3Validator:
 
     def check_cpu_vendor(self):
         p = os.path.join("/", "proc", "cpuinfo")
+        valid = False
         cpu = read_file(p)
-        if "AuthenticAMD" in cpu:
-            self.log("✅ Supported CPU vendor", colors.OK)
-            return True
-        self.failures += [VendorWrong()]
-        self.log(
-            "❌ This tool is not designed for parts from this CPU vendor", colors.FAIL
-        )
-        return False
+        for line in cpu.split("\n"):
+            if "AuthenticAMD" in line:
+                valid = True
+                continue
+            elif "cpu family" in line:
+                self.cpu_family = int(line.split()[-1])
+                continue
+            elif "model name" in line:
+                self.cpu_model_string = line.split(":")[-1].strip()
+                continue
+            elif "model" in line:
+                self.cpu_model = int(line.split()[-1])
+                continue
+            if self.cpu_family and self.cpu_model and self.cpu_model_string:
+                self.log(
+                    "✅ %s (family %x model %x)"
+                    % (self.cpu_model_string, self.cpu_family, self.cpu_model),
+                    colors.OK,
+                )
+                break
+        if not valid:
+            self.failures += [VendorWrong()]
+            self.log(
+                "❌ This tool is not designed for parts from this CPU vendor",
+                colors.FAIL,
+            )
+        return valid
 
     def check_system_vendor(self):
         p = os.path.join("/", "sys", "class", "dmi", "id")
@@ -479,10 +544,10 @@ class S0i3Validator:
             p = os.path.join(device.sys_path, "smu_program")
             v = os.path.join(device.sys_path, "smu_fw_version")
             if os.path.exists(v):
-                smu_version = read_file(v)
-                smu_program = read_file(p)
+                self.smu_version = read_file(v)
+                self.smu_program = read_file(p)
                 message += " (Program {program} Firmware {version})".format(
-                    program=smu_program, version=smu_version
+                    program=self.smu_program, version=self.smu_version
                 )
             self.log(message, colors.OK)
             return True
@@ -728,6 +793,19 @@ class S0i3Validator:
             self.active_gpios += re.findall(
                 r"\d+", re.search("GPIO.*is active", line).group()
             )
+        elif headers.Irq1Workaround in line:
+            self.irq1_workaround = True
+
+    def cpu_needs_irq1_wa(self):
+        from packaging import version
+
+        if self.cpu_family == 0x17:
+            if self.cpu_model == 0x68 or self.cpu_model == 0x60:
+                return True
+        elif self.cpu_family == 0x19:
+            if self.cpu_model == 0x50:
+                return version.parse(self.smu_version) < version.parse("64.66.0")
+        return False
 
     def analyze_kernel_log(self):
         self.total_sleep = 0
@@ -740,6 +818,7 @@ class S0i3Validator:
         self.idle_masks = []
         self.acpi_errors = []
         self.active_gpios = []
+        self.irq1_workaround = False
         if self.offline:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
@@ -776,6 +855,12 @@ class S0i3Validator:
             self.log("○ GPIOs active: %s" % self.active_gpios, colors.OK)
         if self.wakeup_irqs:
             self.log("○ Wakeups triggered from IRQs: %s" % self.wakeup_irqs, colors.OK)
+            if 1 in self.wakeup_irqs and self.cpu_needs_irq1_wa():
+                if self.irq1_workaround:
+                    self.log("○ Kernel workaround for IRQ1 issue utilized")
+                else:
+                    self.log("○ IRQ1 found during wakeup", colors.WARNING)
+                    self.failures += [Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
             for i in range(0, len(self.idle_masks)):
