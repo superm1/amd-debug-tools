@@ -215,6 +215,26 @@ class KernelLockdown(S0i3Failure):
         )
 
 
+class uPepMissing(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "LPS0 _DSM might not have been executed"
+        self.explanation = (
+            "\tThe Linux kernel will execute an ACPI callback during s2idle entry.\n"
+            "\tThis callback is typically used to notify the Embedded Controller (EC) on the system.\n"
+            "\tDepending upon the OEM implementation these requests may have been populated behind.\n"
+            "\tan 'AMD' GUID or an 'Microsoft' GUID. This script turns on extra dynamic debugging.\n"
+            "\tmessages to determine which path was used.\n"
+            "\n"
+            "\tIf no message was detected this might not mean there is a problem, it just means this\n"
+            "\tscript couldn't confirm it.  These are some of the possible causes:\n"
+            "\t * It has been intentionally turned off on the kernel command line by a user.\n"
+            "\t * The BIOS is missing support for it.\n"
+            "\t * Kernel lockdown is engaged.\n"
+            "\t * Dynamic debugging couldn't be used to turn on the messages.\n"
+        )
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -649,7 +669,7 @@ class S0i3Validator:
                             result = True
                         continue
                     if "Time (in us) in S0i3" in line:
-                        n = int(line.split(":")[1]) / 10 ** 6
+                        n = int(line.split(":")[1]) / 10**6
             except PermissionError:
                 self.log("Run as root to gather more data", colors.WARNING)
                 return False
@@ -809,7 +829,7 @@ class S0i3Validator:
                 if not f.endswith("us"):
                     continue
                 try:
-                    self.hw_sleep += float(f.strip("us")) / 10 ** 6
+                    self.hw_sleep += float(f.strip("us")) / 10**6
                 except ValueError:
                     pass
         elif "Triggering wakeup from IRQ" in line:
@@ -910,11 +930,12 @@ class S0i3Validator:
                         )
         if self.upep:
             if self.upep_microsoft:
-                self.log("○ Used Microsoft uPEP GUID", colors.OK)
+                self.log("○ Used Microsoft uPEP GUID in LPS0 _DSM", colors.OK)
             else:
-                self.log("○ Used AMD uPEP GUID", colors.OK)
+                self.log("○ Used AMD uPEP GUID in LPS0 _DSM", colors.OK)
         else:
-            self.log("❌ uPEP GUID not executed", colors.FAIL)
+            self.log("❌ LPS0 _DSM not executed", colors.FAIL)
+            self.failures += [uPepMissing()]
         if self.acpi_errors:
             self.log("❌ ACPI BIOS errors found", colors.FAIL)
             self.failures += [AcpiBiosError(self.acpi_errors)]
