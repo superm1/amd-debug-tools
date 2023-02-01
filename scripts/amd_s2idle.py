@@ -235,6 +235,31 @@ class uPepMissing(S0i3Failure):
         )
 
 
+class WCN6855Bug(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "The firmware loaded for the WCN6855 causes spurious wakeups"
+        self.explanation = (
+            "\tDuring s2idle on AMD systems PCIe devices are put into D3cold. During wakeup they're transitioned back\n"
+            "\tinto the state they were before s2idle.  For many implementations this is D3hot.\n"
+            "\tIf an ACPI event has been triggered by the EC, the hardware will resume from s2idle,\n"
+            "\tbut the kernel should process the event and then put it back into s2idle.\n"
+            "\n"
+            "\tWhen this bug occurs, a GPIO connected to the WLAN card is active on the system making\n"
+            "\the GPIO controller IRQ also active.  The kernel sees that the ACPI event IRQ and GPIO\n"
+            "\tcontroller IRQ are both active and resumes the system.\n"
+            "\n"
+            "\tSome non-exhaustive events that will trigger this behavior:\n"
+            "\t * Suspending the system and then closing the lid.\n"
+            "\t * Suspending the system and then unplugging the AC adapter.\n"
+            "\t * Suspending the system and the EC notifying the OS of a battery level change.\n"
+            "\n"
+            "\tThis issue is fixed by updated WCN6855 firmware which will avoid triggering the GPIO.\n"
+            "\tThe version string containing the fix is 'WLAN.HSP.1.1-03125-QCAHSPSWPL_V1_V2_SILICONZ_LITE-3.6510.23'\n"
+        )
+        self.url = "https://github.com/kvalo/ath11k-firmware/commit/67afd982bbd50e18b665d569a2c3dd87f5746839"
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -350,6 +375,9 @@ class S0i3Validator:
 
         # for comparing GPEs before/after sleep
         self.gpes = {}
+
+        # for checking for WCN6855 F/W bug
+        self.wcn6855 = None
 
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
@@ -613,6 +641,54 @@ class S0i3Validator:
         self.failures += [MissingAmdgpu()]
         return False
 
+    def _process_ath11k_line(self, line) -> bool:
+        if "wcn6855" in line:
+            self.wcn6855 = True
+            return False
+        if self.wcn6855 and re.search("ath11k_pci.*fw_version", line):
+            logging.debug("WCN6855 version string: %s", line)
+            objects = line.split()
+            if objects[2] == "fw_version":
+                self.wcn6855 = int(objects[3], 16)
+                return True
+        return False
+
+    def check_wcn6855_bug(self):
+        if self.offline:
+            for line in self.offline:
+                if "ath11k_pci" in line:
+                    if self._process_ath11k_line(line):
+                        break
+        else:
+            if not self.journal:
+                message = "Unable to test for wcn6855 bug without systemd"
+                self.log(message, colors.WARNING)
+                return True
+
+            self.journal.seek_head()
+            for entry in self.journal:
+                if "ath11k_pci" in entry["MESSAGE"]:
+                    if self._process_ath11k_line(entry["MESSAGE"]):
+                        break
+        if self.wcn6855:
+            if self.wcn6855 >= 0x110B196E:
+                self.log(
+                    "✅ WCN6855 WLAN (fw version {version})".format(
+                        version=hex(self.wcn6855)
+                    ),
+                    colors.OK,
+                )
+            else:
+                self.log(
+                    "❌ WCN6855 WLAN may cause spurious wakeups (fw version {version})".format(
+                        version=hex(self.wcn6855)
+                    ),
+                    colors.FAIL,
+                )
+                self.failures += [WCN6855Bug()]
+
+        return True
+
     def capture_gpes(self):
         base = os.path.join("/", "sys", "firmware", "acpi", "interrupts")
         for root, dirs, files in os.walk(base, topdown=False):
@@ -771,6 +847,7 @@ class S0i3Validator:
             self.check_sleep_mode,
             self.check_storage,
             self.check_pinctrl_amd,
+            self.check_wcn6855_bug,
             self.capture_acpi,
         ]
         result = True
@@ -1056,6 +1133,7 @@ class S0i3Validator:
             self.analyze_kernel_log,
             self.check_hw_sleep,
             self.analyze_masks,
+            self.check_wcn6855_bug,
         ]
         for check in checks:
             check()
