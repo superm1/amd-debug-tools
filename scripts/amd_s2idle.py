@@ -940,6 +940,16 @@ class S0i3Validator:
             self.log("❌ ACPI BIOS errors found", colors.FAIL)
             self.failures += [AcpiBiosError(self.acpi_errors)]
 
+    def analyze_masks(self):
+        try:
+            from common import add_model_checks
+
+            func = add_model_checks(self.cpu_model, self.cpu_family)
+            for mask in self.idle_masks:
+                func(mask)
+        except ImportError:
+            pass
+
     def analyze_results(self):
         self.log(headers.LastCycleResults, colors.HEADER)
         result = True
@@ -1011,6 +1021,10 @@ class S0i3Validator:
                 or headers.LastCycleResults in line
             ):
                 self.log(line, colors.HEADER)
+            if re.search(".*(family.* model.*)", line):
+                nums = re.findall(r"\d+", line)
+                self.cpu_model = int(nums[-1], 16)
+                self.cpu_family = int(nums[-2], 16)
 
     def check_offline(self, input):
         with open(input, "r") as r:
@@ -1021,6 +1035,7 @@ class S0i3Validator:
             self.check_fadt,
             self.analyze_kernel_log,
             self.check_hw_sleep,
+            self.analyze_masks,
         ]
         for check in checks:
             check()
