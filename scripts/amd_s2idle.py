@@ -766,6 +766,7 @@ class S0i3Validator:
             self.check_kernel_version,
             self.capture_disabled_pins,
             self.check_amd_pmc,
+            self.cpu_offers_hpet_wa,
             self.check_amdgpu,
             self.check_sleep_mode,
             self.check_storage,
@@ -846,6 +847,25 @@ class S0i3Validator:
             )
         elif headers.Irq1Workaround in line:
             self.irq1_workaround = True
+
+    def cpu_offers_hpet_wa(self):
+        from packaging import version
+
+        show_warning = False
+        if self.cpu_family == 0x17:
+            if self.cpu_model == 0x68 or self.cpu_model == 0x60:
+                show_warning = True
+        elif self.cpu_family == 0x19:
+            if self.cpu_model == 0x50:
+                show_warning = version.parse(self.smu_version) < version.parse(
+                    "64.53.0"
+                )
+        if show_warning:
+            self.log(
+                "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
+                colors.WARNING,
+            )
+        return True
 
     def cpu_needs_irq1_wa(self):
         from packaging import version
