@@ -346,7 +346,7 @@ class S0i3Validator:
         except ImportError:
             self.log("packaging is missing, attempting to install", colors.FAIL)
             if self.distro == "ubuntu" or self.distro == "debian":
-                installer = ["apt", "install", "python3-setuptools"]
+                installer = ["apt", "install", "python3-packaging"]
             else:
                 installer = [
                     "python3",
