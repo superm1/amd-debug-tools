@@ -379,6 +379,9 @@ class S0i3Validator:
         # for checking for WCN6855 F/W bug
         self.wcn6855 = None
 
+        # for monitoring battery levels across suspend
+        self.energy = {}
+
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
         """Check the kernel emitted a message specific to 6.0 or later indicating FADT had a bit set."""
@@ -436,6 +439,51 @@ class S0i3Validator:
                 "❌ systemd daemon or systemd python module is missing", colors.FAIL
             )
             sys.exit(1)
+        return True
+
+    def check_battery(self):
+        for dev in self.pyudev.list_devices(
+            subsystem="power_supply", POWER_SUPPLY_TYPE="Battery"
+        ):
+            if dev.properties["POWER_SUPPLY_PRESENT"] != "1":
+                continue
+            energy_full_design = int(dev.properties["POWER_SUPPLY_ENERGY_FULL_DESIGN"])
+            energy_full = int(dev.properties["POWER_SUPPLY_ENERGY_FULL"])
+            energy = int(dev.properties["POWER_SUPPLY_ENERGY_NOW"])
+            man = dev.properties["POWER_SUPPLY_MANUFACTURER"]
+            model = dev.properties["POWER_SUPPLY_MODEL_NAME"]
+            name = dev.properties["POWER_SUPPLY_NAME"]
+
+            logging.debug(
+                "{battery} energy level is {energy} µWh".format(
+                    battery=name, energy=energy
+                )
+            )
+
+            if not name in self.energy:
+                self.log(
+                    "○ Battery {name} ({man} {model}) is operating at {percent}% of design".format(
+                        name=name,
+                        man=man,
+                        model=model,
+                        percent=round(float(energy_full) / energy_full_design * 100, 2),
+                    ),
+                    colors.OK,
+                )
+            else:
+                diff = abs(energy - self.energy[name])
+                percent = float(diff) / energy_full
+                if energy > self.energy[name]:
+                    action = "gained"
+                else:
+                    action = "lost"
+                self.log(
+                    "○ Battery {name} {action} {energy} µWh ({percent}%)".format(
+                        name=name, action=action, energy=diff, percent=round(percent, 2)
+                    ),
+                    colors.OK,
+                )
+            self.energy[name] = energy
         return True
 
     def check_cpu_vendor(self):
@@ -848,6 +896,7 @@ class S0i3Validator:
             self.check_storage,
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
+            self.check_battery,
             self.capture_acpi,
         ]
         result = True
@@ -1056,6 +1105,7 @@ class S0i3Validator:
             self.check_hw_sleep,
             self.capture_gpes,
             self.check_lockdown,
+            self.check_battery,
         ]
         for check in checks:
             check()
