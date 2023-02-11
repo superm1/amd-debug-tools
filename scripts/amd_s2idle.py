@@ -741,7 +741,7 @@ class S0i3Validator:
         base = os.path.join("/", "sys", "firmware", "acpi", "interrupts")
         for root, dirs, files in os.walk(base, topdown=False):
             for fname in files:
-                if not fname.startswith("gpe"):
+                if not fname.startswith("gpe") or fname == "gpe_all":
                     continue
                 target = os.path.join(root, fname)
                 val = 0
@@ -754,8 +754,6 @@ class S0i3Validator:
                         "○ %s increased from %d to %d" % (fname, self.gpes[fname], val),
                         colors.OK,
                     )
-                else:
-                    logging.debug("%s did not change (%d)" % (fname, val))
 
     def check_wakeup_irq(self):
         p = os.path.join("/", "sys", "power", "pm_wakeup_irq")
