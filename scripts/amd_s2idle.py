@@ -809,6 +809,26 @@ class S0i3Validator:
             self.log("○ Did not reach hardware sleep state", colors.FAIL)
         return result
 
+    def map_acpi_pci(self):
+        for dev in self.pyudev.list_devices(subsystem="pci"):
+            p = os.path.join(dev.sys_path, "firmware_node", "path")
+            if os.path.exists(p):
+                acpi = read_file(p)
+                pci_id = dev.properties["PCI_ID"]
+                pci_slot_name = dev.properties["PCI_SLOT_NAME"]
+                database_vendor = dev.properties["ID_VENDOR_FROM_DATABASE"]
+                database_class = dev.properties["ID_PCI_CLASS_FROM_DATABASE"]
+                logging.debug(
+                    "{pci_slot_name} : {cls} {vendor} [{id}] : {acpi}".format(
+                        pci_slot_name=pci_slot_name,
+                        vendor=database_vendor,
+                        cls=database_class,
+                        id=pci_id,
+                        acpi=acpi,
+                    )
+                )
+        return True
+
     def capture_acpi(self):
         if not self.iasl:
             self.log(headers.MissingIasl, colors.WARNING)
@@ -895,6 +915,7 @@ class S0i3Validator:
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
             self.check_battery,
+            self.map_acpi_pci,
             self.capture_acpi,
         ]
         result = True
