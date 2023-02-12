@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class colors:
@@ -261,6 +261,19 @@ class WCN6855Bug(S0i3Failure):
         self.url = "https://github.com/kvalo/ath11k-firmware/commit/67afd982bbd50e18b665d569a2c3dd87f5746839"
 
 
+class SpuriousWakeup(S0i3Failure):
+    def __init__(self, duration):
+        super().__init__()
+        self.description = "Userspace wasn't asleep at least %d seconds" % duration
+        self.explanation = (
+            "\tThe system was programmed to sleep for %d seconds, but woke up prematurely.\n"
+            "\tThis typically happens when the system was woken up from a non-timer based source.\n"
+            "\n"
+            "\tIf you didn't intentionally wake it up, then there may be a kernel or firmware bug\n"
+            % duration
+        )
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -369,6 +382,7 @@ class S0i3Validator:
 
         # we only want kernel messages from our triggered suspend
         self.last_suspend = datetime.now()
+        self.suspend_duration = 0
 
         # failure reasons to display at the end
         self.failures = []
@@ -1123,10 +1137,27 @@ class S0i3Validator:
         except ImportError:
             pass
 
+    def analyze_duration(self):
+        now = datetime.now()
+        delta = now - self.last_suspend
+        min_suspend_duration = timedelta(seconds=self.suspend_duration * 0.9)
+        expected_wake_time = self.last_suspend + min_suspend_duration
+        if now > expected_wake_time:
+            self.log("✅ Userspace suspended for {delta}".format(delta=delta), colors.OK)
+        else:
+            self.log(
+                "❌ Userspace suspended for {delta} (< minimum expected {expected})".format(
+                    delta=delta, expected=min_suspend_duration
+                ),
+                colors.FAIL,
+            )
+            self.failures += [SpuriousWakeup(self.suspend_duration)]
+
     def analyze_results(self):
         self.log(headers.LastCycleResults, colors.HEADER)
         result = True
         checks = [
+            self.analyze_duration,
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.check_hw_sleep,
@@ -1138,11 +1169,13 @@ class S0i3Validator:
             check()
 
     def run_countdown(self, t):
+        msg = ""
         while t:
-            msg = "Suspending system in {:02d}s".format(t)
-            print(msg, end="\r")
+            msg = "Suspending system in {time:02d} seconds".format(time=t)
+            print(msg, end="\r", flush=True)
             time.sleep(1)
             t -= 1
+        print(" " * len(msg), end="\r")
 
     def test_suspend(self, duration, count, wait):
         if os.geteuid() != 0:
@@ -1150,22 +1183,38 @@ class S0i3Validator:
             return False
         if not count:
             return True
-        self.log("%s +%ds" % (headers.SuspendDuration, duration), colors.HEADER)
+
+        if count > 1:
+            length = timedelta(seconds=(duration + wait) * count)
+            self.log(
+                "Running {count} cycles, expected to finish at {time}".format(
+                    count=count, time=datetime.now() + length
+                ),
+                colors.HEADER,
+            )
+
+        self.suspend_duration = duration
+        self.log(
+            "%s +%ds" % (headers.SuspendDuration, self.suspend_duration), colors.HEADER
+        )
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
             wakealarm = os.path.join(device.sys_path, "wakealarm")
         self.toggle_debugging(True)
         self.capture_gpes()
 
-        for i in range(0, count):
+        for i in range(1, count + 1):
             self.run_countdown(wait)
-            if count > 1:
-                self.log("%s %d" % (headers.CycleCount, i), colors.HEADER)
             self.last_suspend = datetime.now()
+            if count > 1:
+                self.log(
+                    "%s %d, started at %s" % (headers.CycleCount, i, self.last_suspend),
+                    colors.HEADER,
+                )
             with open(wakealarm, "w") as w:
                 w.write("0")
             with open(wakealarm, "w") as w:
-                w.write("+%s\n" % duration)
+                w.write("+%s\n" % self.suspend_duration)
             p = os.path.join("/", "sys", "power", "state")
             with open(p, "w") as w:
                 w.write("mem")
