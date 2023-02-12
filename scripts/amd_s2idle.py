@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime
 
 
@@ -25,7 +26,7 @@ class colors:
 class headers:
     Prerequisites = "Checking prerequisites for s2idle"
     BrokenPrerequisites = "Your system does not meet s2idle prerequisites!"
-    SuspendDuration = "Suspend programmed for"
+    SuspendDuration = "Suspend timer programmed for"
     LastCycleResults = "Results from last s2idle cycle"
     CycleCount = "Suspend cycle"
     RootError = "Run as root to test suspend"
@@ -1136,7 +1137,14 @@ class S0i3Validator:
         for check in checks:
             check()
 
-    def test_suspend(self, duration, count):
+    def run_countdown(self, t):
+        while t:
+            msg = "Suspending system in {:02d}s".format(t)
+            print(msg, end="\r")
+            time.sleep(1)
+            t -= 1
+
+    def test_suspend(self, duration, count, wait):
         if os.geteuid() != 0:
             self.log(headers.RootError, colors.FAIL)
             return False
@@ -1150,6 +1158,7 @@ class S0i3Validator:
         self.capture_gpes()
 
         for i in range(0, count):
+            self.run_countdown(wait)
             if count > 1:
                 self.log("%s %d" % (headers.CycleCount, i), colors.HEADER)
             self.last_suspend = datetime.now()
@@ -1229,6 +1238,11 @@ def parse_args():
         help="Duration of s2idle cycle in seconds (default 10)",
     )
     parser.add_argument(
+        "--wait",
+        default="4",
+        help="Duration to wait before starting s2idle cycle in seconds (default 4)",
+    )
+    parser.add_argument(
         "--count", default="1", help="Number of times to run s2idle (default 1)"
     )
     parser.add_argument(
@@ -1252,5 +1266,5 @@ if __name__ == "__main__":
         app = S0i3Validator(args.log, args.acpidump)
         test = app.prerequisites()
         if test:
-            app.test_suspend(int(args.duration), int(args.count))
+            app.test_suspend(int(args.duration), int(args.count), int(args.wait))
         app.get_failure_report()
