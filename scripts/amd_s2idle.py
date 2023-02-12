@@ -89,6 +89,17 @@ class MissingAmdPmc(S0i3Failure):
         )
 
 
+class MissingThunderbolt(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "thunderbolt driver is missing"
+        self.explanation = (
+            "\tThe thunderbolt driver is required for the USB4 routers included\n"
+            "\twith the SOC to enter the proper power states.\n"
+            "\tBe sure that you have enabled CONFIG_USB4 in your kernel.\n"
+        )
+
+
 class AcpiBiosError(S0i3Failure):
     def __init__(self, errors):
         super().__init__()
@@ -685,6 +696,19 @@ class S0i3Validator:
         self.log("❌ PMC driver `amd_pmc` not loaded", colors.FAIL)
         return False
 
+    def check_usb4(self):
+        has_usb4 = False
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
+            has_usb4 = True
+        if not has_usb4:
+            return True
+        for device in self.pyudev.list_devices(subsystem="pci", DRIVER="thunderbolt"):
+            self.log("✅ USB4 driver `thunderbolt` loaded", colors.OK)
+            return True
+        self.log("❌ USB4 driver `thunderbolt` missing", colors.FAIL)
+        self.failures += [MissingThunderbolt()]
+        return False
+
     def check_pinctrl_amd(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
             message = "✅ GPIO driver `pinctrl_amd` available"
@@ -939,6 +963,7 @@ class S0i3Validator:
             self.check_fadt,
             self.capture_disabled_pins,
             self.check_amd_pmc,
+            self.check_usb4,
             self.cpu_offers_hpet_wa,
             self.check_amdgpu,
             self.check_sleep_mode,
