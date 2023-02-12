@@ -24,6 +24,7 @@ class colors:
 
 
 class headers:
+    Info = "Debugging script for s2idle on AMD systems"
     Prerequisites = "Checking prerequisites for s2idle"
     BrokenPrerequisites = "Your system does not meet s2idle prerequisites!"
     SuspendDuration = "Suspend timer programmed for"
@@ -404,6 +405,7 @@ class S0i3Validator:
 
         # for analyzing offline reports
         self.offline = None
+        self.offline_report = False
 
         # for comparing GPEs before/after sleep
         self.gpes = {}
@@ -826,6 +828,11 @@ class S0i3Validator:
         result = False
         if self.hw_sleep:
             result = True
+        if self.offline:
+            for line in self.offline:
+                # re-entrant; don't re-run
+                if "✅ Spent" in line or "❌ Did not reach" in line:
+                    return
         if not self.hw_sleep:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
@@ -844,10 +851,14 @@ class S0i3Validator:
                 self.log("○ HW sleep statistics file missing", colors.FAIL)
                 return False
         if result:
+            if self.suspend_delta:
+                percent = float(self.hw_sleep / self.suspend_delta.total_seconds())
+            else:
+                percent = 0
             self.log(
                 "✅ Spent {time} seconds in a hardware sleep state ({percent:.2%})".format(
                     time=self.hw_sleep,
-                    percent=float(self.hw_sleep / self.suspend_delta.total_seconds()),
+                    percent=percent,
                 ),
                 colors.OK,
             )
@@ -951,6 +962,7 @@ class S0i3Validator:
             logging.debug(entry["MESSAGE"])
 
     def prerequisites(self):
+        self.log(headers.Info, colors.HEADER)
         info = [
             self.capture_system_vendor,
             self.capture_kernel_version,
@@ -1093,6 +1105,8 @@ class S0i3Validator:
         self.acpi_errors = []
         self.active_gpios = []
         self.irq1_workaround = False
+        if self.offline_report:
+            return True
         if self.offline:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
@@ -1108,11 +1122,14 @@ class S0i3Validator:
                 return
 
         if self.total_sleep:
+            if self.suspend_delta:
+                percent = float(self.total_sleep) / self.suspend_delta.total_seconds()
+            else:
+                percent = 0
             self.log(
                 "○ Kernel suspended for total of {time:2.4f} seconds ({percent:.2%})".format(
                     time=self.total_sleep,
-                    percent=float(self.total_sleep)
-                    / self.suspend_delta.total_seconds(),
+                    percent=percent,
                 ),
                 colors.OK,
             )
@@ -1271,16 +1288,15 @@ class S0i3Validator:
             item.get_failure()
 
     def replay_checks(self):
-        header_found = False
         for line in self.offline:
             # don't run on regular dmesg
-            if headers.Prerequisites in line:
-                header_found = True
-            if not header_found:
+            if headers.Prerequisites in line or headers.Info in line:
+                self.offline_report = True
+            if not self.offline_report:
                 return
             line = line.split("INFO:\t")[-1].strip()
             # replay s0i3 reports
-            if "✅" in line:
+            if "✅" in line or "○" in line:
                 self.log(line, colors.OK)
             elif "❌" in line:
                 self.log(line, colors.FAIL)
@@ -1288,6 +1304,7 @@ class S0i3Validator:
                 self.log(line, colors.OK)
             if (
                 headers.Prerequisites in line
+                or headers.Info in line
                 or headers.SuspendDuration in line
                 or headers.CycleCount in line
                 or headers.LastCycleResults in line
