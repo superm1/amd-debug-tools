@@ -1102,8 +1102,6 @@ class S0i3Validator:
         self.acpi_errors = []
         self.active_gpios = []
         self.irq1_workaround = False
-        if self.offline_report:
-            return True
         if self.offline:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
@@ -1117,6 +1115,9 @@ class S0i3Validator:
                 message = "Unable to analyze kernel log without systemd"
                 self.log(message, colors.WARNING)
                 return
+
+        if self.offline_report:
+            return True
 
         if self.total_sleep:
             if self.suspend_delta:
