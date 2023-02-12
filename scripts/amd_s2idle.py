@@ -480,11 +480,11 @@ class S0i3Validator:
 
             if not name in self.energy:
                 self.log(
-                    "○ Battery {name} ({man} {model}) is operating at {percent}% of design".format(
+                    "○ Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
                         name=name,
                         man=man,
                         model=model,
-                        percent=round(float(energy_full) / energy_full_design * 100, 2),
+                        percent=float(energy_full) / energy_full_design,
                     ),
                     colors.OK,
                 )
@@ -496,8 +496,8 @@ class S0i3Validator:
                 else:
                     action = "lost"
                 self.log(
-                    "○ Battery {name} {action} {energy} µWh ({percent}%)".format(
-                        name=name, action=action, energy=diff, percent=round(percent, 2)
+                    "○ Battery {name} {action} {energy} µWh ({percent:.2%})".format(
+                        name=name, action=action, energy=diff, percent=percent
                     ),
                     colors.OK,
                 )
