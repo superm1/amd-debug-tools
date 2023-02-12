@@ -835,8 +835,14 @@ class S0i3Validator:
                 acpi = read_file(p)
                 pci_id = dev.properties["PCI_ID"]
                 pci_slot_name = dev.properties["PCI_SLOT_NAME"]
-                database_vendor = dev.properties["ID_VENDOR_FROM_DATABASE"]
-                database_class = dev.properties["ID_PCI_CLASS_FROM_DATABASE"]
+                if "ID_VENDOR_FROM_DATABASE" in dev.properties:
+                    database_vendor = dev.properties["ID_VENDOR_FROM_DATABASE"]
+                else:
+                    database_vendor = ""
+                if "ID_PCI_CLASS_FROM_DATABASE" in dev.properties:
+                    database_class = dev.properties["ID_PCI_CLASS_FROM_DATABASE"]
+                else:
+                    database_class = ""
                 logging.debug(
                     "{pci_slot_name} : {cls} {vendor} [{id}] : {acpi}".format(
                         pci_slot_name=pci_slot_name,
