@@ -383,6 +383,7 @@ class S0i3Validator:
         # we only want kernel messages from our triggered suspend
         self.last_suspend = datetime.now()
         self.suspend_duration = 0
+        self.suspend_delta = 0
 
         # failure reasons to display at the end
         self.failures = []
@@ -817,8 +818,9 @@ class S0i3Validator:
                 return False
         if result:
             self.log(
-                "✅ Spent {time} seconds in a hardware sleep state".format(
-                    time=self.hw_sleep
+                "✅ Spent {time} seconds in a hardware sleep state ({percent:.2%})".format(
+                    time=self.hw_sleep,
+                    percent=float(self.hw_sleep / self.suspend_delta.total_seconds()),
                 ),
                 colors.OK,
             )
@@ -1073,8 +1075,10 @@ class S0i3Validator:
 
         if self.total_sleep:
             self.log(
-                "○ Kernel suspended for total of {:2.4f} seconds".format(
-                    self.total_sleep
+                "○ Kernel suspended for total of {time:2.4f} seconds ({percent:.2%})".format(
+                    time=self.total_sleep,
+                    percent=float(self.total_sleep)
+                    / self.suspend_delta.total_seconds(),
                 ),
                 colors.OK,
             )
@@ -1139,15 +1143,18 @@ class S0i3Validator:
 
     def analyze_duration(self):
         now = datetime.now()
-        delta = now - self.last_suspend
+        self.suspend_delta = now - self.last_suspend
         min_suspend_duration = timedelta(seconds=self.suspend_duration * 0.9)
         expected_wake_time = self.last_suspend + min_suspend_duration
         if now > expected_wake_time:
-            self.log("✅ Userspace suspended for {delta}".format(delta=delta), colors.OK)
+            self.log(
+                "✅ Userspace suspended for {delta}".format(delta=self.suspend_delta),
+                colors.OK,
+            )
         else:
             self.log(
                 "❌ Userspace suspended for {delta} (< minimum expected {expected})".format(
-                    delta=delta, expected=min_suspend_duration
+                    delta=self.suspend_delta, expected=min_suspend_duration
                 ),
                 colors.FAIL,
             )
