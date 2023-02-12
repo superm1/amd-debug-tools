@@ -279,13 +279,16 @@ class WCN6855Bug(S0i3Failure):
 class SpuriousWakeup(S0i3Failure):
     def __init__(self, duration):
         super().__init__()
-        self.description = "Userspace wasn't asleep at least %d seconds" % duration
+        self.description = "Userspace wasn't asleep at least {time}".format(
+            time=timedelta(seconds=duration)
+        )
         self.explanation = (
-            "\tThe system was programmed to sleep for %d seconds, but woke up prematurely.\n"
+            "\tThe system was programmed to sleep for {time}, but woke up prematurely.\n"
             "\tThis typically happens when the system was woken up from a non-timer based source.\n"
             "\n"
-            "\tIf you didn't intentionally wake it up, then there may be a kernel or firmware bug\n"
-            % duration
+            "\tIf you didn't intentionally wake it up, then there may be a kernel or firmware bug\n".format(
+                time=timedelta(seconds=duration)
+            )
         )
 
 
@@ -1223,7 +1226,7 @@ class S0i3Validator:
     def run_countdown(self, t):
         msg = ""
         while t:
-            msg = "Suspending system in {time:02d} seconds".format(time=t)
+            msg = "Suspending system in {time}".format(time=timedelta(seconds=t))
             print(msg, end="\r", flush=True)
             time.sleep(1)
             t -= 1
@@ -1247,7 +1250,11 @@ class S0i3Validator:
 
         self.suspend_duration = duration
         self.log(
-            "%s +%ds" % (headers.SuspendDuration, self.suspend_duration), colors.HEADER
+            "{msg} {time}".format(
+                msg=headers.SuspendDuration,
+                time=timedelta(seconds=self.suspend_duration),
+            ),
+            colors.HEADER,
         )
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
