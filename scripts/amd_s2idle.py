@@ -34,6 +34,9 @@ class headers:
     WokeFromIrq = "Woke up from IRQ"
     MissingIasl = "ACPI extraction tool iasl is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
+    DurationDescription = "How long should suspend cycles last"
+    WaitDescription = "How long to wait in between suspend cycles"
+    CountDescription = "How many suspend cycles to run"
 
 
 def read_file(fn):
@@ -1321,23 +1324,41 @@ def parse_args():
     )
     parser.add_argument(
         "--duration",
-        default="10",
-        help="Duration of s2idle cycle in seconds (default 10)",
+        help=headers.DurationDescription,
     )
     parser.add_argument(
         "--wait",
-        default="4",
-        help="Duration to wait before starting s2idle cycle in seconds (default 4)",
+        help=headers.WaitDescription,
     )
-    parser.add_argument(
-        "--count", default="1", help="Number of times to run s2idle (default 1)"
-    )
+    parser.add_argument("--count", help=headers.CountDescription)
     parser.add_argument(
         "--acpidump",
         action="store_true",
         help="Include and extract full ACPI dump in report",
     )
     return parser.parse_args()
+
+
+def configure_suspend(duration, wait, count):
+    if not duration:
+        duration = input(
+            "{question} (default 10s)? ".format(question=headers.DurationDescription)
+        )
+        if not duration:
+            duration = 10
+    if not wait:
+        wait = input(
+            "{question} (default 4s)? ".format(question=headers.WaitDescription)
+        )
+        if not wait:
+            wait = 4
+    if not count:
+        count = input(
+            "{question} (default 1)? ".format(question=headers.CountDescription)
+        )
+        if not count:
+            count = 1
+    return [int(duration), int(wait), int(count)]
 
 
 if __name__ == "__main__":
@@ -1353,5 +1374,8 @@ if __name__ == "__main__":
         app = S0i3Validator(args.log, args.acpidump)
         test = app.prerequisites()
         if test:
-            app.test_suspend(int(args.duration), int(args.count), int(args.wait))
+            duration, wait, count = configure_suspend(
+                duration=args.duration, wait=args.wait, count=args.count
+            )
+            app.test_suspend(duration=duration, wait=wait, count=count)
         app.get_failure_report()
