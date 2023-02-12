@@ -295,8 +295,10 @@ class S0i3Validator:
             import distro
 
             self.distro = distro.id()
+            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
         except ModuleNotFoundError:
             self.distro = ""
+            self.pretty_distro = ""
         try:
             from pyudev import Context
 
@@ -428,6 +430,8 @@ class S0i3Validator:
 
     def check_kernel_version(self):
         """Log the kernel version used"""
+        if self.pretty_distro:
+            self.log("○ {distro}".format(distro=self.pretty_distro), colors.OK)
         self.log(
             "○ Kernel {version}".format(version=platform.uname().release), colors.OK
         )
@@ -902,10 +906,10 @@ class S0i3Validator:
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
             self.check_system_vendor,
+            self.check_kernel_version,
             self.check_systemd,
             self.check_cpu_vendor,
             self.check_fadt,
-            self.check_kernel_version,
             self.capture_disabled_pins,
             self.check_amd_pmc,
             self.cpu_offers_hpet_wa,
