@@ -428,14 +428,13 @@ class S0i3Validator:
             self.failures += [FadtWrong()]
         return found
 
-    def check_kernel_version(self):
+    def capture_kernel_version(self):
         """Log the kernel version used"""
         if self.pretty_distro:
             self.log("○ {distro}".format(distro=self.pretty_distro), colors.OK)
         self.log(
             "○ Kernel {version}".format(version=platform.uname().release), colors.OK
         )
-        return True
 
     def check_systemd(self):
         if not self.journal:
@@ -522,7 +521,7 @@ class S0i3Validator:
             )
         return valid
 
-    def check_system_vendor(self):
+    def capture_system_vendor(self):
         p = os.path.join("/", "sys", "class", "dmi", "id")
         try:
             vendor = read_file(os.path.join(p, "sys_vendor"))
@@ -542,7 +541,6 @@ class S0i3Validator:
             )
         except FileNotFoundError:
             pass
-        return True
 
     def check_sleep_mode(self):
         fn = os.path.join("/", "sys", "power", "mem_sleep")
@@ -903,12 +901,17 @@ class S0i3Validator:
             logging.debug(entry["MESSAGE"])
 
     def prerequisites(self):
+        info = [
+            self.capture_system_vendor,
+            self.capture_kernel_version,
+            self.check_battery,
+        ]
+        for i in info:
+            i()
+
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
-            self.check_system_vendor,
-            self.check_kernel_version,
             self.check_systemd,
-            self.check_battery,
             self.check_cpu_vendor,
             self.check_fadt,
             self.capture_disabled_pins,
