@@ -908,6 +908,7 @@ class S0i3Validator:
             self.check_system_vendor,
             self.check_kernel_version,
             self.check_systemd,
+            self.check_battery,
             self.check_cpu_vendor,
             self.check_fadt,
             self.capture_disabled_pins,
@@ -918,7 +919,6 @@ class S0i3Validator:
             self.check_storage,
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
-            self.check_battery,
             self.map_acpi_pci,
             self.capture_acpi,
         ]
