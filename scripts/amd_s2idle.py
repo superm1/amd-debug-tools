@@ -817,13 +817,13 @@ class S0i3Validator:
                 return False
         if result:
             self.log(
-                "○ Spent {time} seconds in a hardware sleep state".format(
+                "✅ Spent {time} seconds in a hardware sleep state".format(
                     time=self.hw_sleep
                 ),
                 colors.OK,
             )
         else:
-            self.log("○ Did not reach hardware sleep state", colors.FAIL)
+            self.log("❌ Did not reach hardware sleep state", colors.FAIL)
         return result
 
     def map_acpi_pci(self):
