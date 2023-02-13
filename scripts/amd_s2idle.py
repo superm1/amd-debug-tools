@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 
 class colors:
@@ -38,6 +38,7 @@ class headers:
     DurationDescription = "How long should suspend cycles last"
     WaitDescription = "How long to wait in between suspend cycles"
     CountDescription = "How many suspend cycles to run"
+    LogDescription = "Location of log file"
 
 
 def read_file(fn):
@@ -1338,8 +1339,7 @@ def parse_args():
     parser.add_argument("--offline", action="store_true", help="Analyze shared logs")
     parser.add_argument(
         "--log",
-        default="s2idle_report.txt",
-        help="Log file (default s2idle_report.txt)",
+        help=headers.LogDescription,
     )
     parser.add_argument(
         "--duration",
@@ -1356,6 +1356,21 @@ def parse_args():
         help="Include and extract full ACPI dump in report",
     )
     return parser.parse_args()
+
+
+def configure_log(log):
+    if not log:
+        fname = "{prefix}-{date}.{suffix}".format(
+            prefix="s2idle_report", suffix="txt", date=date.today()
+        )
+        log = input(
+            "{question} (default {default})".format(
+                question=headers.LogDescription, default=fname
+            )
+        )
+        if not log:
+            log = fname
+    return log
 
 
 def configure_suspend(duration, wait, count):
@@ -1382,15 +1397,15 @@ def configure_suspend(duration, wait, count):
 
 if __name__ == "__main__":
     args = parse_args()
+    log = configure_log(args.log)
     if args.offline:
-        if not os.path.exists(args.log):
-            sys.exit("{log} is missing".format(log=args.log))
+        if not os.path.exists(log):
+            sys.exit("{log} is missing".format(log=log))
         app = S0i3Validator("/dev/null", False)
-        app.check_offline(args.log)
+        app.check_offline(log)
         app.get_failure_report()
     else:
-        print("Logs will be saved to {log}".format(log=args.log))
-        app = S0i3Validator(args.log, args.acpidump)
+        app = S0i3Validator(log, args.acpidump)
         test = app.prerequisites()
         if test:
             duration, wait, count = configure_suspend(
