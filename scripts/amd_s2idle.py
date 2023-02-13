@@ -1389,7 +1389,7 @@ def configure_log(log):
             prefix="s2idle_report", suffix="txt", date=date.today()
         )
         log = input(
-            "{question} (default {default})".format(
+            "{question} (default {default})? ".format(
                 question=headers.LogDescription, default=fname
             )
         )
