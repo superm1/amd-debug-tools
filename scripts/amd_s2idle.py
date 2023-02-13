@@ -293,6 +293,18 @@ class SpuriousWakeup(S0i3Failure):
         )
 
 
+class LowHardwareSleepResidency(S0i3Failure):
+    def __init__(self, duration, percent):
+        super().__init__()
+        self.description = "System had low hardware sleep residency"
+        self.explanation = (
+            "\tThe system was asleep for {time}, but only spent {percent:.2%}\n"
+            "\tof this time in a hardware sleep state.  In sleep cycles that are at least\n"
+            "\t60 seconds long it's expected you spend above 90 percent of the cycle in"
+            "\thardware sleep.\n"
+        ).format(time=timedelta(seconds=duration), percent=percent)
+
+
 def _check_ahci_devslp(line):
     return "sds" in line and "sadm" in line
 
@@ -859,10 +871,23 @@ class S0i3Validator:
                 percent = float(self.hw_sleep / self.suspend_delta.total_seconds())
             else:
                 percent = 0
+            if percent and self.suspend_delta.total_seconds() >= 60:
+                if percent > 0.9:
+                    symbol = "✅"
+                else:
+                    symbol = "❌"
+                    self.failures += [
+                        LowHardwareSleepResidency(
+                            self.suspend_delta.total_seconds(), percent
+                        )
+                    ]
+            else:
+                symbol = "✅"
             self.log(
-                "✅ Spent {time} seconds in a hardware sleep state ({percent:.2%})".format(
+                "{symbol} Spent {time} seconds in a hardware sleep state {percent_msg}".format(
+                    symbol=symbol,
                     time=self.hw_sleep,
-                    percent=percent,
+                    percent_msg="" if not percent else "({:.2%})".format(percent),
                 ),
                 colors.OK,
             )
