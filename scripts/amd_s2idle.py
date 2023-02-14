@@ -413,8 +413,10 @@ class S0i3Validator:
 
         # we only want kernel messages from our triggered suspend
         self.last_suspend = datetime.now()
-        self.suspend_duration = 0
-        self.suspend_delta = 0
+        self.requested_duration = 0
+        self.userspace_duration = 0
+        self.kernel_duration = 0
+        self.hw_sleep_duration = 0
 
         # failure reasons to display at the end
         self.failures = []
@@ -842,14 +844,14 @@ class S0i3Validator:
 
     def check_hw_sleep(self):
         result = False
-        if self.hw_sleep:
+        if self.hw_sleep_duration:
             result = True
         if self.offline:
             for line in self.offline:
                 # re-entrant; don't re-run
                 if "✅ Spent" in line or "❌ Did not reach" in line:
                     return
-        if not self.hw_sleep:
+        if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
                 val = read_file(p)
@@ -867,18 +869,20 @@ class S0i3Validator:
                 self.log("○ HW sleep statistics file missing", colors.FAIL)
                 return False
         if result:
-            if self.suspend_delta:
-                percent = float(self.hw_sleep / self.suspend_delta.total_seconds())
+            if self.userspace_duration:
+                percent = float(
+                    self.hw_sleep_duration / self.userspace_duration.total_seconds()
+                )
             else:
                 percent = 0
-            if percent and self.suspend_delta.total_seconds() >= 60:
+            if percent and self.userspace_duration.total_seconds() >= 60:
                 if percent > 0.9:
                     symbol = "✅"
                 else:
                     symbol = "❌"
                     self.failures += [
                         LowHardwareSleepResidency(
-                            self.suspend_delta.total_seconds(), percent
+                            self.userspace_duration.total_seconds(), percent
                         )
                     ]
             else:
@@ -886,7 +890,7 @@ class S0i3Validator:
             self.log(
                 "{symbol} Spent {time} seconds in a hardware sleep state {percent_msg}".format(
                     symbol=symbol,
-                    time=self.hw_sleep,
+                    time=self.hw_sleep_duration,
                     percent_msg="" if not percent else "({:.2%})".format(percent),
                 ),
                 colors.OK,
@@ -1065,7 +1069,7 @@ class S0i3Validator:
             self.cycle_count += 1
             for f in line.split():
                 try:
-                    self.total_sleep += float(f)
+                    self.kernel_duration += float(f)
                 except ValueError:
                     pass
         elif "_DSM function" in line:
@@ -1079,7 +1083,7 @@ class S0i3Validator:
                 if not f.endswith("us"):
                     continue
                 try:
-                    self.hw_sleep += float(f.strip("us")) / 10**6
+                    self.hw_sleep_duration += float(f.strip("us")) / 10**6
                 except ValueError:
                     pass
         elif "Triggering wakeup from IRQ" in line:
@@ -1128,8 +1132,6 @@ class S0i3Validator:
         return False
 
     def analyze_kernel_log(self):
-        self.total_sleep = 0
-        self.hw_sleep = 0
         self.suspend_count = 0
         self.cycle_count = 0
         self.upep = False
@@ -1156,14 +1158,17 @@ class S0i3Validator:
         if self.offline_report:
             return True
 
-        if self.total_sleep:
-            if self.suspend_delta:
-                percent = float(self.total_sleep) / self.suspend_delta.total_seconds()
+        if self.kernel_duration:
+            if self.userspace_duration:
+                percent = (
+                    float(self.kernel_duration)
+                    / self.userspace_duration.total_seconds()
+                )
             else:
                 percent = 0
             self.log(
                 "○ Kernel suspended for total of {time:2.4f} seconds ({percent:.2%})".format(
-                    time=self.total_sleep,
+                    time=self.kernel_duration,
                     percent=percent,
                 ),
                 colors.OK,
@@ -1229,22 +1234,24 @@ class S0i3Validator:
 
     def analyze_duration(self):
         now = datetime.now()
-        self.suspend_delta = now - self.last_suspend
-        min_suspend_duration = timedelta(seconds=self.suspend_duration * 0.9)
+        self.userspace_duration = now - self.last_suspend
+        min_suspend_duration = timedelta(seconds=self.requested_duration * 0.9)
         expected_wake_time = self.last_suspend + min_suspend_duration
         if now > expected_wake_time:
             self.log(
-                "✅ Userspace suspended for {delta}".format(delta=self.suspend_delta),
+                "✅ Userspace suspended for {delta}".format(
+                    delta=self.userspace_duration
+                ),
                 colors.OK,
             )
         else:
             self.log(
                 "❌ Userspace suspended for {delta} (< minimum expected {expected})".format(
-                    delta=self.suspend_delta, expected=min_suspend_duration
+                    delta=self.userspace_duration, expected=min_suspend_duration
                 ),
                 colors.FAIL,
             )
-            self.failures += [SpuriousWakeup(self.suspend_duration)]
+            self.failures += [SpuriousWakeup(self.requested_duration)]
 
     def analyze_results(self):
         self.log(headers.LastCycleResults, colors.HEADER)
@@ -1253,10 +1260,10 @@ class S0i3Validator:
             self.analyze_duration,
             self.analyze_kernel_log,
             self.check_wakeup_irq,
-            self.check_hw_sleep,
             self.capture_gpes,
             self.check_lockdown,
             self.check_battery,
+            self.check_hw_sleep,
         ]
         for check in checks:
             check()
@@ -1283,11 +1290,11 @@ class S0i3Validator:
                 colors.HEADER,
             )
 
-        self.suspend_duration = duration
+        self.requested_duration = duration
         self.log(
             "{msg} {time}".format(
                 msg=headers.SuspendDuration,
-                time=timedelta(seconds=self.suspend_duration),
+                time=timedelta(seconds=self.requested_duration),
             ),
             colors.HEADER,
         )
@@ -1308,7 +1315,7 @@ class S0i3Validator:
             with open(wakealarm, "w") as w:
                 w.write("0")
             with open(wakealarm, "w") as w:
-                w.write("+%s\n" % self.suspend_duration)
+                w.write("+%s\n" % self.requested_duration)
             p = os.path.join("/", "sys", "power", "state")
             with open(p, "w") as w:
                 w.write("mem")
