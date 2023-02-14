@@ -772,9 +772,10 @@ class S0i3Validator:
         if self.wcn6855 and re.search("ath11k_pci.*fw_version", line):
             logging.debug("WCN6855 version string: %s", line)
             objects = line.split()
-            if objects[2] == "fw_version":
-                self.wcn6855 = int(objects[3], 16)
-                return True
+            for i in range(0, len(objects)):
+                if objects[i] == "fw_version":
+                    self.wcn6855 = int(objects[i + 1], 16)
+                    return True
         return False
 
     def check_wcn6855_bug(self):
