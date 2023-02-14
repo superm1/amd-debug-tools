@@ -30,7 +30,7 @@ class headers:
     SuspendDuration = "Suspend timer programmed for"
     LastCycleResults = "Results from last s2idle cycle"
     CycleCount = "Suspend cycle"
-    RootError = "Run as root to test suspend"
+    RootError = "Suspend must be initiated by root user"
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
     MissingIasl = "ACPI extraction tool iasl is missing"
@@ -895,6 +895,16 @@ class S0i3Validator:
             self.log("❌ Did not reach hardware sleep state", colors.FAIL)
         return result
 
+    def check_permissions(self):
+        p = os.path.join("/", "sys", "power", "state")
+        try:
+            with open(p, "w") as w:
+                pass
+        except PermissionError:
+            self.log("❌ %s" % headers.RootError, colors.FAIL)
+            return False
+        return True
+
     def map_acpi_pci(self):
         for dev in self.pyudev.list_devices(subsystem="pci"):
             p = os.path.join(dev.sys_path, "firmware_node", "path")
@@ -1008,6 +1018,7 @@ class S0i3Validator:
             self.check_storage,
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
+            self.check_permissions,
             self.map_acpi_pci,
             self.capture_acpi,
         ]
@@ -1260,9 +1271,6 @@ class S0i3Validator:
         print(" " * len(msg), end="\r")
 
     def test_suspend(self, duration, count, wait):
-        if os.geteuid() != 0:
-            self.log(headers.RootError, colors.FAIL)
-            return False
         if not count:
             return True
 
