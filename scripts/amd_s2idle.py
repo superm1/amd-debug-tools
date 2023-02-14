@@ -442,6 +442,9 @@ class S0i3Validator:
         # for monitoring battery levels across suspend
         self.energy = {}
 
+        # If we're locked down, a lot less errors make sense
+        self.lockdown = False
+
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
         """Check the kernel emitted a message specific to 6.0 or later indicating FADT had a bit set."""
@@ -871,7 +874,13 @@ class S0i3Validator:
                     if "Time (in us) in S0i3" in line:
                         n = int(line.split(":")[1]) / 10**6
             except PermissionError:
-                self.log("Run as root to gather more data", colors.WARNING)
+                if self.lockdown:
+                    self.log(
+                        "Unable to gather hardware sleep data with lockdown engaged",
+                        colors.WARNING,
+                    )
+                else:
+                    self.log("Failed to read hardware sleep data", colors.WARNING)
                 return False
             except FileNotFoundError:
                 self.log("○ HW sleep statistics file missing", colors.FAIL)
@@ -1053,6 +1062,7 @@ class S0i3Validator:
                 colors.WARNING,
             )
             self.failures += [KernelLockdown()]
+            self.lockdown = True
 
     def toggle_debugging(self, enable):
         fn = os.path.join("/", "sys", "power", "pm_debug_messages")
@@ -1208,7 +1218,7 @@ class S0i3Validator:
                 self.log("○ Used Microsoft uPEP GUID in LPS0 _DSM", colors.OK)
             else:
                 self.log("○ Used AMD uPEP GUID in LPS0 _DSM", colors.OK)
-        else:
+        elif not self.lockdown:
             self.log("❌ LPS0 _DSM not executed", colors.FAIL)
             self.failures += [uPepMissing()]
         if self.acpi_errors:
@@ -1265,10 +1275,10 @@ class S0i3Validator:
         self.log(headers.LastCycleResults, colors.HEADER)
         result = True
         checks = [
+            self.check_lockdown,
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.capture_gpes,
-            self.check_lockdown,
             self.check_battery,
             self.analyze_duration,
             self.check_hw_sleep,
