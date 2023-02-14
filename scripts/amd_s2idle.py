@@ -888,9 +888,9 @@ class S0i3Validator:
             else:
                 symbol = "✅"
             self.log(
-                "{symbol} Spent {time} seconds in a hardware sleep state {percent_msg}".format(
+                "{symbol} In a hardware sleep state for {time}{percent_msg}".format(
                     symbol=symbol,
-                    time=self.hw_sleep_duration,
+                    time=timedelta(seconds=self.hw_sleep_duration),
                     percent_msg="" if not percent else "({:.2%})".format(percent),
                 ),
                 colors.OK,
@@ -1158,21 +1158,6 @@ class S0i3Validator:
         if self.offline_report:
             return True
 
-        if self.kernel_duration:
-            if self.userspace_duration:
-                percent = (
-                    float(self.kernel_duration)
-                    / self.userspace_duration.total_seconds()
-                )
-            else:
-                percent = 0
-            self.log(
-                "○ Kernel suspended for total of {time:2.4f} seconds ({percent:.2%})".format(
-                    time=self.kernel_duration,
-                    percent=percent,
-                ),
-                colors.OK,
-            )
         if self.suspend_count:
             self.log(
                 "○ Suspend count: {count}".format(count=self.suspend_count),
@@ -1252,17 +1237,32 @@ class S0i3Validator:
                 colors.FAIL,
             )
             self.failures += [SpuriousWakeup(self.requested_duration)]
+        if self.kernel_duration:
+            if self.userspace_duration:
+                percent = (
+                    float(self.kernel_duration)
+                    / self.userspace_duration.total_seconds()
+                )
+            else:
+                percent = 0
+            self.log(
+                "✅ Kernel suspended for total of {time} ({percent:.2%})".format(
+                    time=timedelta(seconds=self.kernel_duration),
+                    percent=percent,
+                ),
+                colors.OK,
+            )
 
     def analyze_results(self):
         self.log(headers.LastCycleResults, colors.HEADER)
         result = True
         checks = [
-            self.analyze_duration,
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.capture_gpes,
             self.check_lockdown,
             self.check_battery,
+            self.analyze_duration,
             self.check_hw_sleep,
         ]
         for check in checks:
