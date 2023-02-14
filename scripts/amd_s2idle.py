@@ -23,6 +23,14 @@ class colors:
     UNDERLINE = "\033[4m"
 
 
+class defaults:
+    duration = 10
+    wait = 4
+    count = 1
+    log_prefix = "s2idle_report"
+    log_suffix = "txt"
+
+
 class headers:
     Info = "Debugging script for s2idle on AMD systems"
     Prerequisites = "Checking prerequisites for s2idle"
@@ -35,8 +43,8 @@ class headers:
     WokeFromIrq = "Woke up from IRQ"
     MissingIasl = "ACPI extraction tool iasl is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
-    DurationDescription = "How long should suspend cycles last"
-    WaitDescription = "How long to wait in between suspend cycles"
+    DurationDescription = "How long should suspend cycles last in seconds"
+    WaitDescription = "How long to wait in between suspend cycles in seconds"
     CountDescription = "How many suspend cycles to run"
     LogDescription = "Location of log file"
 
@@ -888,7 +896,7 @@ class S0i3Validator:
             else:
                 symbol = "✅"
             self.log(
-                "{symbol} In a hardware sleep state for {time}{percent_msg}".format(
+                "{symbol} In a hardware sleep state for {time} {percent_msg}".format(
                     symbol=symbol,
                     time=timedelta(seconds=self.hw_sleep_duration),
                     percent_msg="" if not percent else "({:.2%})".format(percent),
@@ -1401,11 +1409,11 @@ def parse_args():
 def configure_log(log):
     if not log:
         fname = "{prefix}-{date}.{suffix}".format(
-            prefix="s2idle_report", suffix="txt", date=date.today()
+            prefix=defaults.log_prefix, suffix=defaults.log_suffix, date=date.today()
         )
         log = input(
-            "{question} (default {default})? ".format(
-                question=headers.LogDescription, default=fname
+            "{question} (default {fname})? ".format(
+                question=headers.LogDescription, fname=fname
             )
         )
         if not log:
@@ -1416,22 +1424,28 @@ def configure_log(log):
 def configure_suspend(duration, wait, count):
     if not duration:
         duration = input(
-            "{question} (default 10s)? ".format(question=headers.DurationDescription)
+            "{question} (default {val})? ".format(
+                question=headers.DurationDescription, val=defaults.duration
+            )
         )
         if not duration:
-            duration = 10
+            duration = defaults.duration
     if not wait:
         wait = input(
-            "{question} (default 4s)? ".format(question=headers.WaitDescription)
+            "{question} (default {val})? ".format(
+                question=headers.WaitDescription, val=defaults.wait
+            )
         )
         if not wait:
-            wait = 4
+            wait = defaults.wait
     if not count:
         count = input(
-            "{question} (default 1)? ".format(question=headers.CountDescription)
+            "{question} (default {val})? ".format(
+                question=headers.CountDescription, val=defaults.count
+            )
         )
         if not count:
-            count = 1
+            count = defaults.count
     return [int(duration), int(wait), int(count)]
 
 
