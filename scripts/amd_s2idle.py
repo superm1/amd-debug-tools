@@ -1393,7 +1393,11 @@ class S0i3Validator:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Test for common s2idle problems")
+    parser = argparse.ArgumentParser(
+        description="Test for common s2idle problems on systems with AMD processors.",
+        epilog="Arguments are optional, and if they are not provided will prompted.\n"
+        "To use non-interactively, please populate all optional arguments.",
+    )
     parser.add_argument("--offline", action="store_true", help="Analyze shared logs")
     parser.add_argument(
         "--log",
