@@ -282,7 +282,7 @@ class WCN6855Bug(S0i3Failure):
             "\tThis issue is fixed by updated WCN6855 firmware which will avoid triggering the GPIO.\n"
             "\tThe version string containing the fix is 'WLAN.HSP.1.1-03125-QCAHSPSWPL_V1_V2_SILICONZ_LITE-3.6510.23'\n"
         )
-        self.url = "https://github.com/kvalo/ath11k-firmware/commit/67afd982bbd50e18b665d569a2c3dd87f5746839"
+        self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/commit/?id=c7a57ef688f7d99d8338a5d8edddc8836ff0e6de"
 
 
 class SpuriousWakeup(S0i3Failure):
