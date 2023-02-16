@@ -588,13 +588,15 @@ class S0i3Validator:
             vendor = read_file(os.path.join(p, "sys_vendor"))
             product = read_file(os.path.join(p, "product_name"))
             family = read_file(os.path.join(p, "product_family"))
-            version = read_file(os.path.join(p, "bios_release"))
+            release = read_file(os.path.join(p, "bios_release"))
+            version = read_file(os.path.join(p, "bios_version"))
             date = read_file(os.path.join(p, "bios_date"))
             self.log(
-                "○ {vendor} {product} ({family}) running BIOS {version} released {date}".format(
+                "○ {vendor} {product} ({family}) running BIOS {release} ({version}) released {date}".format(
                     vendor=vendor,
                     product=product,
                     family=family,
+                    release=release,
                     version=version,
                     date=date,
                 ),
