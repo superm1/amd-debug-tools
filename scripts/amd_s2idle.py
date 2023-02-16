@@ -986,6 +986,44 @@ class S0i3Validator:
                     shutil.rmtree(d)
         return True
 
+    def capture_linux_firmware(self):
+        if self.distro == "ubuntu" or self.distro == "debian":
+            import apt
+
+            cache = apt.Cache()
+            packages = ["linux-firmware"]
+            for obj in cache.get_providing_packages("amdgpu-firmware-nda"):
+                packages += [obj.name]
+            for p in packages:
+                pkg = cache.get(p)
+                if not pkg:
+                    continue
+                changelog = ""
+                if "amdgpu" in p:
+                    for f in pkg.installed_files:
+                        import gzip
+
+                        if not "changelog" in f:
+                            continue
+                        changelog = gzip.GzipFile(f).read().decode("utf-8")
+                if changelog:
+                    for line in changelog.split("\n"):
+                        logging.debug(line)
+                else:
+                    logging.debug(pkg.installed)
+
+        try:
+            path = os.path.join(
+                "/", "sys", "kernel", "debug", "dri", "0", "amdgpu_firmware_info"
+            )
+            debugfs = read_file(path)
+            for line in debugfs.split("\n"):
+                logging.debug(line)
+        except PermissionError:
+            logging.debug("Unable to capture {path}".format(path=path))
+
+        return True
+
     def capture_disabled_pins(self):
         base = os.path.join("/", "sys", "module", "gpiolib_acpi", "parameters")
         for parameter in ["ignore_wake", "ignore_interrupt"]:
@@ -1043,6 +1081,7 @@ class S0i3Validator:
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
             self.check_permissions,
+            self.capture_linux_firmware,
             self.map_acpi_pci,
             self.capture_acpi,
         ]
