@@ -509,7 +509,7 @@ class S0i3Validator:
         for dev in self.pyudev.list_devices(
             subsystem="power_supply", POWER_SUPPLY_TYPE="Battery"
         ):
-            if dev.properties["POWER_SUPPLY_PRESENT"] != "1":
+            if not 'PNP0C0A' in dev.device_path:
                 continue
             energy_full_design = int(dev.properties["POWER_SUPPLY_ENERGY_FULL_DESIGN"])
             energy_full = int(dev.properties["POWER_SUPPLY_ENERGY_FULL"])
