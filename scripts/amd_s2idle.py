@@ -441,6 +441,7 @@ class S0i3Validator:
 
         # for monitoring battery levels across suspend
         self.energy = {}
+        self.charge = {}
 
         # If we're locked down, a lot less errors make sense
         self.lockdown = False
@@ -509,45 +510,85 @@ class S0i3Validator:
         for dev in self.pyudev.list_devices(
             subsystem="power_supply", POWER_SUPPLY_TYPE="Battery"
         ):
-            if not 'PNP0C0A' in dev.device_path:
+            if not "PNP0C0A" in dev.device_path:
                 continue
-            energy_full_design = int(dev.properties["POWER_SUPPLY_ENERGY_FULL_DESIGN"])
-            energy_full = int(dev.properties["POWER_SUPPLY_ENERGY_FULL"])
-            energy = int(dev.properties["POWER_SUPPLY_ENERGY_NOW"])
+
+            energy_full_design = int(
+                dev.properties.get(dev.properties["POWER_SUPPLY_ENERGY_FULL_DESIGN"])
+            )
+            energy_full = int(dev.properties.get(["POWER_SUPPLY_ENERGY_FULL"]))
+            energy = int(dev.properties.get(["POWER_SUPPLY_ENERGY_NOW"]))
+            charge_full_design = int(
+                dev.properties.get(dev.properties["POWER_SUPPLY_CHARGE_FULL_DESIGN"])
+            )
+            charge_full = int(dev.properties.get(["POWER_SUPPLY_CHARGE_FULL"]))
+            charge = int(dev.properties.get(["POWER_SUPPLY_CHARGE_NOW"]))
             man = dev.properties["POWER_SUPPLY_MANUFACTURER"]
             model = dev.properties["POWER_SUPPLY_MODEL_NAME"]
             name = dev.properties["POWER_SUPPLY_NAME"]
 
-            logging.debug(
-                "{battery} energy level is {energy} µWh".format(
-                    battery=name, energy=energy
+            if energy_full_design:
+                logging.debug(
+                    "{battery} energy level is {energy} µWh".format(
+                        battery=name, energy=energy
+                    )
                 )
-            )
-
-            if not name in self.energy:
-                self.log(
-                    "○ Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
-                        name=name,
-                        man=man,
-                        model=model,
-                        percent=float(energy_full) / energy_full_design,
-                    ),
-                    colors.OK,
-                )
-            else:
-                diff = abs(energy - self.energy[name])
-                percent = float(diff) / energy_full
-                if energy > self.energy[name]:
-                    action = "gained"
+                if not name in self.energy:
+                    self.log(
+                        "○ Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
+                            name=name,
+                            man=man,
+                            model=model,
+                            percent=float(energy_full) / energy_full_design,
+                        ),
+                        colors.OK,
+                    )
                 else:
-                    action = "lost"
-                self.log(
-                    "○ Battery {name} {action} {energy} µWh ({percent:.2%})".format(
-                        name=name, action=action, energy=diff, percent=percent
-                    ),
-                    colors.OK,
+                    diff = abs(energy - self.energy[name])
+                    percent = float(diff) / energy_full
+                    if energy > self.energy[name]:
+                        action = "gained"
+                    else:
+                        action = "lost"
+                    self.log(
+                        "○ Battery {name} {action} {energy} µWh ({percent:.2%})".format(
+                            name=name, action=action, energy=diff, percent=percent
+                        ),
+                        colors.OK,
+                    )
+                self.energy[name] = energy
+
+            if charge_full_design:
+                logging.debug(
+                    "{battery} charge level is {charge} µAh".format(
+                        battery=name, charge=charge
+                    )
                 )
-            self.energy[name] = energy
+                if not name in self.energy:
+                    self.log(
+                        "○ Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
+                            name=name,
+                            man=man,
+                            model=model,
+                            percent=float(charge_full) / charge_full_design,
+                        ),
+                        colors.OK,
+                    )
+                else:
+                    diff = abs(charge - self.charge[name])
+                    percent = float(diff) / charge_full
+                    if energy > self.energy[name]:
+                        action = "gained"
+                    else:
+                        action = "lost"
+                    self.log(
+                        "○ Battery {name} {action} {charge} µAh ({percent:.2%})".format(
+                            name=name, action=action, charge=diff, percent=percent
+                        ),
+                        colors.OK,
+                    )
+                self.charge[name] = charge
+
         return True
 
     def check_cpu_vendor(self):
