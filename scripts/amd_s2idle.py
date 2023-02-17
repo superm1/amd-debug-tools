@@ -371,9 +371,12 @@ class S0i3Validator:
             import distro
 
             self.distro = distro.id()
-            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
         except ModuleNotFoundError:
             self.distro = ""
+        try:
+            if self.distro:
+                self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
+        except AttributeError:
             self.pretty_distro = ""
         try:
             from pyudev import Context
