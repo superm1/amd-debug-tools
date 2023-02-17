@@ -1133,6 +1133,7 @@ class S0i3Validator:
             self.check_storage,
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
+            self.check_lockdown,
             self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
@@ -1153,11 +1154,12 @@ class S0i3Validator:
         logging.debug("Lockdown: %s" % lockdown)
         if lockdown.split()[0] != "[none]":
             self.log(
-                "❌ Kernel lockdown is engaged, this script will have limited debugging",
+                "🚦 Kernel lockdown is engaged, this script will have limited debugging",
                 colors.WARNING,
             )
             self.failures += [KernelLockdown()]
             self.lockdown = True
+        return True
 
     def toggle_debugging(self, enable):
         fn = os.path.join("/", "sys", "power", "pm_debug_messages")
@@ -1370,7 +1372,6 @@ class S0i3Validator:
         self.log(headers.LastCycleResults, colors.HEADER)
         result = True
         checks = [
-            self.check_lockdown,
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.capture_gpes,
