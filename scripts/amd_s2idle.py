@@ -714,7 +714,7 @@ class S0i3Validator:
 
         else:
             if not self.journal:
-                message = "Unable to test storage without systemd"
+                message = "🚦 Unable to test storage without systemd"
                 self.log(message, colors.WARNING)
                 return True
 
@@ -855,7 +855,7 @@ class S0i3Validator:
                         break
         else:
             if not self.journal:
-                message = "Unable to test for wcn6855 bug without systemd"
+                message = "🚦 Unable to test for wcn6855 bug without systemd"
                 self.log(message, colors.WARNING)
                 return True
 
@@ -1096,7 +1096,7 @@ class S0i3Validator:
                 else:
                     logging.debug("%s is configured to %s" % (f, d))
         if not self.journal:
-            message = "Unable to validate disabled pins without systemd"
+            message = "🚦 Unable to validate disabled pins without systemd"
             self.log(message, colors.WARNING)
             return True
         self.journal.seek_head()
@@ -1107,7 +1107,7 @@ class S0i3Validator:
 
     def capture_full_dmesg(self):
         if not self.journal:
-            message = "Unable to analyze kernel log without systemd"
+            message = "🚦 Unable to analyze kernel log without systemd"
             self.log(message, colors.WARNING)
             return
 
@@ -1272,7 +1272,7 @@ class S0i3Validator:
                     self._analyze_kernel_log_line(entry["MESSAGE"])
                     logging.debug(entry["MESSAGE"])
             else:
-                message = "Unable to analyze kernel log without systemd"
+                message = "🚦 Unable to analyze kernel log without systemd"
                 self.log(message, colors.WARNING)
                 return
 
