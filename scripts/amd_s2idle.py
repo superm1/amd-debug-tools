@@ -942,7 +942,7 @@ class S0i3Validator:
                             result = True
                         continue
                     if "Time (in us) in S0i3" in line:
-                        n = int(line.split(":")[1]) / 10**6
+                        self.hw_sleep_duration = int(line.split(":")[1]) / 10**6
             except PermissionError:
                 if self.lockdown:
                     self.log(
