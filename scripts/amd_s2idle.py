@@ -513,19 +513,15 @@ class S0i3Validator:
             if not "PNP0C0A" in dev.device_path:
                 continue
 
-            energy_full_design = int(
-                dev.properties.get(dev.properties["POWER_SUPPLY_ENERGY_FULL_DESIGN"])
-            )
-            energy_full = int(dev.properties.get(["POWER_SUPPLY_ENERGY_FULL"]))
-            energy = int(dev.properties.get(["POWER_SUPPLY_ENERGY_NOW"]))
-            charge_full_design = int(
-                dev.properties.get(dev.properties["POWER_SUPPLY_CHARGE_FULL_DESIGN"])
-            )
-            charge_full = int(dev.properties.get(["POWER_SUPPLY_CHARGE_FULL"]))
-            charge = int(dev.properties.get(["POWER_SUPPLY_CHARGE_NOW"]))
-            man = dev.properties["POWER_SUPPLY_MANUFACTURER"]
-            model = dev.properties["POWER_SUPPLY_MODEL_NAME"]
-            name = dev.properties["POWER_SUPPLY_NAME"]
+            energy_full_design = dev.properties.get("POWER_SUPPLY_ENERGY_FULL_DESIGN")
+            energy_full = dev.properties.get("POWER_SUPPLY_ENERGY_FULL")
+            energy = dev.properties.get("POWER_SUPPLY_ENERGY_NOW")
+            charge_full_design = dev.properties.get("POWER_SUPPLY_CHARGE_FULL_DESIGN")
+            charge_full = dev.properties.get("POWER_SUPPLY_CHARGE_FULL")
+            charge = dev.properties.get("POWER_SUPPLY_CHARGE_NOW")
+            man = dev.properties.get("POWER_SUPPLY_MANUFACTURER")
+            model = dev.properties.get("POWER_SUPPLY_MODEL_NAME")
+            name = dev.properties.get("POWER_SUPPLY_NAME")
 
             if energy_full_design:
                 logging.debug(
@@ -539,14 +535,14 @@ class S0i3Validator:
                             name=name,
                             man=man,
                             model=model,
-                            percent=float(energy_full) / energy_full_design,
+                            percent=float(energy_full) / int(energy_full_design),
                         ),
                         colors.OK,
                     )
                 else:
-                    diff = abs(energy - self.energy[name])
-                    percent = float(diff) / energy_full
-                    if energy > self.energy[name]:
+                    diff = abs(int(energy) - self.energy[name])
+                    percent = float(diff) / int(energy_full)
+                    if int(energy) > self.energy[name]:
                         action = "gained"
                     else:
                         action = "lost"
@@ -556,7 +552,7 @@ class S0i3Validator:
                         ),
                         colors.OK,
                     )
-                self.energy[name] = energy
+                self.energy[name] = int(energy)
 
             if charge_full_design:
                 logging.debug(
@@ -570,14 +566,14 @@ class S0i3Validator:
                             name=name,
                             man=man,
                             model=model,
-                            percent=float(charge_full) / charge_full_design,
+                            percent=float(charge_full) / int(charge_full_design),
                         ),
                         colors.OK,
                     )
                 else:
-                    diff = abs(charge - self.charge[name])
-                    percent = float(diff) / charge_full
-                    if energy > self.energy[name]:
+                    diff = abs(int(charge) - self.charge[name])
+                    percent = float(diff) / int(charge_full)
+                    if int(charge) > self.charge[name]:
                         action = "gained"
                     else:
                         action = "lost"
@@ -587,7 +583,7 @@ class S0i3Validator:
                         ),
                         colors.OK,
                     )
-                self.charge[name] = charge
+                self.charge[name] = int(charge)
 
         return True
 
