@@ -373,6 +373,7 @@ class S0i3Validator:
             self.distro = distro.id()
         except ModuleNotFoundError:
             self.distro = ""
+            self.pretty_distro = ""
         try:
             if self.distro:
                 self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
