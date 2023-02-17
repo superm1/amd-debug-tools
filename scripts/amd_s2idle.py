@@ -58,6 +58,29 @@ def compare_sysfs(fn, expect):
     return read_file(fn) == expect
 
 
+def check_dynamic_debug(message):
+    """Check if dynamic debug supports a given message"""
+    fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
+    try:
+        dbg = read_file(fn)
+        for line in dbg.split("\n"):
+            if re.search(message, line):
+                return True
+    except PermissionError:
+        pass
+    return False
+
+
+def capture_file_to_debug(fn):
+    """Reads and captures all contents of fn"""
+    try:
+        contents = read_file(fn)
+        for line in contents.split("\n"):
+            logging.debug(line.rstrip())
+    except PermissionError:
+        logging.debug("Unable to capture %s" % fn)
+
+
 def print_color(message, color):
     print("{color}{message}{end}".format(color=color, message=message, end=colors.ENDC))
 
@@ -784,14 +807,15 @@ class S0i3Validator:
 
     def check_pinctrl_amd(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
-            message = "✅ GPIO driver `pinctrl_amd` available"
-            self.log(message, colors.OK)
-            # save debug log if we can get it
-            if os.geteuid() == 0:
-                p = os.path.join("/", "sys", "kernel", "debug", "gpio")
-                with open(p, "r") as r:
-                    for line in r.readlines():
-                        logging.debug(line.strip())
+            self.log("✅ GPIO driver `pinctrl_amd` available", colors.OK)
+            p = os.path.join("/", "sys", "kernel", "debug", "gpio")
+            capture_file_to_debug(p)
+            if not check_dynamic_debug(
+                "drivers/pinctrl/pinctrl-amd.*GPIO %d is active"
+            ):
+                self.log(
+                    "🚦 GPIO dynamic debugging information unavailable", colors.WARNING
+                )
             return True
         self.log("❌ GPIO driver `pinctrl_amd` not loaded", colors.FAIL)
         return False
@@ -1014,9 +1038,7 @@ class S0i3Validator:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
-                    with open("%s.dsl" % prefix, "r") as f:
-                        for line in f.readlines():
-                            logging.debug(line.rstrip())
+                    capture_file_to_debug("%s.dsl" % prefix)
                 except subprocess.CalledProcessError as e:
                     self.log("Failed to capture ACPI table: %s" % e.output, colors.FAIL)
                 finally:
@@ -1049,16 +1071,10 @@ class S0i3Validator:
                 else:
                     logging.debug(pkg.installed)
 
-        try:
-            path = os.path.join(
-                "/", "sys", "kernel", "debug", "dri", "0", "amdgpu_firmware_info"
-            )
-            debugfs = read_file(path)
-            for line in debugfs.split("\n"):
-                logging.debug(line)
-        except PermissionError:
-            logging.debug("Unable to capture {path}".format(path=path))
-
+        path = os.path.join(
+            "/", "sys", "kernel", "debug", "dri", "0", "amdgpu_firmware_info"
+        )
+        capture_file_to_debug(path)
         return True
 
     def capture_disabled_pins(self):
