@@ -533,7 +533,6 @@ class S0i3Validator:
             self.log(
                 "❌ systemd daemon or systemd python module is missing", colors.FAIL
             )
-            sys.exit(1)
         return True
 
     def check_battery(self):
