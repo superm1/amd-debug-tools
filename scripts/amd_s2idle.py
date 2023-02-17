@@ -487,27 +487,30 @@ class S0i3Validator:
                     return
         else:
             if not self.journal:
-                message = "Unable to test storage without systemd"
+                message = "🚦 Unable to test FADT from kernel log without systemd"
                 self.log(message, colors.WARNING)
-                return True
-            self.journal.seek_head()
-            for entry in self.journal:
-                if (
-                    "Low-power S0 idle used by default for system suspend"
-                    in entry["MESSAGE"]
-                ):
-                    found = True
-                    break
+            else:
+                self.journal.seek_head()
+                for entry in self.journal:
+                    if (
+                        "Low-power S0 idle used by default for system suspend"
+                        in entry["MESSAGE"]
+                    ):
+                        found = True
+                        break
         # try to look at FACP directly if not found (older kernel compat)
         if not found:
-            if os.geteuid() == 0:
-                import struct
+            if os.geteuid() != 0:
+                logging.debug("Unable to capture ACPI tables without root")
+                return True
 
-                logging.debug("Fetching low power idle bit directly from FADT")
-                target = os.path.join("/", "sys", "firmware", "acpi", "tables", "FACP")
-                with open(target, "rb") as r:
-                    r.seek(0x70)
-                    found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
+            import struct
+
+            logging.debug("Fetching low power idle bit directly from FADT")
+            target = os.path.join("/", "sys", "firmware", "acpi", "tables", "FACP")
+            with open(target, "rb") as r:
+                r.seek(0x70)
+                found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
         if found:
             message = "✅ ACPI FADT supports Low-power S0 idle"
             self.log(message, colors.OK)
