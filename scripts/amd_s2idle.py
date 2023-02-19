@@ -165,14 +165,23 @@ class VendorWrong(S0i3Failure):
 
 
 class AcpiNvmeStorageD3Enable(S0i3Failure):
-    def __init__(self):
+    def __init__(self, disk, num_ssds):
         super().__init__()
-        self.description = "NVME device missing ACPI attributes"
+        self.description = "{disk} missing ACPI attributes".format(disk=disk)
         self.explanation = (
             "\tAn NVME device was found, but it doesn't specify the StorageD3Enable\n"
             "\tattribute in the device specific data (_DSD).\n"
-            "\tThis is a BIOS bug, but it may be possible to work around in the kernel."
+            "\tThis is a BIOS bug, but it may be possible to work around in the kernel.\n"
         )
+        if num_ssds > 1:
+            self.explanation += (
+                "\n"
+                "\tIf you added an aftermarket SSD to your system, the system vendor might not added this\n"
+                "\tproperty to the BIOS for the second port which could cause this behavior.\n"
+                "\n"
+                "\tPlease re-run this script with the --acpidump argument and file a bug to "
+                "investigate.\n"
+            )
         self.url = "https://bugzilla.kernel.org/show_bug.cgi?id=216440"
 
 
@@ -686,9 +695,9 @@ class S0i3Validator:
         return True
 
     def check_storage(self):
-        has_nvme = False
         has_sata = False
-        valid_nvme = False
+        valid_nvme = {}
+        invalid_nvme = {}
         valid_sata = False
         valid_ahci = False
 
@@ -718,21 +727,25 @@ class S0i3Validator:
                 self.log(message, colors.WARNING)
                 return True
 
-            for device in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
-                has_nvme = True
-                break
-            for device in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
+            for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
+                pci_slot_name = dev.properties["PCI_SLOT_NAME"]
+                vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE", "")
+                model = dev.properties.get("ID_MODEL_FROM_DATABASE", "")
+                message = "{vendor} {model}".format(vendor=vendor, model=model)
+                self.journal.seek_head()
+                for entry in self.journal:
+                    if not pci_slot_name in entry["MESSAGE"]:
+                        continue
+                    if headers.NvmeSimpleSuspend in entry["MESSAGE"]:
+                        valid_nvme[pci_slot_name] = message
+                        break
+                if pci_slot_name not in valid_nvme:
+                    invalid_nvme[pci_slot_name] = message
+
+            for dev in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
                 has_sata = True
                 break
 
-            if has_nvme:
-                self.journal.seek_head()
-                for entry in self.journal:
-                    if not "nvme" in entry["MESSAGE"]:
-                        continue
-                    if headers.NvmeSimpleSuspend in entry["MESSAGE"]:
-                        valid_nvme = True
-                        break
             if has_sata:
                 # Test AHCI
                 self.journal.seek_head()
@@ -752,18 +765,25 @@ class S0i3Validator:
                     if _check_ata_devslp(entry["MESSAGE"]):
                         valid_sata = True
                         break
-        if has_nvme:
-            if valid_nvme:
-                message = "✅ NVME is configured for s2idle in BIOS"
-                self.log(message, colors.OK)
-            else:
-                message = "❌ NVME is not configured for s2idle in BIOS"
+        if invalid_nvme:
+            for disk in invalid_nvme:
+                message = "❌ {disk} is not configured for s2idle in BIOS".format(
+                    disk=invalid_nvme[disk]
+                )
                 self.log(message, colors.FAIL)
-                self.failures += [AcpiNvmeStorageD3Enable()]
+                num = len(invalid_nvme) + len(valid_nvme)
+                self.failures += [AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)]
+        if valid_nvme:
+            for disk in valid_nvme:
+                message = "✅ {disk} is configured for s2idle in BIOS".format(
+                    disk=valid_nvme[disk]
+                )
+                self.log(message, colors.OK)
         if has_sata:
             if valid_sata:
                 message = "✅ SATA supports DevSlp feature"
             else:
+                invalid_nvme = True
                 message = "❌ SATA does not support DevSlp feature"
                 self.log(message, colors.FAIL)
                 self.failures += [DevSlpDiskIssue()]
@@ -776,7 +796,7 @@ class S0i3Validator:
                 self.failures += [DevSlpHostIssue()]
 
         return (
-            (valid_nvme or not has_nvme)
+            (len(invalid_nvme) == 0)
             and (valid_sata or not has_sata)
             and (valid_ahci or not has_sata)
         )
