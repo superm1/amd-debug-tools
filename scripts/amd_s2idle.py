@@ -1731,7 +1731,7 @@ class S0i3Validator:
                 self.log(line, colors.WARNING)
             elif "DEBUG:" in line:
                 line = line.split("DEBUG:\t")[-1].rstrip()
-                self.log("%s" % line, colors.DEBUG)
+                self.log("🦟 %s" % line, colors.DEBUG)
 
     def check_offline(self, input):
         with open(input, "r") as r:
