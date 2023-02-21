@@ -456,7 +456,7 @@ class DmesgLogger(KernelLogger):
 
 class SystemdLogger(KernelLogger):
     def __init__(self):
-        from systemd import journald
+        from systemd import journal
 
         self.journal = journal.Reader()
         self.journal.this_boot()
