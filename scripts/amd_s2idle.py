@@ -1132,11 +1132,11 @@ class S0i3Validator:
             except PermissionError:
                 if self.lockdown:
                     self.log(
-                        "Unable to gather hardware sleep data with lockdown engaged",
+                        "🚦 Unable to gather hardware sleep data with lockdown engaged",
                         colors.WARNING,
                     )
                 else:
-                    self.log("Failed to read hardware sleep data", colors.WARNING)
+                    self.log("🚦 Failed to read hardware sleep data", colors.WARNING)
                 return False
             except FileNotFoundError:
                 self.log("○ HW sleep statistics file missing", colors.FAIL)
@@ -1662,8 +1662,9 @@ class S0i3Validator:
                 self.log(line, colors.OK)
             elif "❌" in line:
                 self.log(line, colors.FAIL)
-            if headers.WokeFromIrq in line:
-                self.log(line, colors.OK)
+            elif "🚦" in line:
+                line = line.split("WARNING:\t")[-1].strip()
+                self.log(line, colors.WARNING)
             if (
                 headers.Prerequisites in line
                 or headers.Info in line
