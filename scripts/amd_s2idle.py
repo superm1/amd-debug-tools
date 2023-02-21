@@ -1642,19 +1642,18 @@ class S0i3Validator:
         if count > 1:
             length = timedelta(seconds=(duration + wait) * count)
             self.log(
-                "Running {count} cycles, expected to finish at {time}".format(
+                "Running {count} cycles (Test finish expected @ {time})".format(
                     count=count, time=datetime.now() + length
                 ),
                 colors.HEADER,
             )
 
         self.requested_duration = duration
-        self.log(
+        logging.debug(
             "{msg} {time}".format(
                 msg=headers.SuspendDuration,
                 time=timedelta(seconds=self.requested_duration),
             ),
-            colors.HEADER,
         )
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
@@ -1668,10 +1667,18 @@ class S0i3Validator:
             self.kernel_duration = 0
             self.hw_sleep_duration = 0
             if count > 1:
-                self.log(
-                    "%s %d, started at %s" % (headers.CycleCount, i, self.last_suspend),
-                    colors.HEADER,
-                )
+                header = "{header} {count}: ".format(header=headers.CycleCount, count=i)
+            else:
+                header = ""
+            self.log(
+                "{header}Started at {start} (cycle finish expected @ {finish})".format(
+                    header=header,
+                    start=self.last_suspend,
+                    finish=datetime.now()
+                    + timedelta(seconds=self.requested_duration + wait),
+                ),
+                colors.HEADER,
+            )
             with open(wakealarm, "w") as w:
                 w.write("0")
             with open(wakealarm, "w") as w:
