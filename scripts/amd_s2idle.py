@@ -272,6 +272,23 @@ class KernelLockdown(S0i3Failure):
         )
 
 
+class KernelRingBufferWrapped(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "Kernel ringbuffer has wrapped"
+        self.explanation = (
+            "\tThis script relies upon analyzing the kernel log for markers.\n"
+            "\tThe kernel's log provided by dmesg uses a ring buffer.\n"
+            "\tWhen the ring buffer fills up it will wrap around and overwrite old messages.\n"
+            "\n"
+            "\tIn this case it's not possible to look for some of these markers\n"
+            "\n"
+            "\tPassing the pre-requisites check won't be possible without rebooting the machine.\n"
+            "\tIf you are sure your system meets pre-requisites, you can re-run the script using.\n"
+            "\tthe systemd logger or with --force.\n"
+        )
+
+
 class uPepMissing(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -432,6 +449,9 @@ class DmesgLogger(KernelLogger):
         self.seek()
         for entry in self.buffer.split("\n"):
             super().capture_full_dmesg(entry)
+
+    def capture_header(self):
+        return self.buffer.split("\n")[0]
 
 
 class SystemdLogger(KernelLogger):
@@ -1286,6 +1306,14 @@ class S0i3Validator:
                 "🚦Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
                 colors.WARNING,
             )
+            header = self.kernel_log.capture_header()
+            if not header.startswith("Linux version"):
+                self.log(
+                    "❌ Kernel ringbuffer has wrapped, unable to accurately validate pre-requisites",
+                    colors.FAIL,
+                )
+                self.failures += [KernelRingBufferWrapped()]
+                return False
         return True
 
     def prerequisites(self):
