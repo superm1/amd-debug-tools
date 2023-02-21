@@ -485,7 +485,7 @@ class S0i3Validator:
             logging.info(message)
         print_color(message, color)
 
-    def __init__(self, log, acpidump):
+    def __init__(self, log, acpidump, kernel_log):
         # for saving a log file for analysis
         logging.basicConfig(
             format="%(asctime)s %(levelname)s:\t%(message)s",
@@ -542,15 +542,20 @@ class S0i3Validator:
             self.iasl = False
 
         # for analyzing kernel logs
-        try:
-            self.kernel_log = SystemdLogger()
-        except ImportError:
-            self.kernel_log = None
-        if not self.kernel_log:
+        if kernel_log == "auto":
             try:
-                self.kernel_log = DmesgLogger()
-            except subprocess.CalledProcessError:
+                self.kernel_log = SystemdLogger()
+            except ImportError:
                 self.kernel_log = None
+            if not self.kernel_log:
+                try:
+                    self.kernel_log = DmesgLogger()
+                except subprocess.CalledProcessError:
+                    self.kernel_log = None
+        elif kernel_log == "systemd":
+            self.kernel_log = SystemdLogger()
+        elif kernel_log == "dmesg":
+            self.kernel_log = DmesgLogger()
 
         # for comparing SMU version
         try:
@@ -1679,6 +1684,12 @@ def parse_args():
         help=headers.WaitDescription,
     )
     parser.add_argument(
+        "--kernel-log-provider",
+        default="auto",
+        choices=["auto", "systemd", "dmesg"],
+        help="Kernel log provider",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Run suspend test even if prerequisites failed",
@@ -1741,11 +1752,11 @@ if __name__ == "__main__":
     if args.offline:
         if not os.path.exists(log):
             sys.exit("{log} is missing".format(log=log))
-        app = S0i3Validator("/dev/null", False)
+        app = S0i3Validator("/dev/null", False, None)
         app.check_offline(log)
         app.get_failure_report()
     else:
-        app = S0i3Validator(log, args.acpidump)
+        app = S0i3Validator(log, args.acpidump, args.kernel_log_provider)
         test = app.prerequisites()
         if test or args.force:
             duration, wait, count = configure_suspend(
