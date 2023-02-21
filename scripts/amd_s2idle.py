@@ -1591,6 +1591,8 @@ class S0i3Validator:
         for i in range(1, count + 1):
             self.run_countdown(wait)
             self.last_suspend = datetime.now()
+            self.kernel_duration = 0
+            self.hw_sleep_duration = 0
             if count > 1:
                 self.log(
                     "%s %d, started at %s" % (headers.CycleCount, i, self.last_suspend),
