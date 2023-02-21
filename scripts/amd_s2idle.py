@@ -1116,7 +1116,7 @@ class S0i3Validator:
         if self.offline:
             for line in self.offline:
                 # re-entrant; don't re-run
-                if "✅ Spent" in line or "❌ Did not reach" in line:
+                if "✅ In a hardware sleep state" in line or "❌ Did not reach" in line:
                     return
         if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
