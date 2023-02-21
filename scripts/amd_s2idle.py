@@ -670,9 +670,9 @@ class S0i3Validator:
     def capture_kernel_version(self):
         """Log the kernel version used"""
         if self.pretty_distro:
-            self.log("○ {distro}".format(distro=self.pretty_distro), colors.OK)
+            self.log("🐧 {distro}".format(distro=self.pretty_distro), colors.OK)
         self.log(
-            "○ Kernel {version}".format(version=platform.uname().release), colors.OK
+            "🐧 Kernel {version}".format(version=platform.uname().release), colors.OK
         )
 
     def check_battery(self):
@@ -700,7 +700,7 @@ class S0i3Validator:
                 )
                 if not name in self.energy:
                     self.log(
-                        "○ Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
+                        "🔋 Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
                             name=name,
                             man=man,
                             model=model,
@@ -716,7 +716,7 @@ class S0i3Validator:
                     else:
                         action = "lost"
                     self.log(
-                        "○ Battery {name} {action} {energy} µWh ({percent:.2%})".format(
+                        "🔋 Battery {name} {action} {energy} µWh ({percent:.2%})".format(
                             name=name, action=action, energy=diff, percent=percent
                         ),
                         colors.OK,
@@ -798,7 +798,7 @@ class S0i3Validator:
             version = read_file(os.path.join(p, "bios_version"))
             date = read_file(os.path.join(p, "bios_date"))
             self.log(
-                "○ {vendor} {product} ({family}) running BIOS {release} ({version}) released {date}".format(
+                "💻 {vendor} {product} ({family}) running BIOS {release} ({version}) released {date}".format(
                     vendor=vendor,
                     product=product,
                     family=family,
@@ -1658,7 +1658,7 @@ class S0i3Validator:
                 return
             line = line.split("INFO:\t")[-1].strip()
             # replay s0i3 reports
-            if "✅" in line or "○" in line:
+            if any(mk in line for mk in ["✅", "🔋", "🐧", "💻", "○"]):
                 self.log(line, colors.OK)
             elif "❌" in line:
                 self.log(line, colors.FAIL)
