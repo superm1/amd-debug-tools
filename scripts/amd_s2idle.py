@@ -456,7 +456,7 @@ class DmesgLogger(KernelLogger):
 
 class SystemdLogger(KernelLogger):
     def __init__(self):
-        from systemd import journal
+        from systemd import journald
 
         self.journal = journal.Reader()
         self.journal.this_boot()
@@ -1293,7 +1293,7 @@ class S0i3Validator:
 
     def capture_full_dmesg(self):
         if not self.kernel_log:
-            message = "🚦 Unable to analyze kernel log without systemd"
+            message = "🚦 Unable to analyze kernel log"
             self.log(message, colors.WARNING)
             return
         self.kernel_log.capture_full_dmesg()
