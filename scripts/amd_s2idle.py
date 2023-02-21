@@ -1678,6 +1678,11 @@ def parse_args():
         "--wait",
         help=headers.WaitDescription,
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Run suspend test even if prerequisites failed",
+    )
     parser.add_argument("--count", help=headers.CountDescription)
     parser.add_argument(
         "--acpidump",
@@ -1742,7 +1747,7 @@ if __name__ == "__main__":
     else:
         app = S0i3Validator(log, args.acpidump)
         test = app.prerequisites()
-        if test:
+        if test or args.force:
             duration, wait, count = configure_suspend(
                 duration=args.duration, wait=args.wait, count=args.count
             )
