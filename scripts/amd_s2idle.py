@@ -360,12 +360,119 @@ class LowHardwareSleepResidency(S0i3Failure):
         ).format(time=timedelta(seconds=duration), percent=percent)
 
 
-def _check_ahci_devslp(line):
-    return "sds" in line and "sadm" in line
+class KernelLogger:
+    def __init__(self):
+        pass
+
+    def seek(self):
+        pass
+
+    def process_callback(self, validator, callback):
+        pass
+
+    def match_line(self, matches):
+        pass
+
+    def match_pattern(self, pattern):
+        pass
+
+    def capture_full_dmesg(self, line):
+        logging.debug(line)
 
 
-def _check_ata_devslp(line):
-    return "Features" in line and "Dev-Sleep" in line
+class DmesgLogger(KernelLogger):
+    def __init__(self):
+        import subprocess
+
+        self.command = ["dmesg", "-t", "-k"]
+        self._refresh_head()
+
+    def _refresh_head(self):
+        self.buffer = []
+        self.seeked = False
+        result = subprocess.run(self.command, check=True, capture_output=True)
+        if result.returncode == 0:
+            self.buffer = result.stdout.decode("utf-8")
+
+    def seek(self, time=None):
+        if time:
+            # look 10 seconds back because dmesg time isn't always accurate
+            fuzz = time - timedelta(seconds=10)
+            cmd = self.command + [
+                "--time-format=iso",
+                "--since=%s" % fuzz.strftime("%Y-%m-%dT%H:%M:%S"),
+            ]
+            result = subprocess.run(cmd, check=True, capture_output=True)
+            if result.returncode == 0:
+                self.buffer = result.stdout.decode("utf-8")
+                self.seeked = True
+        elif self.seeked:
+            self._refresh_head()
+
+    def process_callback(self, callback):
+        for entry in self.buffer.split("\n"):
+            callback(entry)
+
+    def match_line(self, matches):
+        """Find lines that match all matches"""
+        for entry in self.buffer.split("\n"):
+            for match in matches:
+                if match not in entry:
+                    break
+                return entry
+        return None
+
+    def match_pattern(self, pattern):
+        for entry in self.buffer.split("\n"):
+            if re.search(pattern, entry):
+                return entry
+        return None
+
+    def capture_full_dmesg(self, line=None):
+        self.seek()
+        for entry in self.buffer.split("\n"):
+            super().capture_full_dmesg(entry)
+
+
+class SystemdLogger(KernelLogger):
+    def __init__(self):
+        from systemd import journal
+
+        self.journal = journal.Reader()
+        self.journal.this_boot()
+        self.journal.log_level(journal.LOG_INFO)
+        self.journal.add_match(_TRANSPORT="kernel")
+        self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
+
+    def seek(self, time=None):
+        if time:
+            self.journal.seek_realtime(time)
+        else:
+            self.journal.seek_head()
+
+    def process_callback(self, callback):
+        for entry in self.journal:
+            callback(entry["MESSAGE"])
+
+    def match_line(self, matches):
+        """Find lines that match all matches"""
+        for entry in self.journal:
+            for match in matches:
+                if match not in entry["MESSAGE"]:
+                    break
+                return entry["MESSAGE"]
+        return None
+
+    def match_pattern(self, pattern):
+        for entry in self.journal:
+            if re.search(pattern, entry["MESSAGE"]):
+                return entry
+        return None
+
+    def capture_full_dmesg(self, line=None):
+        self.seek()
+        for entry in self.journal:
+            super().capture_full_dmesg(entry["MESSAGE"])
 
 
 class S0i3Validator:
@@ -434,17 +541,16 @@ class S0i3Validator:
                 subprocess.check_call(installer)
             self.iasl = False
 
-        # for analyzing systemd's journal
+        # for analyzing kernel logs
         try:
-            from systemd import journal
-
-            self.journal = journal.Reader()
-            self.journal.this_boot()
-            self.journal.log_level(journal.LOG_INFO)
-            self.journal.add_match(_TRANSPORT="kernel")
-            self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
+            self.kernel_log = SystemdLogger()
         except ImportError:
-            self.journal = False
+            self.kernel_log = None
+        if not self.kernel_log:
+            try:
+                self.kernel_log = DmesgLogger()
+            except subprocess.CalledProcessError:
+                self.kernel_log = None
 
         # for comparing SMU version
         try:
@@ -487,9 +593,6 @@ class S0i3Validator:
         # for comparing GPEs before/after sleep
         self.gpes = {}
 
-        # for checking for WCN6855 F/W bug
-        self.wcn6855 = None
-
         # for monitoring battery levels across suspend
         self.energy = {}
         self.charge = {}
@@ -510,18 +613,13 @@ class S0i3Validator:
                 if "✅ ACPI FADT supports Low-power S0 idle" in line:
                     return
         else:
-            if not self.journal:
-                message = "🚦 Unable to test FADT from kernel log without systemd"
+            if not self.kernel_log:
+                message = "🚦 Unable to test FADT from kernel log"
                 self.log(message, colors.WARNING)
             else:
-                self.journal.seek_head()
-                for entry in self.journal:
-                    if (
-                        "Low-power S0 idle used by default for system suspend"
-                        in entry["MESSAGE"]
-                    ):
-                        found = True
-                        break
+                self.kernel_log.seek()
+                matches = ["Low-power S0 idle used by default for system suspend"]
+                found = self.kernel_log.match_line(matches)
         # try to look at FACP directly if not found (older kernel compat)
         if not found:
             if os.geteuid() != 0:
@@ -551,13 +649,6 @@ class S0i3Validator:
         self.log(
             "○ Kernel {version}".format(version=platform.uname().release), colors.OK
         )
-
-    def check_systemd(self):
-        if not self.journal:
-            self.log(
-                "❌ systemd daemon or systemd python module is missing", colors.FAIL
-            )
-        return True
 
     def check_battery(self):
         for dev in self.pyudev.list_devices(
@@ -742,8 +833,8 @@ class S0i3Validator:
                     return True
 
         else:
-            if not self.journal:
-                message = "🚦 Unable to test storage without systemd"
+            if not self.kernel_log:
+                message = "🚦 Unable to test storage from kernel log"
                 self.log(message, colors.WARNING)
                 return True
 
@@ -752,13 +843,10 @@ class S0i3Validator:
                 vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE", "")
                 model = dev.properties.get("ID_MODEL_FROM_DATABASE", "")
                 message = "{vendor} {model}".format(vendor=vendor, model=model)
-                self.journal.seek_head()
-                for entry in self.journal:
-                    if not pci_slot_name in entry["MESSAGE"]:
-                        continue
-                    if headers.NvmeSimpleSuspend in entry["MESSAGE"]:
-                        valid_nvme[pci_slot_name] = message
-                        break
+                self.kernel_log.seek()
+                matches = [pci_slot_name, headers.NvmeSimpleSuspend]
+                if self.kernel_log.match_line(matches):
+                    valid_nvme[pci_slot_name] = message
                 if pci_slot_name not in valid_nvme:
                     invalid_nvme[pci_slot_name] = message
 
@@ -768,23 +856,15 @@ class S0i3Validator:
 
             if has_sata:
                 # Test AHCI
-                self.journal.seek_head()
-                for entry in self.journal:
-                    if not "ahci" in entry["MESSAGE"]:
-                        continue
-                    if not "flags" in entry["MESSAGE"]:
-                        continue
-                    if _check_ahci_devslp(entry["MESSAGE"]):
-                        valid_ahci = True
-                        break
+                self.kernel_log.seek()
+                matches = ["ahci", "flags", "sds", "sadm"]
+                if self.kernel_log.match_line(matches):
+                    valid_ahci = True
                 # Test SATA
-                self.journal.seek_head()
-                for entry in self.journal:
-                    if not "ata" in entry["MESSAGE"]:
-                        continue
-                    if _check_ata_devslp(entry["MESSAGE"]):
-                        valid_sata = True
-                        break
+                self.kernel_log.seek()
+                matches = ["ata", "Features", "Dev-Sleep"]
+                if self.kernel_log.match_line(matches):
+                    valid_sata = True
         if invalid_nvme:
             for disk in invalid_nvme:
                 message = "❌ NVME {disk} is not configured for s2idle in BIOS".format(
@@ -831,19 +911,18 @@ class S0i3Validator:
                     )
                     break
         else:
-            if not self.journal:
-                message = "🚦 Unable to test for amd_hsmp bug without systemd"
+            if not self.kernel_log:
+                message = "🚦 Unable to test for amd_hsmp bug from kernel log"
                 self.log(message, colors.WARNING)
                 return True
-            self.journal.seek_head()
-            for entry in self.journal:
-                if re.search("amd_hsmp.*HSMP is not supported", entry["MESSAGE"]):
-                    self.log(
-                        "❌ HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
-                        colors.FAIL,
-                    )
-                    self.failures += [AmdHsmpBug()]
-                    return False
+            self.kernel_log.seek()
+            if self.kernel_log.match_pattern("amd_hsmp.*HSMP is not supported"):
+                self.log(
+                    "❌ HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                    colors.FAIL,
+                )
+                self.failures += [AmdHsmpBug()]
+                return False
 
             cmdline = read_file(os.path.join("/proc", "cmdline"))
             blocked = "initcall_blacklist=hsmp_plt_init" in cmdline
@@ -922,37 +1001,32 @@ class S0i3Validator:
         return False
 
     def _process_ath11k_line(self, line) -> bool:
-        if "wcn6855" in line:
-            self.wcn6855 = True
-            return False
-        if self.wcn6855 and re.search("ath11k_pci.*fw_version", line):
+        if re.search("ath11k_pci.*fw_version", line):
             logging.debug("WCN6855 version string: %s", line)
             objects = line.split()
             for i in range(0, len(objects)):
                 if objects[i] == "fw_version":
-                    self.wcn6855 = int(objects[i + 1], 16)
-                    return True
+                    return int(objects[i + 1], 16)
         return False
 
     def check_wcn6855_bug(self):
-        if self.offline:
-            for line in self.offline:
-                if "ath11k_pci" in line:
-                    if self._process_ath11k_line(line):
-                        break
-        else:
-            if not self.journal:
-                message = "🚦 Unable to test for wcn6855 bug without systemd"
-                self.log(message, colors.WARNING)
-                return True
+        if not self.kernel_log:
+            message = "🚦 Unable to test for wcn6855 bug from kernel log"
+            self.log(message, colors.WARNING)
+            return True
+        wcn6855 = False
+        self.kernel_log.seek()
+        if self.kernel_log.match_pattern("ath11k_pci.*wcn6855"):
+            match = self.kernel_log.match_pattern("ath11k_pci.*fw_version")
+            if match:
+                logging.debug("WCN6855 version string: %s", match)
+                objects = line.split()
+                for i in range(0, len(objects)):
+                    if objects[i] == "fw_version":
+                        wcn6855 = int(objects[i + 1], 16)
 
-            self.journal.seek_head()
-            for entry in self.journal:
-                if "ath11k_pci" in entry["MESSAGE"]:
-                    if self._process_ath11k_line(entry["MESSAGE"]):
-                        break
-        if self.wcn6855:
-            if self.wcn6855 >= 0x110B196E:
+        if wcn6855:
+            if wcn6855 >= 0x110B196E:
                 self.log(
                     "✅ WCN6855 WLAN (fw version {version})".format(
                         version=hex(self.wcn6855)
@@ -1182,25 +1256,32 @@ class S0i3Validator:
                     logging.debug("%s is not configured" % (f))
                 else:
                     logging.debug("%s is configured to %s" % (f, d))
-        if not self.journal:
-            message = "🚦 Unable to validate disabled pins without systemd"
+        if not self.kernel_log:
+            message = "🚦 Unable to validate disabled pins from kernel log"
             self.log(message, colors.WARNING)
             return True
-        self.journal.seek_head()
-        for entry in self.journal:
-            if re.search("Ignoring.* on pin", entry["MESSAGE"]):
-                self.log("○ %s" % entry["MESSAGE"], colors.OK)
+        self.kernel_log.seek()
+        result = self.kernel_log.match_pattern("Ignoring.* on pin")
+        if result:
+            self.log("○ %s" % result, colors.OK)
         return True
 
     def capture_full_dmesg(self):
-        if not self.journal:
+        if not self.kernel_log:
             message = "🚦 Unable to analyze kernel log without systemd"
             self.log(message, colors.WARNING)
             return
+        self.kernel_log.capture_full_dmesg()
 
-        self.journal.seek_head()
-        for entry in self.journal:
-            logging.debug(entry["MESSAGE"])
+    def check_logger(self):
+        if isinstance(self.kernel_log, SystemdLogger):
+            self.log("✅ Logs are provided via systemd", colors.OK)
+        if isinstance(self.kernel_log, DmesgLogger):
+            self.log(
+                "🚦Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
+                colors.WARNING,
+            )
+        return True
 
     def prerequisites(self):
         self.log(headers.Info, colors.HEADER)
@@ -1214,7 +1295,7 @@ class S0i3Validator:
 
         self.log(headers.Prerequisites, colors.HEADER)
         checks = [
-            self.check_systemd,
+            self.check_logger,
             self.check_cpu_vendor,
             self.check_fadt,
             self.capture_disabled_pins,
@@ -1309,6 +1390,7 @@ class S0i3Validator:
             )
         elif headers.Irq1Workaround in line:
             self.irq1_workaround = True
+        logging.debug(line)
 
     def cpu_offers_hpet_wa(self):
         from packaging import version
@@ -1355,15 +1437,8 @@ class S0i3Validator:
             for line in self.offline:
                 self._analyze_kernel_log_line(line)
         else:
-            if self.journal:
-                self.journal.seek_realtime(self.last_suspend)
-                for entry in self.journal:
-                    self._analyze_kernel_log_line(entry["MESSAGE"])
-                    logging.debug(entry["MESSAGE"])
-            else:
-                message = "🚦 Unable to analyze kernel log without systemd"
-                self.log(message, colors.WARNING)
-                return
+            self.kernel_log.seek(self.last_suspend)
+            self.kernel_log.process_callback(self._analyze_kernel_log_line)
 
         if self.offline_report:
             return True
@@ -1577,7 +1652,6 @@ class S0i3Validator:
             self.analyze_kernel_log,
             self.check_hw_sleep,
             self.analyze_masks,
-            self.check_wcn6855_bug,
         ]
         for check in checks:
             check()
