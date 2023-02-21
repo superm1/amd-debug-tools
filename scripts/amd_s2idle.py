@@ -292,6 +292,21 @@ class uPepMissing(S0i3Failure):
         )
 
 
+class AmdHsmpBug(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "amd-hsmp built in to kernel"
+        self.explanation = (
+            "\tThe kernel has been compiled with CONFIG_AMD_HSMP=y.\n"
+            "\tThis has been shown to cause suspend failures on some systems.\n"
+            "\n"
+            "\tEither recompile the kernel without CONFIG_AMD_HSMP,\n"
+            "\tor use initcall_blacklist=hsmp_plt_init on your kernel command line to avoid triggering problems\n"
+            "\n"
+        )
+        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/2414"
+
+
 class WCN6855Bug(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -806,14 +821,61 @@ class S0i3Validator:
             and (valid_ahci or not has_sata)
         )
 
+    def check_amd_hsmp(self):
+        if self.offline:
+            for line in self.offline:
+                if re.search("amd_hsmp.*HSMP is not supported", line):
+                    self.log(
+                        "❌ HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                        colors.FAIL,
+                    )
+                    break
+        else:
+            if not self.journal:
+                message = "🚦 Unable to test for amd_hsmp bug without systemd"
+                self.log(message, colors.WARNING)
+                return True
+            self.journal.seek_head()
+            for entry in self.journal:
+                if re.search("amd_hsmp.*HSMP is not supported", entry["MESSAGE"]):
+                    self.log(
+                        "❌ HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                        colors.FAIL,
+                    )
+                    self.failures += [AmdHsmpBug()]
+                    return False
+
+            cmdline = read_file(os.path.join("/proc", "cmdline"))
+            blocked = "initcall_blacklist=hsmp_plt_init" in cmdline
+
+            p = os.path.join("/", "sys", "module", "amd_hsmp")
+            if os.path.exists(p) and not blacklisted:
+                self.log("❌ `amd_hsmp` driver may conflict with amd_pmc", colors.FAIL)
+                self.failures += [AmdHsmpBug()]
+                return False
+
+            self.log(
+                "✅ HSMP driver `amd_hsmp` not detected (blocked: {blocked})".format(
+                    blocked=blocked
+                ),
+                colors.OK,
+            )
+        return True
+
     def check_amd_pmc(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_pmc"):
             message = "✅ PMC driver `amd_pmc` loaded"
             p = os.path.join(device.sys_path, "smu_program")
             v = os.path.join(device.sys_path, "smu_fw_version")
             if os.path.exists(v):
-                self.smu_version = read_file(v)
-                self.smu_program = read_file(p)
+                try:
+                    self.smu_version = read_file(v)
+                    self.smu_program = read_file(p)
+                except TimeoutError:
+                    self.log(
+                        "❌ failed to communicate using `amd_pmc` driver", colors.FAIL
+                    )
+                    return False
                 message += " (Program {program} Firmware {version})".format(
                     program=self.smu_program, version=self.smu_version
                 )
@@ -1156,6 +1218,7 @@ class S0i3Validator:
             self.check_cpu_vendor,
             self.check_fadt,
             self.capture_disabled_pins,
+            self.check_amd_hsmp,
             self.check_amd_pmc,
             self.check_usb4,
             self.cpu_offers_hpet_wa,
@@ -1256,9 +1319,10 @@ class S0i3Validator:
                 show_warning = True
         elif self.cpu_family == 0x19:
             if self.cpu_model == 0x50:
-                show_warning = version.parse(self.smu_version) < version.parse(
-                    "64.53.0"
-                )
+                if self.smu_version:
+                    show_warning = version.parse(self.smu_version) < version.parse(
+                        "64.53.0"
+                    )
         if show_warning:
             self.log(
                 "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
