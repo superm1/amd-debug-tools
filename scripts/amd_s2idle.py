@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, date
 
 
 class colors:
+    DEBUG = "\033[90m"
     HEADER = "\033[95m"
     OK = "\033[94m"
     WARNING = "\033[93m"
@@ -1705,19 +1706,24 @@ class S0i3Validator:
                 self.offline_report = True
             if not self.offline_report:
                 return
-            line = line.split("INFO:\t")[-1].strip()
             # replay s0i3 reports
-            if any(mk in line for mk in ["✅", "🔋", "🐧", "💻", "○"]):
-                self.log(line, colors.OK)
-            elif any(mk in line for mk in ["👀", "❌"]):
-                self.log(line, colors.FAIL)
-            elif "🚦" in line:
+            if "INFO:" in line:
+                line = line.split("INFO:\t")[-1].strip()
+                if any(mk in line for mk in ["✅", "🔋", "🐧", "💻", "○"]):
+                    self.log(line, colors.OK)
+            elif "ERROR:" in line:
+                line = line.split("ERROR:\t")[-1].strip()
+                if any(mk in line for mk in ["👀", "❌"]):
+                    self.log(line, colors.FAIL)
+            elif "WARNING:" in line:
                 line = line.split("WARNING:\t")[-1].strip()
                 self.log(line, colors.WARNING)
+            elif "DEBUG:" in line:
+                line = line.split("DEBUG:\t")[-1].rstrip()
+                self.log("%s" % line, colors.DEBUG)
             if (
                 headers.Prerequisites in line
                 or headers.Info in line
-                or headers.SuspendDuration in line
                 or headers.CycleCount in line
                 or headers.LastCycleResults in line
             ):
