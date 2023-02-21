@@ -1711,6 +1711,17 @@ class S0i3Validator:
                 line = line.split("INFO:\t")[-1].strip()
                 if any(mk in line for mk in ["✅", "🔋", "🐧", "💻", "○"]):
                     self.log(line, colors.OK)
+                elif (
+                    headers.Prerequisites in line
+                    or headers.Info in line
+                    or headers.CycleCount in line
+                    or headers.LastCycleResults in line
+                ):
+                    self.log(line, colors.HEADER)
+                if re.search(".*(family.* model.*)", line):
+                    nums = re.findall(r"\d+", line)
+                    self.cpu_model = int(nums[-1], 16)
+                    self.cpu_family = int(nums[-2], 16)
             elif "ERROR:" in line:
                 line = line.split("ERROR:\t")[-1].strip()
                 if any(mk in line for mk in ["👀", "❌"]):
@@ -1721,17 +1732,6 @@ class S0i3Validator:
             elif "DEBUG:" in line:
                 line = line.split("DEBUG:\t")[-1].rstrip()
                 self.log("%s" % line, colors.DEBUG)
-            if (
-                headers.Prerequisites in line
-                or headers.Info in line
-                or headers.CycleCount in line
-                or headers.LastCycleResults in line
-            ):
-                self.log(line, colors.HEADER)
-            if re.search(".*(family.* model.*)", line):
-                nums = re.findall(r"\d+", line)
-                self.cpu_model = int(nums[-1], 16)
-                self.cpu_family = int(nums[-2], 16)
 
     def check_offline(self, input):
         with open(input, "r") as r:
