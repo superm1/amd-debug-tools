@@ -1178,7 +1178,7 @@ class S0i3Validator:
             with open(p, "w") as w:
                 pass
         except PermissionError:
-            self.log("❌ %s" % headers.RootError, colors.FAIL)
+            self.log("👀 %s" % headers.RootError, colors.FAIL)
             return False
         return True
 
@@ -1660,7 +1660,7 @@ class S0i3Validator:
             # replay s0i3 reports
             if any(mk in line for mk in ["✅", "🔋", "🐧", "💻", "○"]):
                 self.log(line, colors.OK)
-            elif "❌" in line:
+            elif any(mk in line for mk in ["👀", "❌"]):
                 self.log(line, colors.FAIL)
             elif "🚦" in line:
                 line = line.split("WARNING:\t")[-1].strip()
