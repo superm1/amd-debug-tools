@@ -707,14 +707,19 @@ class S0i3Validator:
                     has_nvme = True
                 if "SATA link up" in line:
                     has_sata = True
-                if has_nvme and headers.NvmeSimpleSuspend in line:
-                    valid_nvme = True
+                if headers.NvmeSimpleSuspend in line:
+                    objects = line.split()
+                    for i in range(0, len(objects)):
+                        if objects[i] == "nvme":
+                            valid_nvme[objects[i + 1]] = objects[i + 1]
                 if has_sata and _check_ahci_devslp(line):
                     valid_ahci = True
                 if has_sata and _check_ata_devslp(line):
                     valid_sata = True
                 # re-entrant; don't re-run
                 if "✅ NVME" in line:
+                    return True
+                if "❌ NVME" in line:
                     return True
                 if "✅ AHCI" in line:
                     return True
@@ -767,7 +772,7 @@ class S0i3Validator:
                         break
         if invalid_nvme:
             for disk in invalid_nvme:
-                message = "❌ {disk} is not configured for s2idle in BIOS".format(
+                message = "❌ NVME {disk} is not configured for s2idle in BIOS".format(
                     disk=invalid_nvme[disk]
                 )
                 self.log(message, colors.FAIL)
@@ -775,7 +780,7 @@ class S0i3Validator:
                 self.failures += [AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)]
         if valid_nvme:
             for disk in valid_nvme:
-                message = "✅ {disk} is configured for s2idle in BIOS".format(
+                message = "✅ NVME {disk} is configured for s2idle in BIOS".format(
                     disk=valid_nvme[disk]
                 )
                 self.log(message, colors.OK)
