@@ -1440,7 +1440,7 @@ class S0i3Validator:
                     )
         if show_warning:
             self.log(
-                "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
+                "🚦 Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
                 colors.WARNING,
             )
         return True
@@ -1495,7 +1495,7 @@ class S0i3Validator:
                 if self.irq1_workaround:
                     self.log("○ Kernel workaround for IRQ1 issue utilized")
                 else:
-                    self.log("○ IRQ1 found during wakeup", colors.WARNING)
+                    self.log("🚦 IRQ1 found during wakeup", colors.WARNING)
                     self.failures += [Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
