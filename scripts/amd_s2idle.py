@@ -41,12 +41,15 @@ class headers:
     RootError = "Suspend must be initiated by root user"
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
-    MissingIasl = "ACPI extraction tool iasl is missing"
+    MissingPyudev = "Udev access library `pyudev` is missing"
+    MissingIasl = "ACPI extraction tool `iasl` is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
     DurationDescription = "How long should suspend cycles last in seconds"
     WaitDescription = "How long to wait in between suspend cycles in seconds"
     CountDescription = "How many suspend cycles to run"
     LogDescription = "Location of log file"
+    InstallAction = "Attempting to install"
+    RerunAction = "Running this script as root will attempt to install it"
 
 
 def read_file(fn):
@@ -495,6 +498,44 @@ class SystemdLogger(KernelLogger):
             super().capture_full_dmesg(entry["MESSAGE"])
 
 
+class DistroPackage:
+    def __init__(self, deb, rpm, pip, root):
+        self.deb = deb
+        self.rpm = rpm
+        self.pip = pip
+        self.root = root
+
+    def install(self, distro):
+        if not self.root:
+            sys.exit(1)
+        if distro == "ubuntu" or distro == "debian":
+            if not self.deb:
+                return False
+            installer = ["apt", "install", self.deb]
+        elif distro == "fedora":
+            if not self.rpm:
+                return False
+            installer = ["dnf", "install", "-y", self.rpm]
+        else:
+            if not self.pip:
+                return False
+            installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
+        subprocess.check_call(installer)
+        return True
+
+
+class PyUdevPackage(DistroPackage):
+    def __init__(self, root):
+        super().__init__(
+            deb="python3-pyudev", rpm="python3-pyudev", pip="pyudev", root=root
+        )
+
+
+class IaslPackage(DistroPackage):
+    def __init__(self, root):
+        super().__init__(deb="acpica-tools", rpm="python3-pyudev", pip=None, root=root)
+
+
 class S0i3Validator:
     def log(self, message, color):
         if color == colors.FAIL:
@@ -505,6 +546,11 @@ class S0i3Validator:
             logging.info(message)
         print_color(message, color)
 
+    def show_install_message(self, message):
+        action = headers.InstallAction if self.root_user else headers.RerunAction
+        message = "👀 {message}. {action}.".format(message=message, action=action)
+        self.log(message, colors.FAIL)
+
     def __init__(self, log, acpidump, kernel_log):
         # for saving a log file for analysis
         logging.basicConfig(
@@ -513,6 +559,9 @@ class S0i3Validator:
             filemode="w",
             level=logging.DEBUG,
         )
+
+        # for installing and running suspend
+        self.root_user = os.geteuid() == 0
 
         # capture all DSDT/SSDT or just one with _AEI
         self.acpidump = acpidump
@@ -538,12 +587,9 @@ class S0i3Validator:
             self.pyudev = False
 
         if not self.pyudev:
-            self.log("pyudev is missing, attempting to install", colors.FAIL)
-            if self.distro == "ubuntu" or self.distro == "debian":
-                installer = ["apt", "install", "python3-pyudev"]
-            else:
-                installer = ["python3", "-m", "pip", "install", "--upgrade", "pyudev"]
-            subprocess.check_call(installer)
+            self.show_install_message(headers.MissingPyudev)
+            package = PyUdevPackage(self.root_user)
+            package.install(self.distro)
             from pyudev import Context
 
             self.pyudev = Context()
@@ -552,14 +598,9 @@ class S0i3Validator:
             self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
         except:
             installer = False
-            if self.distro == "ubuntu" or self.distro == "debian":
-                installer = ["apt", "install", "acpica-tools"]
-                self.log("%s: attempting to install" % headers.MissingIasl, colors.OK)
-            elif self.distro == "fedora":
-                installer = ["dnf", "install", "-y", "/usr/bin/iasl"]
-            if installer:
-                subprocess.check_call(installer)
-            self.iasl = False
+            self.show_install_message(headers.MissingIasl)
+            package = IaslPackage(self.root_user)
+            self.iasl = package.install(self.distro)
 
         # for analyzing kernel logs
         if kernel_log == "auto":
@@ -647,7 +688,7 @@ class S0i3Validator:
                 found = self.kernel_log.match_line(matches)
         # try to look at FACP directly if not found (older kernel compat)
         if not found:
-            if os.geteuid() != 0:
+            if not self.root_user:
                 logging.debug("Unable to capture ACPI tables without root")
                 return True
 
@@ -1206,7 +1247,7 @@ class S0i3Validator:
         if not self.iasl:
             self.log(headers.MissingIasl, colors.WARNING)
             return True
-        if os.geteuid() != 0:
+        if not self.root_user:
             logging.debug("Unable to capture ACPI tables without root")
             return True
         base = os.path.join("/", "sys", "firmware", "acpi", "tables")
