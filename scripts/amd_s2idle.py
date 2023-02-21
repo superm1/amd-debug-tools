@@ -50,6 +50,7 @@ class headers:
     LogDescription = "Location of log file"
     InstallAction = "Attempting to install"
     RerunAction = "Running this script as root will attempt to install it"
+    FailureReport = "S0i3 failures reported on your system"
 
 
 def read_file(fn):
@@ -1693,7 +1694,7 @@ class S0i3Validator:
     def get_failure_report(self):
         if len(self.failures) == 0:
             return True
-        print_color("S0i3 failures reported on your system", colors.HEADER)
+        print_color(headers.FailureReport, colors.HEADER)
         for item in self.failures:
             item.get_failure()
 
