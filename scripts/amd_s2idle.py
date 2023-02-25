@@ -912,8 +912,8 @@ class S0i3Validator:
                 model = dev.properties.get("ID_MODEL_FROM_DATABASE", "")
                 message = "{vendor} {model}".format(vendor=vendor, model=model)
                 self.kernel_log.seek()
-                matches = [pci_slot_name, headers.NvmeSimpleSuspend]
-                if self.kernel_log.match_line(matches):
+                pattern = "%s.*%s" % (pci_slot_name, headers.NvmeSimpleSuspend)
+                if self.kernel_log.match_pattern(pattern):
                     valid_nvme[pci_slot_name] = message
                 if pci_slot_name not in valid_nvme:
                     invalid_nvme[pci_slot_name] = message
