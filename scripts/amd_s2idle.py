@@ -805,7 +805,7 @@ class S0i3Validator:
             self.log("❌ LPS0 _DSM disabled", colors.FAIL)
         else:
             self.log("✅ LPS0 _DSM enabled", colors.OK)
-        return fail
+        return not fail
 
     def check_cpu_vendor(self):
         p = os.path.join("/", "proc", "cpuinfo")
