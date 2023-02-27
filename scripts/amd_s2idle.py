@@ -43,6 +43,7 @@ class headers:
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
     MissingPyudev = "Udev access library `pyudev` is missing"
+    MissingPackaging = "Python library `packaging` is missing"
     MissingIasl = "ACPI extraction tool `iasl` is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
     DurationDescription = "How long should suspend cycles last in seconds"
@@ -538,6 +539,13 @@ class IaslPackage(DistroPackage):
         super().__init__(deb="acpica-tools", rpm="python3-pyudev", pip=None, root=root)
 
 
+class PackagingPackage(DistroPackage):
+    def __init__(self, root):
+        super().__init__(
+            deb="python3-packaging", rpm=None, pip="python3-setuptools", root=root
+        )
+
+
 class S0i3Validator:
     def log(self, message, color):
         if color == colors.FAIL:
@@ -624,18 +632,9 @@ class S0i3Validator:
         try:
             from packaging import version
         except ImportError:
-            self.log("packaging is missing, attempting to install", colors.FAIL)
-            if self.distro == "ubuntu" or self.distro == "debian":
-                installer = ["apt", "install", "python3-packaging"]
-            else:
-                installer = [
-                    "python3",
-                    "-m",
-                    "pip",
-                    "install",
-                    "--upgrade",
-                    "setuptools",
-                ]
+            self.show_install_message(headers.MissingPackaging)
+            package = PackagingPackage(self.root_user)
+            package.install(self.distro)
             from packaging import version
 
         self.cpu_family = ""
