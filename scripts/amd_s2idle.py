@@ -798,6 +798,15 @@ class S0i3Validator:
 
         return True
 
+    def check_lps0(self):
+        p = os.path.join("/", "sys", "module", "acpi", "parameters", "sleep_no_lps0")
+        fail = read_file(p) == "Y"
+        if fail:
+            self.log("❌ LPS0 _DSM disabled", colors.FAIL)
+        else:
+            self.log("✅ LPS0 _DSM enabled", colors.OK)
+        return fail
+
     def check_cpu_vendor(self):
         p = os.path.join("/", "proc", "cpuinfo")
         valid = False
@@ -1372,6 +1381,7 @@ class S0i3Validator:
         checks = [
             self.check_logger,
             self.check_cpu_vendor,
+            self.check_lps0,
             self.check_fadt,
             self.capture_disabled_pins,
             self.check_amd_hsmp,
