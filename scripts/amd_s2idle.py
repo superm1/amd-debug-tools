@@ -1130,13 +1130,12 @@ class S0i3Validator:
                 val = 0
                 with open(target, "r") as r:
                     val = int(r.read().split()[0])
-                if fname not in self.gpes:
-                    self.gpes[fname] = val
-                elif self.gpes[fname] != val:
+                if fname in self.gpes and self.gpes[fname] != val:
                     self.log(
                         "○ %s increased from %d to %d" % (fname, self.gpes[fname], val),
                         colors.OK,
                     )
+                self.gpes[fname] = val
 
     def check_wakeup_irq(self):
         p = os.path.join("/", "sys", "power", "pm_wakeup_irq")
