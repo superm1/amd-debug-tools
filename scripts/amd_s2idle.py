@@ -1096,7 +1096,7 @@ class S0i3Validator:
             match = self.kernel_log.match_pattern("ath11k_pci.*fw_version")
             if match:
                 logging.debug("WCN6855 version string: %s", match)
-                objects = line.split()
+                objects = match.split()
                 for i in range(0, len(objects)):
                     if objects[i] == "fw_version":
                         wcn6855 = int(objects[i + 1], 16)
@@ -1105,14 +1105,14 @@ class S0i3Validator:
             if wcn6855 >= 0x110B196E:
                 self.log(
                     "✅ WCN6855 WLAN (fw version {version})".format(
-                        version=hex(self.wcn6855)
+                        version=hex(wcn6855)
                     ),
                     colors.OK,
                 )
             else:
                 self.log(
                     "❌ WCN6855 WLAN may cause spurious wakeups (fw version {version})".format(
-                        version=hex(self.wcn6855)
+                        version=hex(wcn6855)
                     ),
                     colors.FAIL,
                 )
