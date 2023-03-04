@@ -87,8 +87,33 @@ def capture_file_to_debug(fn):
         logging.debug("Unable to capture %s" % fn)
 
 
-def print_color(message, color):
-    print("{color}{message}{end}".format(color=color, message=message, end=colors.ENDC))
+def print_color(message, group):
+    prefix = "%s " % group
+    if group == "🚦":
+        color = colors.WARNING
+    elif group == "🦟":
+        color = colors.DEBUG
+    elif any(mk in group for mk in ["❌", "👀"]):
+        color = colors.FAIL
+    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○"]):
+        color = colors.OK
+    else:
+        color = group
+        prefix = ""
+    print(
+        "{prefix}{color}{message}{suffix}".format(
+            prefix=prefix, color=color, message=message, suffix=colors.ENDC
+        )
+    )
+    log_txt = "{prefix}{message}".format(prefix=prefix, message=message).strip()
+    if any(c in color for c in [colors.OK, colors.HEADER, colors.UNDERLINE]):
+        logging.info(log_txt)
+    elif color == colors.WARNING:
+        logging.warning(log_txt)
+    elif color == colors.FAIL:
+        logging.error(log_txt)
+    else:
+        logging.debug(log_txt)
 
 
 class S0i3Failure:
@@ -99,7 +124,7 @@ class S0i3Failure:
 
     def get_failure(self):
         if self.description:
-            print_color(self.description, colors.WARNING)
+            print_color(self.description, "🚦")
         if self.explanation:
             print(self.explanation)
         if self.url:
@@ -492,7 +517,7 @@ class SystemdLogger(KernelLogger):
     def match_pattern(self, pattern):
         for entry in self.journal:
             if re.search(pattern, entry["MESSAGE"]):
-                return entry
+                return entry["MESSAGE"]
         return None
 
     def capture_full_dmesg(self, line=None):
@@ -547,19 +572,10 @@ class PackagingPackage(DistroPackage):
 
 
 class S0i3Validator:
-    def log(self, message, color):
-        if color == colors.FAIL:
-            logging.error(message)
-        elif color == colors.UNDERLINE or color == colors.WARNING:
-            logging.warning(message)
-        else:
-            logging.info(message)
-        print_color(message, color)
-
     def show_install_message(self, message):
         action = headers.InstallAction if self.root_user else headers.RerunAction
-        message = "👀 {message}. {action}.".format(message=message, action=action)
-        self.log(message, colors.FAIL)
+        message = "{message}. {action}.".format(message=message, action=action)
+        print_color(message, "👀")
 
     def __init__(self, log, acpidump, kernel_log):
         # for saving a log file for analysis
@@ -677,12 +693,12 @@ class S0i3Validator:
                     found = True
                     break
                 # re-entrant; don't re-run
-                if "✅ ACPI FADT supports Low-power S0 idle" in line:
+                if "ACPI FADT supports Low-power S0 idle" in line:
                     return
         else:
             if not self.kernel_log:
-                message = "🚦 Unable to test FADT from kernel log"
-                self.log(message, colors.WARNING)
+                message = "Unable to test FADT from kernel log"
+                print_color(message, "🚦")
             else:
                 self.kernel_log.seek()
                 matches = ["Low-power S0 idle used by default for system suspend"]
@@ -701,21 +717,19 @@ class S0i3Validator:
                 r.seek(0x70)
                 found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
         if found:
-            message = "✅ ACPI FADT supports Low-power S0 idle"
-            self.log(message, colors.OK)
+            message = "ACPI FADT supports Low-power S0 idle"
+            print_color(message, "✅")
         else:
-            message = "❌ ACPI FADT doesn't support Low-power S0 idle"
-            self.log(message, colors.FAIL)
+            message = "ACPI FADT doesn't support Low-power S0 idle"
+            print_color(message, "❌")
             self.failures += [FadtWrong()]
         return found
 
     def capture_kernel_version(self):
         """Log the kernel version used"""
         if self.pretty_distro:
-            self.log("🐧 {distro}".format(distro=self.pretty_distro), colors.OK)
-        self.log(
-            "🐧 Kernel {version}".format(version=platform.uname().release), colors.OK
-        )
+            print_color("{distro}".format(distro=self.pretty_distro), "🐧")
+        print_color("Kernel {version}".format(version=platform.uname().release), "🐧")
 
     def check_battery(self):
         for dev in self.pyudev.list_devices(
@@ -741,14 +755,14 @@ class S0i3Validator:
                     )
                 )
                 if not name in self.energy:
-                    self.log(
-                        "🔋 Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
+                    print_color(
+                        "Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
                             name=name,
                             man=man,
                             model=model,
                             percent=float(energy_full) / int(energy_full_design),
                         ),
-                        colors.OK,
+                        "🔋",
                     )
                 else:
                     diff = abs(int(energy) - self.energy[name])
@@ -757,11 +771,11 @@ class S0i3Validator:
                         action = "gained"
                     else:
                         action = "lost"
-                    self.log(
-                        "🔋 Battery {name} {action} {energy} µWh ({percent:.2%})".format(
+                    print_color(
+                        "Battery {name} {action} {energy} µWh ({percent:.2%})".format(
                             name=name, action=action, energy=diff, percent=percent
                         ),
-                        colors.OK,
+                        "🔋",
                     )
                 self.energy[name] = int(energy)
 
@@ -772,14 +786,14 @@ class S0i3Validator:
                     )
                 )
                 if not name in self.energy:
-                    self.log(
-                        "○ Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
+                    print_color(
+                        "Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
                             name=name,
                             man=man,
                             model=model,
                             percent=float(charge_full) / int(charge_full_design),
                         ),
-                        colors.OK,
+                        "○",
                     )
                 else:
                     diff = abs(int(charge) - self.charge[name])
@@ -788,11 +802,11 @@ class S0i3Validator:
                         action = "gained"
                     else:
                         action = "lost"
-                    self.log(
-                        "○ Battery {name} {action} {charge} µAh ({percent:.2%})".format(
+                    print_color(
+                        "Battery {name} {action} {charge} µAh ({percent:.2%})".format(
                             name=name, action=action, charge=diff, percent=percent
                         ),
-                        colors.OK,
+                        "○",
                     )
                 self.charge[name] = int(charge)
 
@@ -802,9 +816,9 @@ class S0i3Validator:
         p = os.path.join("/", "sys", "module", "acpi", "parameters", "sleep_no_lps0")
         fail = read_file(p) == "Y"
         if fail:
-            self.log("❌ LPS0 _DSM disabled", colors.FAIL)
+            print_color("LPS0 _DSM disabled", "❌")
         else:
-            self.log("✅ LPS0 _DSM enabled", colors.OK)
+            print_color("LPS0 _DSM enabled", "✅")
         return not fail
 
     def check_cpu_vendor(self):
@@ -825,17 +839,17 @@ class S0i3Validator:
                 self.cpu_model = int(line.split()[-1])
                 continue
             if self.cpu_family and self.cpu_model and self.cpu_model_string:
-                self.log(
-                    "✅ %s (family %x model %x)"
+                print_color(
+                    "%s (family %x model %x)"
                     % (self.cpu_model_string, self.cpu_family, self.cpu_model),
-                    colors.OK,
+                    "✅",
                 )
                 break
         if not valid:
             self.failures += [VendorWrong()]
-            self.log(
-                "❌ This tool is not designed for parts from this CPU vendor",
-                colors.FAIL,
+            print_color(
+                "This tool is not designed for parts from this CPU vendor",
+                "❌",
             )
         return valid
 
@@ -848,8 +862,8 @@ class S0i3Validator:
             release = read_file(os.path.join(p, "bios_release"))
             version = read_file(os.path.join(p, "bios_version"))
             date = read_file(os.path.join(p, "bios_date"))
-            self.log(
-                "💻 {vendor} {product} ({family}) running BIOS {release} ({version}) released {date}".format(
+            print_color(
+                "{vendor} {product} ({family}) running BIOS {release} ({version}) released {date}".format(
                     vendor=vendor,
                     product=product,
                     family=family,
@@ -857,7 +871,7 @@ class S0i3Validator:
                     version=version,
                     date=date,
                 ),
-                colors.OK,
+                "💻",
             )
         except FileNotFoundError:
             pass
@@ -865,15 +879,13 @@ class S0i3Validator:
     def check_sleep_mode(self):
         fn = os.path.join("/", "sys", "power", "mem_sleep")
         if not os.path.exists(fn):
-            self.log("❌ Kernel doesn't support sleep", colors.FAIL)
+            print_color("Kernel doesn't support sleep", "❌")
             return False
         if not compare_sysfs(fn, "[s2idle]"):
             self.failures += [SleepModeWrong()]
-            self.log(
-                "❌ System isn't configured for s2idle in firmware setup", colors.FAIL
-            )
+            print_color("System isn't configured for s2idle in firmware setup", "❌")
             return False
-        self.log("✅ System is configured for s2idle", colors.OK)
+        print_color("System is configured for s2idle", "✅")
         return True
 
     def check_storage(self):
@@ -899,19 +911,19 @@ class S0i3Validator:
                 if has_sata and _check_ata_devslp(line):
                     valid_sata = True
                 # re-entrant; don't re-run
-                if "✅ NVME" in line:
+                if "NVME" in line:
                     return True
-                if "❌ NVME" in line:
+                if "NVME" in line:
                     return True
-                if "✅ AHCI" in line:
+                if "AHCI" in line:
                     return True
-                if "✅ SATA" in line:
+                if "SATA" in line:
                     return True
 
         else:
             if not self.kernel_log:
-                message = "🚦 Unable to test storage from kernel log"
-                self.log(message, colors.WARNING)
+                message = "Unable to test storage from kernel log"
+                print_color(message, "🚦")
                 return True
 
             for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
@@ -943,32 +955,32 @@ class S0i3Validator:
                     valid_sata = True
         if invalid_nvme:
             for disk in invalid_nvme:
-                message = "❌ NVME {disk} is not configured for s2idle in BIOS".format(
+                message = "NVME {disk} is not configured for s2idle in BIOS".format(
                     disk=invalid_nvme[disk]
                 )
-                self.log(message, colors.FAIL)
+                print_color(message, "❌")
                 num = len(invalid_nvme) + len(valid_nvme)
                 self.failures += [AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)]
         if valid_nvme:
             for disk in valid_nvme:
-                message = "✅ NVME {disk} is configured for s2idle in BIOS".format(
+                message = "NVME {disk} is configured for s2idle in BIOS".format(
                     disk=valid_nvme[disk]
                 )
-                self.log(message, colors.OK)
+                print_color(message, "✅")
         if has_sata:
             if valid_sata:
-                message = "✅ SATA supports DevSlp feature"
+                message = "SATA supports DevSlp feature"
             else:
                 invalid_nvme = True
-                message = "❌ SATA does not support DevSlp feature"
-                self.log(message, colors.FAIL)
+                message = "SATA does not support DevSlp feature"
+                print_color(message, "❌")
                 self.failures += [DevSlpDiskIssue()]
 
             if valid_ahci:
-                message = "✅ AHCI is configured for DevSlp in BIOS"
+                message = "AHCI is configured for DevSlp in BIOS"
             else:
-                message = "❌ AHCI is not configured for DevSlp in BIOS"
-                self.log(message, colors.FAIL)
+                message = "AHCI is not configured for DevSlp in BIOS"
+                print_color(message, "❌")
                 self.failures += [DevSlpHostIssue()]
 
         return (
@@ -981,21 +993,21 @@ class S0i3Validator:
         if self.offline:
             for line in self.offline:
                 if re.search("amd_hsmp.*HSMP is not supported", line):
-                    self.log(
-                        "❌ HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
-                        colors.FAIL,
+                    print_color(
+                        "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                        "❌",
                     )
                     break
         else:
             if not self.kernel_log:
-                message = "🚦 Unable to test for amd_hsmp bug from kernel log"
-                self.log(message, colors.WARNING)
+                message = "Unable to test for amd_hsmp bug from kernel log"
+                print_color(message, colors.WARNING)
                 return True
             self.kernel_log.seek()
             if self.kernel_log.match_pattern("amd_hsmp.*HSMP is not supported"):
-                self.log(
-                    "❌ HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
-                    colors.FAIL,
+                print_color(
+                    "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                    "❌",
                 )
                 self.failures += [AmdHsmpBug()]
                 return False
@@ -1005,21 +1017,21 @@ class S0i3Validator:
 
             p = os.path.join("/", "sys", "module", "amd_hsmp")
             if os.path.exists(p) and not blacklisted:
-                self.log("❌ `amd_hsmp` driver may conflict with amd_pmc", colors.FAIL)
+                print_color("`amd_hsmp` driver may conflict with amd_pmc", "❌")
                 self.failures += [AmdHsmpBug()]
                 return False
 
-            self.log(
-                "✅ HSMP driver `amd_hsmp` not detected (blocked: {blocked})".format(
+            print_color(
+                "HSMP driver `amd_hsmp` not detected (blocked: {blocked})".format(
                     blocked=blocked
                 ),
-                colors.OK,
+                "✅",
             )
         return True
 
     def check_amd_pmc(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_pmc"):
-            message = "✅ PMC driver `amd_pmc` loaded"
+            message = "PMC driver `amd_pmc` loaded"
             p = os.path.join(device.sys_path, "smu_program")
             v = os.path.join(device.sys_path, "smu_fw_version")
             if os.path.exists(v):
@@ -1027,17 +1039,15 @@ class S0i3Validator:
                     self.smu_version = read_file(v)
                     self.smu_program = read_file(p)
                 except TimeoutError:
-                    self.log(
-                        "❌ failed to communicate using `amd_pmc` driver", colors.FAIL
-                    )
+                    print_color("failed to communicate using `amd_pmc` driver", "❌")
                     return False
                 message += " (Program {program} Firmware {version})".format(
                     program=self.smu_program, version=self.smu_version
                 )
-            self.log(message, colors.OK)
+            print_color(message, "✅")
             return True
         self.failures += [MissingAmdPmc()]
-        self.log("❌ PMC driver `amd_pmc` not loaded", colors.FAIL)
+        print_color("PMC driver `amd_pmc` not loaded", "❌")
         return False
 
     def check_usb4(self):
@@ -1047,32 +1057,32 @@ class S0i3Validator:
         if not has_usb4:
             return True
         for device in self.pyudev.list_devices(subsystem="pci", DRIVER="thunderbolt"):
-            self.log("✅ USB4 driver `thunderbolt` loaded", colors.OK)
+            print_color("USB4 driver `thunderbolt` loaded", "✅")
             return True
-        self.log("❌ USB4 driver `thunderbolt` missing", colors.FAIL)
+        print_color("USB4 driver `thunderbolt` missing", "❌")
         self.failures += [MissingThunderbolt()]
         return False
 
     def check_pinctrl_amd(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
-            self.log("✅ GPIO driver `pinctrl_amd` available", colors.OK)
+            print_color("GPIO driver `pinctrl_amd` available", "✅")
             p = os.path.join("/", "sys", "kernel", "debug", "gpio")
             capture_file_to_debug(p)
             if not check_dynamic_debug(
                 "drivers/pinctrl/pinctrl-amd.*GPIO %d is active"
             ):
-                self.log(
-                    "🚦 GPIO dynamic debugging information unavailable", colors.WARNING
+                print_color(
+                    "GPIO dynamic debugging information unavailable", colors.WARNING
                 )
             return True
-        self.log("❌ GPIO driver `pinctrl_amd` not loaded", colors.FAIL)
+        print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
 
     def check_amdgpu(self):
         for device in self.pyudev.list_devices(subsystem="pci", DRIVER="amdgpu"):
-            self.log("✅ GPU driver `amdgpu` available", colors.OK)
+            print_color("GPU driver `amdgpu` available", "✅")
             return True
-        self.log("❌ GPU driver `amdgpu` not loaded", colors.FAIL)
+        print_color("GPU driver `amdgpu` not loaded", "❌")
         self.failures += [MissingAmdgpu()]
         return False
 
@@ -1087,8 +1097,8 @@ class S0i3Validator:
 
     def check_wcn6855_bug(self):
         if not self.kernel_log:
-            message = "🚦 Unable to test for wcn6855 bug from kernel log"
-            self.log(message, colors.WARNING)
+            message = "Unable to test for wcn6855 bug from kernel log"
+            print_color(message, "🚦")
             return True
         wcn6855 = False
         self.kernel_log.seek()
@@ -1103,18 +1113,16 @@ class S0i3Validator:
 
         if wcn6855:
             if wcn6855 >= 0x110B196E:
-                self.log(
-                    "✅ WCN6855 WLAN (fw version {version})".format(
-                        version=hex(wcn6855)
-                    ),
-                    colors.OK,
+                print_color(
+                    "WCN6855 WLAN (fw version {version})".format(version=hex(wcn6855)),
+                    "✅",
                 )
             else:
-                self.log(
-                    "❌ WCN6855 WLAN may cause spurious wakeups (fw version {version})".format(
+                print_color(
+                    "WCN6855 WLAN may cause spurious wakeups (fw version {version})".format(
                         version=hex(wcn6855)
                     ),
-                    colors.FAIL,
+                    "❌",
                 )
                 self.failures += [WCN6855Bug()]
 
@@ -1131,9 +1139,9 @@ class S0i3Validator:
                 with open(target, "r") as r:
                     val = int(r.read().split()[0])
                 if fname in self.gpes and self.gpes[fname] != val:
-                    self.log(
-                        "○ %s increased from %d to %d" % (fname, self.gpes[fname], val),
-                        colors.OK,
+                    print_color(
+                        "%s increased from %d to %d" % (fname, self.gpes[fname], val),
+                        "○",
                     )
                 self.gpes[fname] = val
 
@@ -1146,7 +1154,7 @@ class S0i3Validator:
             name = read_file(os.path.join(p, "name"))
             hw = read_file(os.path.join(p, "hwirq"))
             actions = read_file(os.path.join(p, "actions"))
-            message = "○ {header} {number} ({chip_name} {hw}-{name} {actions})".format(
+            message = "{header} {number} ({chip_name} {hw}-{name} {actions})".format(
                 header=headers.WokeFromIrq,
                 number=n,
                 chip_name=chip_name,
@@ -1154,7 +1162,7 @@ class S0i3Validator:
                 name=name,
                 actions=actions,
             )
-            self.log(message, colors.OK)
+            print_color(message, "○")
         except OSError:
             pass
         return True
@@ -1166,7 +1174,7 @@ class S0i3Validator:
         if self.offline:
             for line in self.offline:
                 # re-entrant; don't re-run
-                if "✅ In a hardware sleep state" in line or "❌ Did not reach" in line:
+                if "In a hardware sleep state" in line or "Did not reach" in line:
                     return
         if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
@@ -1181,15 +1189,15 @@ class S0i3Validator:
                         self.hw_sleep_duration = int(line.split(":")[1]) / 10**6
             except PermissionError:
                 if self.lockdown:
-                    self.log(
-                        "🚦 Unable to gather hardware sleep data with lockdown engaged",
+                    print_color(
+                        "Unable to gather hardware sleep data with lockdown engaged",
                         colors.WARNING,
                     )
                 else:
-                    self.log("🚦 Failed to read hardware sleep data", colors.WARNING)
+                    print_color("Failed to read hardware sleep data", colors.WARNING)
                 return False
             except FileNotFoundError:
-                self.log("○ HW sleep statistics file missing", colors.FAIL)
+                print_color("HW sleep statistics file missing", "❌")
                 return False
         if result:
             if self.userspace_duration:
@@ -1210,16 +1218,16 @@ class S0i3Validator:
                     ]
             else:
                 symbol = "✅"
-            self.log(
-                "{symbol} In a hardware sleep state for {time} {percent_msg}".format(
+            print_color(
+                "In a hardware sleep state for {time} {percent_msg}".format(
                     symbol=symbol,
                     time=timedelta(seconds=self.hw_sleep_duration),
                     percent_msg="" if not percent else "({:.2%})".format(percent),
                 ),
-                colors.OK,
+                symbol,
             )
         else:
-            self.log("❌ Did not reach hardware sleep state", colors.FAIL)
+            print_color("Did not reach hardware sleep state", "❌")
         return result
 
     def check_permissions(self):
@@ -1228,7 +1236,7 @@ class S0i3Validator:
             with open(p, "w") as w:
                 pass
         except PermissionError:
-            self.log("👀 %s" % headers.RootError, colors.FAIL)
+            print_color("%s" % headers.RootError, "👀")
             return False
         return True
 
@@ -1254,7 +1262,7 @@ class S0i3Validator:
 
     def capture_acpi(self):
         if not self.iasl:
-            self.log(headers.MissingIasl, colors.WARNING)
+            print_color(headers.MissingIasl, colors.WARNING)
             return True
         if not self.root_user:
             logging.debug("Unable to capture ACPI tables without root")
@@ -1282,7 +1290,7 @@ class S0i3Validator:
                     )
                     capture_file_to_debug("%s.dsl" % prefix)
                 except subprocess.CalledProcessError as e:
-                    self.log("Failed to capture ACPI table: %s" % e.output, colors.FAIL)
+                    print_color("Failed to capture ACPI table: %s" % e.output, "👀")
                 finally:
                     shutil.rmtree(d)
         return True
@@ -1332,42 +1340,42 @@ class S0i3Validator:
                 else:
                     logging.debug("%s is configured to %s" % (f, d))
         if not self.kernel_log:
-            message = "🚦 Unable to validate disabled pins from kernel log"
-            self.log(message, colors.WARNING)
+            message = "Unable to validate disabled pins from kernel log"
+            print_color(message, colors.WARNING)
             return True
         self.kernel_log.seek()
         result = self.kernel_log.match_pattern("Ignoring.* on pin")
         if result:
-            self.log("○ %s" % result, colors.OK)
+            print_color("%s" % result, "○")
         return True
 
     def capture_full_dmesg(self):
         if not self.kernel_log:
-            message = "🚦 Unable to analyze kernel log"
-            self.log(message, colors.WARNING)
+            message = "Unable to analyze kernel log"
+            print_color(message, colors.WARNING)
             return
         self.kernel_log.capture_full_dmesg()
 
     def check_logger(self):
         if isinstance(self.kernel_log, SystemdLogger):
-            self.log("✅ Logs are provided via systemd", colors.OK)
+            print_color("Logs are provided via systemd", "✅")
         if isinstance(self.kernel_log, DmesgLogger):
-            self.log(
+            print_color(
                 "🚦Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
                 colors.WARNING,
             )
             header = self.kernel_log.capture_header()
             if not header.startswith("Linux version"):
-                self.log(
-                    "❌ Kernel ringbuffer has wrapped, unable to accurately validate pre-requisites",
-                    colors.FAIL,
+                print_color(
+                    "Kernel ringbuffer has wrapped, unable to accurately validate pre-requisites",
+                    "❌",
                 )
                 self.failures += [KernelRingBufferWrapped()]
                 return False
         return True
 
     def prerequisites(self):
-        self.log(headers.Info, colors.HEADER)
+        print_color(headers.Info, colors.HEADER)
         info = [
             self.capture_system_vendor,
             self.capture_kernel_version,
@@ -1376,7 +1384,7 @@ class S0i3Validator:
         for i in info:
             i()
 
-        self.log(headers.Prerequisites, colors.HEADER)
+        print_color(headers.Prerequisites, colors.HEADER)
         checks = [
             self.check_logger,
             self.check_cpu_vendor,
@@ -1403,7 +1411,7 @@ class S0i3Validator:
             if not check():
                 result = False
         if not result:
-            self.log(headers.BrokenPrerequisites, colors.UNDERLINE)
+            print_color(headers.BrokenPrerequisites, colors.UNDERLINE)
             self.capture_full_dmesg()
         return result
 
@@ -1412,8 +1420,8 @@ class S0i3Validator:
         lockdown = read_file(fn)
         logging.debug("Lockdown: %s" % lockdown)
         if lockdown.split()[0] != "[none]":
-            self.log(
-                "🚦 Kernel lockdown is engaged, this script will have limited debugging",
+            print_color(
+                "Kernel lockdown is engaged, this script will have limited debugging",
                 colors.WARNING,
             )
             self.failures += [KernelLockdown()]
@@ -1490,8 +1498,8 @@ class S0i3Validator:
                         "64.53.0"
                     )
         if show_warning:
-            self.log(
-                "🚦 Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
+            print_color(
+                "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
                 colors.WARNING,
             )
         return True
@@ -1528,25 +1536,25 @@ class S0i3Validator:
             return True
 
         if self.suspend_count:
-            self.log(
-                "○ Suspend count: {count}".format(count=self.suspend_count),
-                colors.OK,
+            print_color(
+                "Suspend count: {count}".format(count=self.suspend_count),
+                "○",
             )
 
         if self.cycle_count:
-            self.log(
-                "○ Hardware sleep cycle count: {count}".format(count=self.cycle_count),
-                colors.OK,
+            print_color(
+                "Hardware sleep cycle count: {count}".format(count=self.cycle_count),
+                "○",
             )
         if self.active_gpios:
-            self.log("○ GPIOs active: %s" % self.active_gpios, colors.OK)
+            print_color("GPIOs active: %s" % self.active_gpios, "○")
         if self.wakeup_irqs:
-            self.log("○ Wakeups triggered from IRQs: %s" % self.wakeup_irqs, colors.OK)
+            print_color("Wakeups triggered from IRQs: %s" % self.wakeup_irqs, "○")
             if 1 in self.wakeup_irqs and self.cpu_needs_irq1_wa():
                 if self.irq1_workaround:
-                    self.log("○ Kernel workaround for IRQ1 issue utilized")
+                    print_color("Kernel workaround for IRQ1 issue utilized")
                 else:
-                    self.log("🚦 IRQ1 found during wakeup", colors.WARNING)
+                    print_color("IRQ1 found during wakeup", colors.WARNING)
                     self.failures += [Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
@@ -1559,21 +1567,21 @@ class S0i3Validator:
             if bit_changed:
                 for bit in range(0, 31):
                     if bit_changed & (1 << bit):
-                        self.log(
-                            "○ Idle mask bit %d (0x%x) changed during suspend"
+                        print_color(
+                            "Idle mask bit %d (0x%x) changed during suspend"
                             % (bit, (1 << bit)),
-                            colors.OK,
+                            "○",
                         )
         if self.upep:
             if self.upep_microsoft:
-                self.log("○ Used Microsoft uPEP GUID in LPS0 _DSM", colors.OK)
+                print_color("Used Microsoft uPEP GUID in LPS0 _DSM", "○")
             else:
-                self.log("○ Used AMD uPEP GUID in LPS0 _DSM", colors.OK)
+                print_color("Used AMD uPEP GUID in LPS0 _DSM", "○")
         elif not self.lockdown:
-            self.log("❌ LPS0 _DSM not executed", colors.FAIL)
+            print_color("LPS0 _DSM not executed", "❌")
             self.failures += [uPepMissing()]
         if self.acpi_errors:
-            self.log("❌ ACPI BIOS errors found", colors.FAIL)
+            print_color("ACPI BIOS errors found", "❌")
             self.failures += [AcpiBiosError(self.acpi_errors)]
 
     def analyze_masks(self):
@@ -1592,18 +1600,16 @@ class S0i3Validator:
         min_suspend_duration = timedelta(seconds=self.requested_duration * 0.9)
         expected_wake_time = self.last_suspend + min_suspend_duration
         if now > expected_wake_time:
-            self.log(
-                "✅ Userspace suspended for {delta}".format(
-                    delta=self.userspace_duration
-                ),
-                colors.OK,
+            print_color(
+                "Userspace suspended for {delta}".format(delta=self.userspace_duration),
+                "✅",
             )
         else:
-            self.log(
-                "❌ Userspace suspended for {delta} (< minimum expected {expected})".format(
+            print_color(
+                "Userspace suspended for {delta} (< minimum expected {expected})".format(
                     delta=self.userspace_duration, expected=min_suspend_duration
                 ),
-                colors.FAIL,
+                "❌",
             )
             self.failures += [SpuriousWakeup(self.requested_duration)]
         if self.kernel_duration:
@@ -1614,16 +1620,16 @@ class S0i3Validator:
                 )
             else:
                 percent = 0
-            self.log(
-                "✅ Kernel suspended for total of {time} ({percent:.2%})".format(
+            print_color(
+                "Kernel suspended for total of {time} ({percent:.2%})".format(
                     time=timedelta(seconds=self.kernel_duration),
                     percent=percent,
                 ),
-                colors.OK,
+                "✅",
             )
 
     def analyze_results(self):
-        self.log(headers.LastCycleResults, colors.HEADER)
+        print_color(headers.LastCycleResults, colors.HEADER)
         result = True
         checks = [
             self.analyze_kernel_log,
@@ -1651,7 +1657,7 @@ class S0i3Validator:
 
         if count > 1:
             length = timedelta(seconds=(duration + wait) * count)
-            self.log(
+            print_color(
                 "Running {count} cycles (Test finish expected @ {time})".format(
                     count=count, time=datetime.now() + length
                 ),
@@ -1680,7 +1686,7 @@ class S0i3Validator:
                 header = "{header} {count}: ".format(header=headers.CycleCount, count=i)
             else:
                 header = ""
-            self.log(
+            print_color(
                 "{header}Started at {start} (cycle finish expected @ {finish})".format(
                     header=header,
                     start=self.last_suspend,
@@ -1717,29 +1723,28 @@ class S0i3Validator:
             # replay s0i3 reports
             if "INFO:" in line:
                 line = line.split("INFO:\t")[-1].strip()
-                if any(mk in line for mk in ["✅", "🔋", "🐧", "💻", "○"]):
-                    self.log(line, colors.OK)
-                elif (
+                if (
                     headers.Prerequisites in line
                     or headers.Info in line
                     or headers.CycleCount in line
                     or headers.LastCycleResults in line
                 ):
-                    self.log(line, colors.HEADER)
+                    print_color(line, colors.HEADER)
+                else:
+                    print_color(line, colors.OK)
                 if re.search(".*(family.* model.*)", line):
                     nums = re.findall(r"\d+", line)
                     self.cpu_model = int(nums[-1], 16)
                     self.cpu_family = int(nums[-2], 16)
             elif "ERROR:" in line:
                 line = line.split("ERROR:\t")[-1].strip()
-                if any(mk in line for mk in ["👀", "❌"]):
-                    self.log(line, colors.FAIL)
+                print_color(line, colors.FAIL)
             elif "WARNING:" in line:
                 line = line.split("WARNING:\t")[-1].strip()
-                self.log(line, colors.WARNING)
+                print_color(line, colors.WARNING)
             elif "DEBUG:" in line:
                 line = line.split("DEBUG:\t")[-1].rstrip()
-                self.log("🦟 %s" % line, colors.DEBUG)
+                print_color(line, "🦟")
 
     def check_offline(self, input):
         with open(input, "r") as r:
