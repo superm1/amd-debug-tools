@@ -771,9 +771,19 @@ class S0i3Validator:
                         action = "gained"
                     else:
                         action = "lost"
+                    avg = round(
+                        diff
+                        / 1000000
+                        / (self.userspace_duration.total_seconds() / 360),
+                        2,
+                    )
                     print_color(
-                        "Battery {name} {action} {energy} µWh ({percent:.2%})".format(
-                            name=name, action=action, energy=diff, percent=percent
+                        "Battery {name} {action} {energy} µWh ({percent:.2%}) [Average rate {avg}W]".format(
+                            name=name,
+                            action=action,
+                            energy=diff,
+                            percent=percent,
+                            avg=avg,
                         ),
                         "🔋",
                     )
@@ -793,7 +803,7 @@ class S0i3Validator:
                             model=model,
                             percent=float(charge_full) / int(charge_full_design),
                         ),
-                        "○",
+                        "🔋",
                     )
                 else:
                     diff = abs(int(charge) - self.charge[name])
@@ -802,11 +812,21 @@ class S0i3Validator:
                         action = "gained"
                     else:
                         action = "lost"
+                    avg = round(
+                        diff
+                        / 1000000
+                        / (self.userspace_duration.total_seconds() / 360),
+                        2,
+                    )
                     print_color(
-                        "Battery {name} {action} {charge} µAh ({percent:.2%})".format(
-                            name=name, action=action, charge=diff, percent=percent
+                        "Battery {name} {action} {charge} µAh ({percent:.2%}) [Average rate: {avg}A]".format(
+                            name=name,
+                            action=action,
+                            charge=diff,
+                            percent=percent,
+                            avg=avg,
                         ),
-                        "○",
+                        "🔋",
                     )
                 self.charge[name] = int(charge)
 
@@ -1635,9 +1655,9 @@ class S0i3Validator:
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.capture_gpes,
-            self.check_battery,
             self.analyze_duration,
             self.check_hw_sleep,
+            self.check_battery,
         ]
         for check in checks:
             check()
