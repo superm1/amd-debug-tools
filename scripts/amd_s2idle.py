@@ -207,7 +207,7 @@ class AcpiNvmeStorageD3Enable(S0i3Failure):
         if num_ssds > 1:
             self.explanation += (
                 "\n"
-                "\tIf you added an aftermarket SSD to your system, the system vendor might not added this\n"
+                "\tIf you added an aftermarket SSD to your system, the system vendor might not have added this\n"
                 "\tproperty to the BIOS for the second port which could cause this behavior.\n"
                 "\n"
                 "\tPlease re-run this script with the --acpidump argument and file a bug to "
