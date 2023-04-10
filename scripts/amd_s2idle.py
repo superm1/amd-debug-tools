@@ -1662,10 +1662,10 @@ class S0i3Validator:
         for check in checks:
             check()
 
-    def run_countdown(self, t):
+    def run_countdown(self, prefix, t):
         msg = ""
         while t:
-            msg = "Suspending system in {time}".format(time=timedelta(seconds=t))
+            msg = "{prefix} in {time}".format(prefix=prefix, time=timedelta(seconds=t))
             print(msg, end="\r", flush=True)
             time.sleep(1)
             t -= 1
@@ -1698,7 +1698,7 @@ class S0i3Validator:
         self.capture_gpes()
 
         for i in range(1, count + 1):
-            self.run_countdown(wait)
+            self.run_countdown("Suspending system", wait / 2)
             self.last_suspend = datetime.now()
             self.kernel_duration = 0
             self.hw_sleep_duration = 0
@@ -1722,6 +1722,7 @@ class S0i3Validator:
             p = os.path.join("/", "sys", "power", "state")
             with open(p, "w") as w:
                 w.write("mem")
+            self.run_countdown("Collecting data", wait / 2)
             self.analyze_results()
         self.toggle_debugging(False)
         return True
