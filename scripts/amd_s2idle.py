@@ -1019,24 +1019,24 @@ class S0i3Validator:
                     )
                     break
         else:
-            if not self.kernel_log:
-                message = "Unable to test for amd_hsmp bug from kernel log"
-                print_color(message, colors.WARNING)
-                return True
-            self.kernel_log.seek()
-            if self.kernel_log.match_pattern("amd_hsmp.*HSMP is not supported"):
-                print_color(
-                    "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
-                    "❌",
-                )
-                self.failures += [AmdHsmpBug()]
-                return False
+            f = os.path.join(
+                "/", "boot", "config-{release}".format(release=platform.uname().release)
+            )
+            if os.path.exists(f):
+                kconfig = read_file(f)
+                if "CONFIG_AMD_HSMP=" in kconfig:
+                    print_color(
+                        "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                        "❌",
+                    )
+                    self.failures += [AmdHsmpBug()]
+                    return False
 
             cmdline = read_file(os.path.join("/proc", "cmdline"))
             blocked = "initcall_blacklist=hsmp_plt_init" in cmdline
 
             p = os.path.join("/", "sys", "module", "amd_hsmp")
-            if os.path.exists(p) and not blacklisted:
+            if os.path.exists(p) and not blocked:
                 print_color("`amd_hsmp` driver may conflict with amd_pmc", "❌")
                 self.failures += [AmdHsmpBug()]
                 return False
@@ -1359,14 +1359,6 @@ class S0i3Validator:
                     logging.debug("%s is not configured" % (f))
                 else:
                     logging.debug("%s is configured to %s" % (f, d))
-        if not self.kernel_log:
-            message = "Unable to validate disabled pins from kernel log"
-            print_color(message, colors.WARNING)
-            return True
-        self.kernel_log.seek()
-        result = self.kernel_log.match_pattern("Ignoring.* on pin")
-        if result:
-            print_color("%s" % result, "○")
         return True
 
     def capture_full_dmesg(self):
