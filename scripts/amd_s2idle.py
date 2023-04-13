@@ -926,10 +926,8 @@ class S0i3Validator:
                     for i in range(0, len(objects)):
                         if objects[i] == "nvme":
                             valid_nvme[objects[i + 1]] = objects[i + 1]
-                if has_sata and _check_ahci_devslp(line):
+                if has_sata:
                     valid_ahci = True
-                if has_sata and _check_ata_devslp(line):
-                    valid_sata = True
                 # re-entrant; don't re-run
                 if "NVME" in line:
                     return True
