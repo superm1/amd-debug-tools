@@ -1705,10 +1705,13 @@ class S0i3Validator:
                 ),
                 colors.HEADER,
             )
-            with open(wakealarm, "w") as w:
-                w.write("0")
-            with open(wakealarm, "w") as w:
-                w.write("+%s\n" % self.requested_duration)
+            if wakealarm:
+                with open(wakealarm, "w") as w:
+                    w.write("0")
+                with open(wakealarm, "w") as w:
+                    w.write("+%s\n" % self.requested_duration)
+            else:
+                print_color("No RTC device found, please manually wake system", "🚦")
             p = os.path.join("/", "sys", "power", "state")
             with open(p, "w") as w:
                 w.write("mem")
