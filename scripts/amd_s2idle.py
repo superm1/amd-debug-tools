@@ -744,9 +744,9 @@ class S0i3Validator:
             charge_full_design = dev.properties.get("POWER_SUPPLY_CHARGE_FULL_DESIGN")
             charge_full = dev.properties.get("POWER_SUPPLY_CHARGE_FULL")
             charge = dev.properties.get("POWER_SUPPLY_CHARGE_NOW")
-            man = dev.properties.get("POWER_SUPPLY_MANUFACTURER")
-            model = dev.properties.get("POWER_SUPPLY_MODEL_NAME")
-            name = dev.properties.get("POWER_SUPPLY_NAME")
+            man = dev.properties.get("POWER_SUPPLY_MANUFACTURER", "")
+            model = dev.properties.get("POWER_SUPPLY_MODEL_NAME", "")
+            name = dev.properties.get("POWER_SUPPLY_NAME", "Unknown")
 
             if energy_full_design:
                 logging.debug(
