@@ -87,6 +87,14 @@ def capture_file_to_debug(fn):
         logging.debug("Unable to capture %s" % fn)
 
 
+def get_property_pyudev(properties, key, fallback=""):
+    """Get a property from a udev device"""
+    try:
+        return properties.get(key, fallback)
+    except UnicodeDecodeError:
+        return ""
+
+
 def print_color(message, group):
     prefix = "%s " % group
     if group == "🚦":
@@ -738,15 +746,23 @@ class S0i3Validator:
             if not "PNP0C0A" in dev.device_path:
                 continue
 
-            energy_full_design = dev.properties.get("POWER_SUPPLY_ENERGY_FULL_DESIGN")
-            energy_full = dev.properties.get("POWER_SUPPLY_ENERGY_FULL")
-            energy = dev.properties.get("POWER_SUPPLY_ENERGY_NOW")
-            charge_full_design = dev.properties.get("POWER_SUPPLY_CHARGE_FULL_DESIGN")
-            charge_full = dev.properties.get("POWER_SUPPLY_CHARGE_FULL")
-            charge = dev.properties.get("POWER_SUPPLY_CHARGE_NOW")
-            man = dev.properties.get("POWER_SUPPLY_MANUFACTURER", "")
-            model = dev.properties.get("POWER_SUPPLY_MODEL_NAME", "")
-            name = dev.properties.get("POWER_SUPPLY_NAME", "Unknown")
+            energy_full_design = get_property_pyudev(
+                dev.properties, "POWER_SUPPLY_ENERGY_FULL_DESIGN"
+            )
+            energy_full = get_property_pyudev(
+                dev.properties, "POWER_SUPPLY_ENERGY_FULL"
+            )
+            energy = get_property_pyudev(dev.properties, "POWER_SUPPLY_ENERGY_NOW")
+            charge_full_design = get_property_pyudev(
+                dev.properties, "POWER_SUPPLY_CHARGE_FULL_DESIGN"
+            )
+            charge_full = get_property_pyudev(
+                dev.properties, "POWER_SUPPLY_CHARGE_FULL"
+            )
+            charge = get_property_pyudev(dev.properties, "POWER_SUPPLY_CHARGE_NOW")
+            man = get_property_pyudev(dev.properties, "POWER_SUPPLY_MANUFACTURER", "")
+            model = get_property_pyudev(dev.properties, "POWER_SUPPLY_MODEL_NAME", "")
+            name = get_property_pyudev(dev.properties, "POWER_SUPPLY_NAME", "Unknown")
 
             if energy_full_design:
                 logging.debug(
@@ -946,8 +962,12 @@ class S0i3Validator:
 
             for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
                 pci_slot_name = dev.properties["PCI_SLOT_NAME"]
-                vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE", "")
-                model = dev.properties.get("ID_MODEL_FROM_DATABASE", "")
+                vendor = get_property_pyudev(
+                    dev.properties, "ID_VENDOR_FROM_DATABASE", ""
+                )
+                model = get_property_pyudev(
+                    dev.properties, "ID_MODEL_FROM_DATABASE", ""
+                )
                 message = "{vendor} {model}".format(vendor=vendor, model=model)
                 self.kernel_log.seek()
                 pattern = "%s.*%s" % (pci_slot_name, headers.NvmeSimpleSuspend)
@@ -1265,8 +1285,12 @@ class S0i3Validator:
                 acpi = read_file(p)
                 pci_id = dev.properties["PCI_ID"]
                 pci_slot_name = dev.properties["PCI_SLOT_NAME"]
-                database_vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE", "")
-                database_class = dev.properties.get("ID_PCI_CLASS_FROM_DATABASE", "")
+                database_vendor = get_property_pyudev(
+                    dev.properties, "ID_VENDOR_FROM_DATABASE", ""
+                )
+                database_class = get_property_pyudev(
+                    dev.properties, "ID_PCI_CLASS_FROM_DATABASE", ""
+                )
                 logging.debug(
                     "{pci_slot_name} : {cls} {vendor} [{id}] : {acpi}".format(
                         pci_slot_name=pci_slot_name,
