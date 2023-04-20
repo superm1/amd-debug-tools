@@ -1488,6 +1488,10 @@ class S0i3Validator:
                     self.kernel_duration += float(f)
                 except ValueError:
                     pass
+        elif "Successfully transitioned to state" in line:
+            self.upep = True
+            if "Successfully transitioned to state lps0 ms entry" in line:
+                self.upep_microsoft = True
         elif "_DSM function" in line:
             self.upep = True
             if "_DSM function 7" in line:
