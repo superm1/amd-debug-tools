@@ -1363,10 +1363,12 @@ class S0i3Validator:
                 else:
                     logging.debug(pkg.installed)
 
-        path = os.path.join(
-            "/", "sys", "kernel", "debug", "dri", "0", "amdgpu_firmware_info"
-        )
-        capture_file_to_debug(path)
+        for num in range(0, 2):
+            p = os.path.join(
+            "/", "sys", "kernel", "debug", "dri", "%d" % num, "amdgpu_firmware_info"
+            )
+            if os.path.exists(p):
+                capture_file_to_debug(p)
         return True
 
     def capture_disabled_pins(self):
