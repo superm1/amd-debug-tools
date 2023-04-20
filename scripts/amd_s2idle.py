@@ -1215,6 +1215,12 @@ class S0i3Validator:
                 if "In a hardware sleep state" in line or "Did not reach" in line:
                     return
         if not self.hw_sleep_duration:
+            p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
+            try:
+                val = int(read_file(p)) / 10**6
+            except FileNotFoundError as e:
+                logging.debug("Failed to read hardware sleep data from %s: %s", p, e)
+        if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
                 val = read_file(p)
