@@ -1042,7 +1042,7 @@ class S0i3Validator:
             )
             if os.path.exists(f):
                 kconfig = read_file(f)
-                if "CONFIG_AMD_HSMP=" in kconfig:
+                if "CONFIG_AMD_HSMP=y" in kconfig:
                     print_color(
                         "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
                         "❌",
