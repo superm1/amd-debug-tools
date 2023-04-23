@@ -1216,10 +1216,13 @@ class S0i3Validator:
                     return
         if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
-            try:
-                val = int(read_file(p)) / 10**6
-            except FileNotFoundError as e:
-                logging.debug("Failed to read hardware sleep data from %s: %s", p, e)
+            if os.path.exists(p):
+                try:
+                    val = int(read_file(p)) / 10**6
+                except FileNotFoundError as e:
+                    logging.debug(
+                        "Failed to read hardware sleep data from %s: %s" % (p, e)
+                    )
         if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
@@ -1371,7 +1374,7 @@ class S0i3Validator:
 
         for num in range(0, 2):
             p = os.path.join(
-            "/", "sys", "kernel", "debug", "dri", "%d" % num, "amdgpu_firmware_info"
+                "/", "sys", "kernel", "debug", "dri", "%d" % num, "amdgpu_firmware_info"
             )
             if os.path.exists(p):
                 capture_file_to_debug(p)
