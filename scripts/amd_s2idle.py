@@ -1693,7 +1693,7 @@ class S0i3Validator:
 
     def run_countdown(self, prefix, t):
         msg = ""
-        while t:
+        while t > 0:
             msg = "{prefix} in {time}".format(prefix=prefix, time=timedelta(seconds=t))
             print(msg, end="\r", flush=True)
             time.sleep(1)
