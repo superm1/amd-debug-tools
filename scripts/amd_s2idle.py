@@ -892,6 +892,10 @@ class S0i3Validator:
     def capture_system_vendor(self):
         p = os.path.join("/", "sys", "class", "dmi", "id")
         try:
+            ec = read_file(os.path.join(p, "ec_firmware_release"))
+        except FileNotFoundError:
+            ec = "unknown"
+        try:
             vendor = read_file(os.path.join(p, "sys_vendor"))
             product = read_file(os.path.join(p, "product_name"))
             family = read_file(os.path.join(p, "product_family"))
@@ -899,13 +903,14 @@ class S0i3Validator:
             version = read_file(os.path.join(p, "bios_version"))
             date = read_file(os.path.join(p, "bios_date"))
             print_color(
-                "{vendor} {product} ({family}) running BIOS {release} ({version}) released {date}".format(
+                "{vendor} {product} ({family}) running BIOS {release} ({version}) released {date} and EC {ec_release}".format(
                     vendor=vendor,
                     product=product,
                     family=family,
                     release=release,
                     version=version,
                     date=date,
+                    ec_release=ec,
                 ),
                 "💻",
             )
