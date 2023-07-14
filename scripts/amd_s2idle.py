@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import struct
 from datetime import datetime, timedelta, date
 
 
@@ -53,6 +54,10 @@ class headers:
     InstallAction = "Attempting to install"
     RerunAction = "Running this script as root will attempt to install it"
     FailureReport = "S0i3 failures reported on your system"
+
+
+def BIT(num):
+    return 1 << num
 
 
 def read_file(fn):
@@ -416,6 +421,16 @@ class LowHardwareSleepResidency(S0i3Failure):
         ).format(time=timedelta(seconds=duration), percent=percent)
 
 
+class MSRFailure(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "PC6 or CC6 state disabled"
+        self.explanation = (
+            "\tThe PC6 state of the package or the CC6 state of CPU cores was disabled.\n"
+            "\tThis will prevent the system from getting to the deepest sleep state over suspend.\n"
+        )
+
+
 class KernelLogger:
     def __init__(self):
         pass
@@ -732,6 +747,40 @@ class S0i3Validator:
             print_color(message, "❌")
             self.failures += [FadtWrong()]
         return found
+
+    def check_msr(self):
+        """Check if PC6 or CC6 has been disabled"""
+
+        def read_msr(msr, cpu):
+            p = "/dev/cpu/%d/msr" % cpu
+            if not os.path.exists(p) and self.root_user:
+                os.system("modprobe msr")
+            f = os.open(p, os.O_RDONLY)
+            os.lseek(f, msr, os.SEEK_SET)
+            val = struct.unpack("Q", os.read(f, 8))[0]
+            os.close(f)
+            return val
+
+        def check_bits(value, mask):
+            return value & mask
+
+        expect = {
+            0xC0010292: BIT(32),  # PC6
+            0xC0010296: (BIT(22) | BIT(14) | BIT(6)), #CC6
+        }
+        try:
+            for reg in expect:
+                val = read_msr(reg, 0)
+                if not check_bits(val, expect[reg]):
+                    self.failures += [MSRFailure()]
+                    return False
+        except FileNotFoundError:
+            print_color("Unabled to check MSRs: MSR kernel module not loaded", "❌")
+            return False
+        except PermissionError:
+            print_color("MSR checks unavailable", colors.WARNING)
+
+        return True
 
     def capture_kernel_version(self):
         """Log the kernel version used"""
@@ -1471,6 +1520,7 @@ class S0i3Validator:
             self.check_pinctrl_amd,
             self.check_wcn6855_bug,
             self.check_lockdown,
+            self.check_msr,
             self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
