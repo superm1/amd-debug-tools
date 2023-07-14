@@ -1072,6 +1072,25 @@ class S0i3Validator:
             )
         return True
 
+    def check_port_pm_override(self):
+        from packaging import version
+
+        if self.cpu_family != 0x19:
+            return
+        if self.cpu_model not in [0x74, 0x78]:
+            return
+        if version.parse(self.smu_version) > version.parse("76.60.0"):
+            return
+        if version.parse(self.smu_version) < version.parse("76.18.0"):
+            return
+        cmdline = read_file(os.path.join("/proc", "cmdline"))
+        if "pcie_port_pm=off" in cmdline:
+            return
+        print_color(
+            "Platform may hang resuming.  Upgrade your firmware or add pcie_port_pm=off to kernel command line if you have problems.",
+            colors.WARNING,
+        )
+
     def check_amd_pmc(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_pmc"):
             message = "PMC driver `amd_pmc` loaded"
@@ -1087,6 +1106,7 @@ class S0i3Validator:
                 message += " (Program {program} Firmware {version})".format(
                     program=self.smu_program, version=self.smu_version
                 )
+            self.check_port_pm_override()
             print_color(message, "✅")
             return True
         self.failures += [MissingAmdPmc()]
