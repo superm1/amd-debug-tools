@@ -1159,7 +1159,7 @@ class S0i3Validator:
             print_color(message, "✅")
             return True
         self.failures += [MissingAmdPmc()]
-        print_color("PMC driver `amd_pmc` not loaded", "❌")
+        print_color("PMC driver `amd_pmc` did not bind to any ACPI device", "❌")
         return False
 
     def check_usb4(self):
