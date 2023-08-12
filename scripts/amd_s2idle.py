@@ -1537,7 +1537,11 @@ class S0i3Validator:
 
     def check_lockdown(self):
         fn = os.path.join("/", "sys", "kernel", "security", "lockdown")
-        lockdown = read_file(fn)
+        try:
+            lockdown = read_file(fn)
+        except FileNotFoundError:
+            logging.debug("Lockdown not available")
+            return True
         logging.debug("Lockdown: %s" % lockdown)
         if lockdown.split()[0] != "[none]":
             print_color(
