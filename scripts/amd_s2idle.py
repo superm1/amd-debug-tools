@@ -766,7 +766,7 @@ class S0i3Validator:
 
         expect = {
             0xC0010292: BIT(32),  # PC6
-            0xC0010296: (BIT(22) | BIT(14) | BIT(6)), #CC6
+            0xC0010296: (BIT(22) | BIT(14) | BIT(6)),  # CC6
         }
         try:
             for reg in expect:
