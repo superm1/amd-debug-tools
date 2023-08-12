@@ -455,6 +455,14 @@ class DmesgLogger(KernelLogger):
     def __init__(self):
         import subprocess
 
+        self.since_support = False
+        cmd = ["dmesg", "-h"]
+        result = subprocess.run(cmd, check=True, capture_output=True)
+        for line in result.stdout.decode("utf-8").split("\n"):
+            if "--since" in line:
+                self.since_support = True
+        logging.debug("Since support: %d" % self.since_support)
+
         self.command = ["dmesg", "-t", "-k"]
         self._refresh_head()
 
@@ -467,16 +475,20 @@ class DmesgLogger(KernelLogger):
 
     def seek(self, time=None):
         if time:
-            # look 10 seconds back because dmesg time isn't always accurate
-            fuzz = time - timedelta(seconds=10)
-            cmd = self.command + [
-                "--time-format=iso",
-                "--since=%s" % fuzz.strftime("%Y-%m-%dT%H:%M:%S"),
-            ]
+            if self.since_support:
+                # look 10 seconds back because dmesg time isn't always accurate
+                fuzz = time - timedelta(seconds=10)
+                cmd = self.command + [
+                    "--time-format=iso",
+                    "--since=%s" % fuzz.strftime("%Y-%m-%dT%H:%M:%S"),
+                ]
+            else:
+                cmd = self.command
             result = subprocess.run(cmd, check=True, capture_output=True)
             if result.returncode == 0:
                 self.buffer = result.stdout.decode("utf-8")
-                self.seeked = True
+                if self.since_support:
+                    self.seeked = True
         elif self.seeked:
             self._refresh_head()
 
