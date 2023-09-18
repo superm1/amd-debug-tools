@@ -1198,6 +1198,7 @@ class S0i3Validator:
                     if "WAKE_INT_MASTER_REG:" in line:
                         val = "en" if int(line.split()[1], 16) & BIT(15) else "dis"
                         logging.debug("Winblue GPIO 0 debounce: %sabled", val)
+                        break
             if not check_dynamic_debug(
                 "drivers/pinctrl/pinctrl-amd.*GPIO %d is active"
             ):
