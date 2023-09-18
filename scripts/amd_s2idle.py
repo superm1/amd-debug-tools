@@ -88,6 +88,7 @@ def capture_file_to_debug(fn):
         contents = read_file(fn)
         for line in contents.split("\n"):
             logging.debug(line.rstrip())
+        return contents
     except PermissionError:
         logging.debug("Unable to capture %s" % fn)
 
@@ -1191,7 +1192,12 @@ class S0i3Validator:
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
             print_color("GPIO driver `pinctrl_amd` available", "✅")
             p = os.path.join("/", "sys", "kernel", "debug", "gpio")
-            capture_file_to_debug(p)
+            contents = capture_file_to_debug(p)
+            if contents:
+                for line in contents.split("\n"):
+                    if "WAKE_INT_MASTER_REG:" in line:
+                        val = "en" if int(line.split()[1], 16) & BIT(15) else "dis"
+                        logging.debug("Winblue GPIO 0 debounce: %sabled", val)
             if not check_dynamic_debug(
                 "drivers/pinctrl/pinctrl-amd.*GPIO %d is active"
             ):
