@@ -1466,6 +1466,84 @@ class S0i3Validator:
                 capture_file_to_debug(p)
         return True
 
+    def capture_command_line(self):
+        cmdline = read_file(os.path.join("/proc", "cmdline"))
+        # borrowed from https://github.com/fwupd/fwupd/blob/1.9.5/libfwupdplugin/fu-common-linux.c#L95
+        filtered = [
+            "apparmor",
+            "audit",
+            "auto",
+            "boot",
+            "BOOT_IMAGE",
+            "console",
+            "crashkernel",
+            "cryptdevice",
+            "cryptkey",
+            "dm",
+            "earlycon",
+            "earlyprintk",
+            "ether",
+            "initrd",
+            "ip",
+            "LANG",
+            "loglevel",
+            "luks.key",
+            "luks.name",
+            "luks.options",
+            "luks.uuid",
+            "mitigations",
+            "mount.usr",
+            "mount.usrflags",
+            "mount.usrfstype",
+            "netdev",
+            "netroot",
+            "nfsaddrs",
+            "nfs.nfs4_unique_id",
+            "nfsroot",
+            "noplymouth",
+            "ostree",
+            "quiet",
+            "rd.dm.uuid",
+            "rd.luks.allow-discards",
+            "rd.luks.key",
+            "rd.luks.name",
+            "rd.luks.options",
+            "rd.luks.uuid",
+            "rd.lvm.lv",
+            "rd.lvm.vg",
+            "rd.md.uuid",
+            "rd.systemd.mask",
+            "rd.systemd.wants",
+            "resume",
+            "resumeflags",
+            "rhgb",
+            "ro",
+            "root",
+            "rootflags",
+            "roothash",
+            "rw",
+            "security",
+            "showopts",
+            "splash",
+            "swap",
+            "systemd.mask",
+            "systemd.show_status",
+            "systemd.unit",
+            "systemd.verity_root_data",
+            "systemd.verity_root_hash",
+            "systemd.wants",
+            "udev.log_priority",
+            "verbose",
+            "vt.handoff",
+            "zfs",
+        ]
+        # remove anything that starts with something in filtered from cmdline
+        cmdline = " ".join(
+            [x for x in cmdline.split() if not x.startswith(tuple(filtered))]
+        )
+        logging.debug("/proc/cmdline: %s" % cmdline)
+        return True
+
     def capture_disabled_pins(self):
         base = os.path.join("/", "sys", "module", "gpiolib_acpi", "parameters")
         for parameter in ["ignore_wake", "ignore_interrupt"]:
@@ -1522,6 +1600,7 @@ class S0i3Validator:
             self.check_lps0,
             self.check_fadt,
             self.capture_disabled_pins,
+            self.capture_command_line,
             self.check_amd_hsmp,
             self.check_amd_pmc,
             self.check_usb4,
