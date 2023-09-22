@@ -1551,6 +1551,23 @@ class S0i3Validator:
         logging.debug("/proc/cmdline: %s" % cmdline)
         return True
 
+    def capture_logind(self):
+        base = os.path.join("/", "etc", "systemd", "logind.conf")
+        if not os.path.exists(base):
+            return True
+        import configparser
+
+        config = configparser.ConfigParser()
+        config.read(base)
+        section = config["Login"]
+        if not section.keys():
+            logging.debug("LOGIND: no configuration changes")
+            return True
+        logging.debug("LOGIND: configuration changes:")
+        for key in section.keys():
+            logging.debug("\t{}: {}".format(key, section[key]))
+        return True
+
     def capture_disabled_pins(self):
         base = os.path.join("/", "sys", "module", "gpiolib_acpi", "parameters")
         for parameter in ["ignore_wake", "ignore_interrupt"]:
@@ -1608,6 +1625,7 @@ class S0i3Validator:
             self.check_fadt,
             self.capture_disabled_pins,
             self.capture_command_line,
+            self.capture_logind,
             self.check_amd_hsmp,
             self.check_amd_pmc,
             self.check_usb4,
