@@ -1069,7 +1069,7 @@ class S0i3Validator:
         if valid_nvme:
             for disk in valid_nvme:
                 message = "NVME {disk} is configured for s2idle in BIOS".format(
-                    disk=valid_nvme[disk]
+                    disk=valid_nvme[disk].strip()
                 )
                 print_color(message, "✅")
         if has_sata:
