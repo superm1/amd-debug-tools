@@ -1311,7 +1311,9 @@ class S0i3Validator:
             p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
             if os.path.exists(p):
                 try:
-                    val = int(read_file(p)) / 10**6
+                    self.hw_sleep_duration = int(read_file(p)) / 10**6
+                    if self.hw_sleep_duration > 0:
+                        result = True
                 except FileNotFoundError as e:
                     logging.debug(
                         "Failed to read hardware sleep data from %s: %s" % (p, e)
