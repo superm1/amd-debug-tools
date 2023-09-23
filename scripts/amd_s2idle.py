@@ -1384,24 +1384,36 @@ class S0i3Validator:
 
     def map_acpi_pci(self):
         for dev in self.pyudev.list_devices(subsystem="pci"):
+            pci_id = dev.properties["PCI_ID"].lower()
+            pci_slot_name = dev.properties["PCI_SLOT_NAME"]
+            database_class = get_property_pyudev(
+                dev.properties, "ID_PCI_SUBCLASS_FROM_DATABASE", ""
+            )
+            database_vendor = get_property_pyudev(
+                dev.properties, "ID_VENDOR_FROM_DATABASE", ""
+            )
+            prefix = "├─ " if dev.parent.subsystem == "pci" else "| "
             p = os.path.join(dev.sys_path, "firmware_node", "path")
             if os.path.exists(p):
                 acpi = read_file(p)
-                pci_id = dev.properties["PCI_ID"]
-                pci_slot_name = dev.properties["PCI_SLOT_NAME"]
-                database_vendor = get_property_pyudev(
-                    dev.properties, "ID_VENDOR_FROM_DATABASE", ""
-                )
-                database_class = get_property_pyudev(
-                    dev.properties, "ID_PCI_CLASS_FROM_DATABASE", ""
-                )
                 logging.debug(
-                    "{pci_slot_name} : {cls} {vendor} [{id}] : {acpi}".format(
+                    "{prefix}{pci_slot_name} : {vendor} {cls} [{id}] : {acpi}".format(
+                        prefix=prefix,
                         pci_slot_name=pci_slot_name,
                         vendor=database_vendor,
                         cls=database_class,
                         id=pci_id,
                         acpi=acpi,
+                    )
+                )
+            else:
+                logging.debug(
+                    "{prefix}{pci_slot_name} : {vendor} {cls} [{id}]".format(
+                        prefix=prefix,
+                        vendor=database_vendor,
+                        pci_slot_name=pci_slot_name,
+                        cls=database_class,
+                        id=pci_id,
                     )
                 )
         return True
