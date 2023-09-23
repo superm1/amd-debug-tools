@@ -1192,13 +1192,16 @@ class S0i3Validator:
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
             print_color("GPIO driver `pinctrl_amd` available", "✅")
             p = os.path.join("/", "sys", "kernel", "debug", "gpio")
-            contents = capture_file_to_debug(p)
+            contents = read_file(p)
             if contents:
                 for line in contents.split("\n"):
                     if "WAKE_INT_MASTER_REG:" in line:
                         val = "en" if int(line.split()[1], 16) & BIT(15) else "dis"
                         logging.debug("Winblue GPIO 0 debounce: %sabled", val)
-                        break
+                        continue
+                    if line.endswith("|0x0"):
+                        continue
+                    logging.debug(line)
             if not check_dynamic_debug(
                 "drivers/pinctrl/pinctrl-amd.*GPIO %d is active"
             ):
