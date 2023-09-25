@@ -1192,7 +1192,11 @@ class S0i3Validator:
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
             print_color("GPIO driver `pinctrl_amd` available", "✅")
             p = os.path.join("/", "sys", "kernel", "debug", "gpio")
-            contents = read_file(p)
+            try:
+                contents = read_file(p)
+            except PermissionError:
+                logging.debug("Unable to capture %s" % p)
+                contents = None
             if contents:
                 for line in contents.split("\n"):
                     if "WAKE_INT_MASTER_REG:" in line:
