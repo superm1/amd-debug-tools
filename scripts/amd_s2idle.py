@@ -1153,6 +1153,22 @@ class S0i3Validator:
             colors.WARNING,
         )
 
+    def check_wake_sources(self):
+        for device in self.pyudev.list_devices(subsystem="acpi", DRIVER="button"):
+            p = os.path.join(device.sys_path, "power", "wakeup")
+            if "PNP0C0D" in device.sys_name:
+                key = "lid"
+            elif "PNP0C0C" in device.sys_name:
+                key = "Power button"
+            else:
+                key = "Unknown button"
+            logging.debug(
+                "ACPI {key} wakeup ({name}) is {state}".format(
+                    key=key, name=device.sys_name, state=read_file(p)
+                )
+            )
+        return True
+
     def check_amd_pmc(self):
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_pmc"):
             message = "PMC driver `amd_pmc` loaded"
@@ -1661,6 +1677,7 @@ class S0i3Validator:
             self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
+            self.check_wake_sources,
             self.capture_acpi,
         ]
         result = True
