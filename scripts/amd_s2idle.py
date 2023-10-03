@@ -1154,16 +1154,15 @@ class S0i3Validator:
         )
 
     def check_wake_sources(self):
+        # Check ACPI 'button' driver wake sources
         for device in self.pyudev.list_devices(subsystem="acpi", DRIVER="button"):
             p = os.path.join(device.sys_path, "power", "wakeup")
-            if "PNP0C0D" in device.sys_name:
-                key = "lid"
-            elif "PNP0C0C" in device.sys_name:
-                key = "Power button"
-            else:
-                key = "Unknown button"
+            key = "unknown"
+            for input in self.pyudev.list_devices(subsystem="input"):
+                if device.sys_path in input.sys_path and "NAME" in input.properties:
+                    key = input.properties["NAME"]
             logging.debug(
-                "ACPI {key} wakeup ({name}) is {state}".format(
+                "ACPI {key} wakeup ({name}): {state}".format(
                     key=key, name=device.sys_name, state=read_file(p)
                 )
             )
