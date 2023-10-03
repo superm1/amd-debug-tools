@@ -1294,6 +1294,14 @@ class S0i3Validator:
 
         return True
 
+    def capture_lid(self):
+        p = os.path.join("/", "proc", "acpi", "button", "lid")
+        for root, dirs, files in os.walk(p):
+            for fname in files:
+                p = os.path.join(root, fname)
+                state = read_file(p).split(":")[1].strip()
+                logging.debug("ACPI Lid ({fname}): {val}".format(fname=p, val=state))
+
     def capture_gpes(self):
         base = os.path.join("/", "sys", "firmware", "acpi", "interrupts")
         for root, dirs, files in os.walk(base, topdown=False):
@@ -1929,6 +1937,7 @@ class S0i3Validator:
             self.analyze_kernel_log,
             self.check_wakeup_irq,
             self.capture_gpes,
+            self.capture_lid,
             self.analyze_duration,
             self.check_hw_sleep,
             self.check_battery,
@@ -1970,6 +1979,7 @@ class S0i3Validator:
             wakealarm = os.path.join(device.sys_path, "wakealarm")
         self.toggle_debugging(True)
         self.capture_gpes()
+        self.capture_lid()
 
         for i in range(1, count + 1):
             self.run_countdown("Suspending system", wait / 2)
