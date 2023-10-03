@@ -1166,6 +1166,19 @@ class S0i3Validator:
                     key=key, name=device.sys_name, state=read_file(p)
                 )
             )
+        # Check ACPI 'device' wake sources
+        p = os.path.join("/", "proc", "acpi", "wakeup")
+        for line in read_file(p).split("\n"):
+            if not line:
+                continue
+            if line.startswith("Device"):
+                continue
+            objects = line.split()
+            if len(objects) < 3:
+                continue
+            logging.debug(
+                "ACPI {name} wakeup: {state}".format(name=objects[0], state=objects[2])
+            )
         return True
 
     def check_amd_pmc(self):
