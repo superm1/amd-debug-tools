@@ -334,26 +334,6 @@ class KernelRingBufferWrapped(S0i3Failure):
         )
 
 
-class uPepMissing(S0i3Failure):
-    def __init__(self):
-        super().__init__()
-        self.description = "LPS0 _DSM might not have been executed"
-        self.explanation = (
-            "\tThe Linux kernel will execute an ACPI callback during s2idle entry.\n"
-            "\tThis callback is typically used to notify the Embedded Controller (EC) on the system.\n"
-            "\tDepending upon the OEM implementation these requests may have been populated behind.\n"
-            "\tan 'AMD' GUID or an 'Microsoft' GUID. This script turns on extra dynamic debugging.\n"
-            "\tmessages to determine which path was used.\n"
-            "\n"
-            "\tIf no message was detected this might not mean there is a problem, it just means this\n"
-            "\tscript couldn't confirm it.  These are some of the possible causes:\n"
-            "\t * It has been intentionally turned off on the kernel command line by a user.\n"
-            "\t * The BIOS is missing support for it.\n"
-            "\t * Kernel lockdown is engaged.\n"
-            "\t * Dynamic debugging couldn't be used to turn on the messages.\n"
-        )
-
-
 class AmdHsmpBug(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -1876,12 +1856,9 @@ class S0i3Validator:
                         )
         if self.upep:
             if self.upep_microsoft:
-                print_color("Used Microsoft uPEP GUID in LPS0 _DSM", "○")
+                logging.debug("Used Microsoft uPEP GUID in LPS0 _DSM")
             else:
-                print_color("Used AMD uPEP GUID in LPS0 _DSM", "○")
-        elif not self.lockdown:
-            print_color("LPS0 _DSM not executed", "❌")
-            self.failures += [uPepMissing()]
+                logging.debug("Used AMD uPEP GUID in LPS0 _DSM")
         if self.acpi_errors:
             print_color("ACPI BIOS errors found", "❌")
             self.failures += [AcpiBiosError(self.acpi_errors)]
