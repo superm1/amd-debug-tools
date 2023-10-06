@@ -54,6 +54,7 @@ class headers:
     InstallAction = "Attempting to install"
     RerunAction = "Running this script as root will attempt to install it"
     ExplanationReport = "Explanations for your system"
+    EcDebugging = "Turn on dynamic debug messages for EC during suspend"
 
 
 def BIT(num):
@@ -593,7 +594,7 @@ class S0i3Validator:
         message = "{message}. {action}.".format(message=message, action=action)
         print_color(message, "👀")
 
-    def __init__(self, log, acpidump, kernel_log):
+    def __init__(self, log, acpidump, debug_ec, kernel_log):
         # for saving a log file for analysis
         logging.basicConfig(
             format="%(asctime)s %(levelname)s:\t%(message)s",
@@ -607,6 +608,9 @@ class S0i3Validator:
 
         # capture all DSDT/SSDT or just one with _AEI
         self.acpidump = acpidump
+
+        # turn on EC debug messages
+        self.debug_ec = debug_ec
 
         # for analyzing devices
         try:
@@ -1720,6 +1724,9 @@ class S0i3Validator:
                 w.write("file drivers/pinctrl/pinctrl-amd.c %sp" % setting)
             with open(fn, "w") as w:
                 w.write("file drivers/platform/x86/amd/pmc.c %sp" % setting)
+            if self.debug_ec:
+                with open(fn, "w") as w:
+                    w.write("file drivers/acpi/ec.c %sp" % setting)
         except PermissionError:
             # caught by lockdown test
             pass
@@ -2082,6 +2089,7 @@ def parse_args():
         action="store_true",
         help="Include and extract full ACPI dump in report",
     )
+    parser.add_argument("--debug-ec", action="store_true", help=headers.EcDebugging)
     return parser.parse_args()
 
 
@@ -2134,11 +2142,11 @@ if __name__ == "__main__":
     if args.offline:
         if not os.path.exists(log):
             sys.exit("{log} is missing".format(log=log))
-        app = S0i3Validator("/dev/null", False, None)
+        app = S0i3Validator("/dev/null", False, False, None)
         app.check_offline(log)
         app.get_failure_report()
     else:
-        app = S0i3Validator(log, args.acpidump, args.kernel_log_provider)
+        app = S0i3Validator(log, args.acpidump, args.debug_ec, args.kernel_log_provider)
         test = app.prerequisites()
         if test or args.force:
             duration, wait, count = configure_suspend(
