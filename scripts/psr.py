@@ -59,6 +59,7 @@ def get_dmcub():
 
 
 def discover_gpu():
+    gpus = []
     try:
         from pyudev import Context
     except ModuleNotFoundError:
@@ -67,21 +68,26 @@ def discover_gpu():
     for dev in context.list_devices(subsystem="drm_dp_aux_dev"):
         if not "eDP" in dev.sys_path:
             continue
-        return dev.device_node
+        gpus += [dev.device_node]
+    return gpus
 
 
 if __name__ == "__main__":
-    gpu = discover_gpu()
-    if not gpu:
+    gpus = discover_gpu()
+    if not gpus:
         sys.exit("failed to find drm_dp_aux_dev")
     get_dmcub()
-    try:
-        with open(gpu, "rb") as f:
-            try:
-                decode_psr_support(f)
-                get_id_string(f)
-                get_psr_error(f)
-            except OSError:
-                sys.exit("Could not read DPCD, is the panel on?")
-    except PermissionError:
-        sys.exit("run as root")
+    for gpu in gpus:
+        try:
+            with open(gpu, "rb") as f:
+                try:
+                    decode_psr_support(f)
+                    get_id_string(f)
+                    get_psr_error(f)
+                except OSError:
+                    print(
+                        "Could not read DPCD, skipping. If the panel is off, please turn on and try again."
+                    )
+                    continue
+        except PermissionError:
+            sys.exit("run as root")
