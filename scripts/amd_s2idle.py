@@ -146,6 +146,17 @@ class S0i3Failure:
             print("For more information on this failure see:\n\t%s" % self.url)
 
 
+class RtcAlarmWrong(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "rtc_cmos is not configured to use ACPI alarm"
+        self.explanation = (
+            "\tSome problems can occur during wakeup cycles if the HPET RTC emulation is used to\n"
+            "\twake systems. This can manifest in unexpected wakeups or high power consumption.\n"
+        )
+        self.url = "https://github.com/systemd/systemd/issues/24279"
+
+
 class MissingAmdgpu(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -1228,6 +1239,16 @@ class S0i3Validator:
         print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
 
+    def check_rtc_cmos(self):
+        # check /sys/module/rtc_cmos/parameters/use_acpi_alarm
+        p = os.path.join(
+            "/", "sys", "module", "rtc_cmos", "parameters", "use_acpi_alarm"
+        )
+        val = read_file(p)
+        if val == "N":
+            print_color("RTC driver `rtc_cmos` configured to use ACPI alarm", "🚦")
+            self.failures += [RtcAlarmWrong()]
+
     def check_amdgpu(self):
         for device in self.pyudev.list_devices(subsystem="pci", DRIVER="amdgpu"):
             print_color("GPU driver `amdgpu` available", "✅")
@@ -1925,6 +1946,7 @@ class S0i3Validator:
             self.analyze_duration,
             self.check_hw_sleep,
             self.check_battery,
+            self.check_rtc_cmos,
         ]
         for check in checks:
             check()
