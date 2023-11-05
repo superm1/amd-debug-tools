@@ -168,6 +168,20 @@ class MissingAmdgpu(S0i3Failure):
         )
 
 
+class MissingAmdgpuFirmware(S0i3Failure):
+    def __init__(self, errors):
+        super().__init__()
+        self.description = "AMDGPU firmware is missing"
+        self.explanation = (
+            "\tThe amdgpu driver loads firmware from /lib/firmware/amdgpu\n"
+            "\tIn some cases missing firmware will prevent a successful suspend cycle.\n"
+            "\tUpgrade to a newer snapshot at https://gitlab.com/kernel-firmware/linux-firmware\n"
+        )
+        self.url = "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1053856"
+        for error in errors:
+            self.explanation += "\t%s" % error
+
+
 class MissingAmdPmc(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -1250,12 +1264,21 @@ class S0i3Validator:
             self.failures += [RtcAlarmWrong()]
 
     def check_amdgpu(self):
+        found = False
         for device in self.pyudev.list_devices(subsystem="pci", DRIVER="amdgpu"):
             print_color("GPU driver `amdgpu` available", "✅")
-            return True
-        print_color("GPU driver `amdgpu` not loaded", "❌")
-        self.failures += [MissingAmdgpu()]
-        return False
+            found = True
+        if not found:
+            print_color("GPU driver `amdgpu` not loaded", "❌")
+            self.failures += [MissingAmdgpu()]
+            return False
+        self.kernel_log.seek()
+        match = self.kernel_log.match_pattern("Direct firmware load for amdgpu.*failed")
+        if match:
+            print_color("GPU firmware missing", "❌")
+            self.failures += [MissingAmdgpuFirmware([match])]
+            return False
+        return True
 
     def _process_ath11k_line(self, line) -> bool:
         if re.search("ath11k_pci.*fw_version", line):
