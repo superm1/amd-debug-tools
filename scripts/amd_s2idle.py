@@ -1733,11 +1733,11 @@ class S0i3Validator:
 
     def minimum_kernel(self, major, minor):
         """Checks if the kernel version is at least major.minor"""
-        if major > self.kernel_major:
+        if self.kernel_major > major:
             return True
-        if major < self.kernel_major:
+        if self.kernel_major < major:
             return False
-        return minor >= self.kernel_minor
+        return self.kernel_minor >= minor
 
     def toggle_dynamic_debugging(self, enable):
         try:
