@@ -1731,15 +1731,22 @@ class S0i3Validator:
             self.lockdown = True
         return True
 
+    def minimum_kernel(self, major, minor):
+        """Checks if the kernel version is at least major.minor"""
+        if major > self.kernel_major:
+            return True
+        if major < self.kernel_major:
+            return False
+        return minor >= self.kernel_minor
+
     def toggle_dynamic_debugging(self, enable):
         try:
             fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
             setting = "+" if enable else "-"
-            with open(fn, "w") as w:
-                w.write("file drivers/acpi/x86/s2idle.c %sp" % setting)
-            if self.kernel_major < 7 and (
-                self.kernel_major == 6 and self.kernel_minor < 5
-            ):
+            if not self.minimum_kernel(6, 2):
+                with open(fn, "w") as w:
+                    w.write("file drivers/acpi/x86/s2idle.c %sp" % setting)
+            if not self.minimum_kernel(6, 5):
                 # only needed if missing https://github.com/torvalds/linux/commit/c9a236419ff936755eb5db8a894c3047440e65a8
                 with open(fn, "w") as w:
                     w.write("file drivers/pinctrl/pinctrl-amd.c %sp" % setting)
