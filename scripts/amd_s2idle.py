@@ -70,19 +70,6 @@ def compare_sysfs(fn, expect):
     return read_file(fn) == expect
 
 
-def check_dynamic_debug(message):
-    """Check if dynamic debug supports a given message"""
-    fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
-    try:
-        dbg = read_file(fn)
-        for line in dbg.split("\n"):
-            if re.search(message, line):
-                return True
-    except PermissionError:
-        pass
-    return False
-
-
 def capture_file_to_debug(fn):
     """Reads and captures all contents of fn"""
     try:
@@ -820,9 +807,12 @@ class S0i3Validator:
 
     def capture_kernel_version(self):
         """Log the kernel version used"""
+        kernel = platform.uname().release
+        self.kernel_major = int(kernel.split(".")[0])
+        self.kernel_minor = int(kernel.split(".")[1])
         if self.pretty_distro:
             print_color("{distro}".format(distro=self.pretty_distro), "🐧")
-        print_color("Kernel {version}".format(version=platform.uname().release), "🐧")
+        print_color("Kernel {version}".format(version=kernel), "🐧")
 
     def check_battery(self):
         for dev in self.pyudev.list_devices(
@@ -1257,12 +1247,6 @@ class S0i3Validator:
                     if line.endswith("|0x0"):
                         continue
                     logging.debug(line)
-            if not check_dynamic_debug(
-                "drivers/pinctrl/pinctrl-amd.*GPIO %d is active"
-            ):
-                print_color(
-                    "GPIO dynamic debugging information unavailable", colors.WARNING
-                )
             return True
         print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
@@ -1774,10 +1758,15 @@ class S0i3Validator:
             setting = "+" if enable else "-"
             with open(fn, "w") as w:
                 w.write("file drivers/acpi/x86/s2idle.c %sp" % setting)
-            with open(fn, "w") as w:
-                w.write("file drivers/pinctrl/pinctrl-amd.c %sp" % setting)
-            with open(fn, "w") as w:
-                w.write("file drivers/platform/x86/amd/pmc.c %sp" % setting)
+            if self.kernel_major < 7 and (
+                self.kernel_major == 6 and self.kernel_minor < 5
+            ):
+                # only needed if missing https://github.com/torvalds/linux/commit/c9a236419ff936755eb5db8a894c3047440e65a8
+                with open(fn, "w") as w:
+                    w.write("file drivers/pinctrl/pinctrl-amd.c %sp" % setting)
+                # only needed if missing https://github.com/torvalds/linux/commit/b77505ed8a885c67a589c049c38824082a569068
+                with open(fn, "w") as w:
+                    w.write("file drivers/platform/x86/amd/pmc.c %sp" % setting)
             if self.debug_ec:
                 with open(fn, "w") as w:
                     w.write("file drivers/acpi/ec.c %sp" % setting)
