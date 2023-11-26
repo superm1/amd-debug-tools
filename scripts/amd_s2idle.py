@@ -328,22 +328,6 @@ class Irq1Workaround(S0i3Failure):
         self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/platform/x86/amd/pmc.c?id=8e60615e8932167057b363c11a7835da7f007106"
 
 
-class KernelLockdown(S0i3Failure):
-    def __init__(self):
-        super().__init__()
-        self.description = "Kernel lockdown engaged"
-        self.explanation = (
-            "\tKernel lockdown is a security feature that makes sure that processes can't tamper\n"
-            "\twith the security state of the kernel.\n"
-            "\tThis is generally a good security feature, but it will prevent the capture of some.\n"
-            "\tdebugging information\n"
-            "\n"
-            "\tPlease disable it and re-run this script for a more accurate report.\n"
-            "\tIf you didn't manually enable it, some Linux distributions enable it when UEFI secure\n"
-            "\tboot has been enabled. So you may want to manually disable it to capture debugging data.\n"
-        )
-
-
 class KernelRingBufferWrapped(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -1744,11 +1728,6 @@ class S0i3Validator:
             return True
         logging.debug("Lockdown: %s" % lockdown)
         if lockdown.split()[0] != "[none]":
-            print_color(
-                "Kernel lockdown is engaged, this script will have limited debugging",
-                colors.WARNING,
-            )
-            self.failures += [KernelLockdown()]
             self.lockdown = True
         return True
 
