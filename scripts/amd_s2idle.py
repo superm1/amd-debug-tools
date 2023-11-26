@@ -131,6 +131,20 @@ def print_color(message, group):
         logging.debug(log_txt)
 
 
+def pm_debugging(func):
+    def runner(*args, **kwargs):
+        fn = os.path.join("/", "sys", "power", "pm_debug_messages")
+        with open(fn, "w") as w:
+            w.write("1")
+        # getting the returned value
+        ret = func(*args, **kwargs)
+        with open(fn, "w") as w:
+            w.write("0")
+        return ret
+
+    return runner
+
+
 class S0i3Failure:
     def __init__(self):
         self.explanation = ""
@@ -1754,11 +1768,7 @@ class S0i3Validator:
             self.lockdown = True
         return True
 
-    def toggle_debugging(self, enable):
-        fn = os.path.join("/", "sys", "power", "pm_debug_messages")
-        setting = "1" if enable else "0"
-        with open(fn, "w") as w:
-            w.write(setting)
+    def toggle_dynamic_debugging(self, enable):
         try:
             fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
             setting = "+" if enable else "-"
@@ -1983,6 +1993,12 @@ class S0i3Validator:
             t -= 1
         print(" " * len(msg), end="\r")
 
+    @pm_debugging
+    def execute_suspend(self):
+        p = os.path.join("/", "sys", "power", "state")
+        with open(p, "w") as w:
+            w.write("mem")
+
     def test_suspend(self, duration, count, wait):
         if not count:
             return True
@@ -2006,7 +2022,7 @@ class S0i3Validator:
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
             wakealarm = os.path.join(device.sys_path, "wakealarm")
-        self.toggle_debugging(True)
+        self.toggle_dynamic_debugging(True)
         self.capture_gpes()
         self.capture_lid()
 
@@ -2035,12 +2051,10 @@ class S0i3Validator:
                     w.write("+%s\n" % self.requested_duration)
             else:
                 print_color("No RTC device found, please manually wake system", "🚦")
-            p = os.path.join("/", "sys", "power", "state")
-            with open(p, "w") as w:
-                w.write("mem")
+            self.execute_suspend()
             self.run_countdown("Collecting data", wait / 2)
             self.analyze_results()
-        self.toggle_debugging(False)
+        self.toggle_dynamic_debugging(False)
         return True
 
     def get_failure_report(self):
