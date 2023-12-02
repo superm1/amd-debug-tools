@@ -1174,31 +1174,111 @@ class S0i3Validator:
         )
 
     def check_wake_sources(self):
-        # Check ACPI 'button' driver wake sources
-        for device in self.pyudev.list_devices(subsystem="acpi", DRIVER="button"):
-            p = os.path.join(device.sys_path, "power", "wakeup")
-            key = "unknown"
-            for input in self.pyudev.list_devices(subsystem="input"):
-                if device.sys_path in input.sys_path and "NAME" in input.properties:
-                    key = input.properties["NAME"]
-            logging.debug(
-                "ACPI {key} wakeup ({name}): {state}".format(
-                    key=key, name=device.sys_name, state=read_file(p)
+        def get_input_sibling_name(pyudev, parent):
+            # input is a sibling not a parent to the wakeup
+            for input in pyudev.list_devices(subsystem="input", parent=parent):
+                if not "NAME" in input.properties:
+                    continue
+                return input.properties["NAME"]
+            return ""
+
+        devices = []
+        for wake_dev in self.pyudev.list_devices(subsystem="wakeup"):
+            p = os.path.join(wake_dev.sys_path, "device", "power", "wakeup")
+            if not os.path.exists(p):
+                continue
+            wake_en = read_file(p)
+            name = ""
+            sys_name = wake_dev.sys_path
+            # determine the type of device it hangs off of
+            acpi = wake_dev.find_parent(subsystem="acpi")
+            serio = wake_dev.find_parent(subsystem="serio")
+            rtc = wake_dev.find_parent(subsystem="rtc")
+            pci = wake_dev.find_parent(subsystem="pci")
+            mhi = wake_dev.find_parent(subsystem="mhi")
+            pnp = wake_dev.find_parent(subsystem="pnp")
+            hid = wake_dev.find_parent(subsystem="hid")
+            thunderbolt_device = wake_dev.find_parent(
+                subsystem="thunderbolt", device_type="thunderbolt_device"
+            )
+            thunderbolt_domain = wake_dev.find_parent(
+                subsystem="thunderbolt", device_type="thunderbolt_domain"
+            )
+            i2c = wake_dev.find_parent(subsystem="i2c")
+            if i2c is not None:
+                sys_name = i2c.sys_name
+                name = get_input_sibling_name(self.pyudev, i2c)
+            elif thunderbolt_device is not None:
+                if "USB4_TYPE" in thunderbolt_device.properties:
+                    name = "USB4 {type} controller".format(
+                        type=thunderbolt_device.properties["USB4_TYPE"]
+                    )
+                sys_name = thunderbolt_device.sys_name
+            elif thunderbolt_domain is not None:
+                name = "Thunderbolt domain"
+                sys_name = thunderbolt_domain.sys_name
+            elif serio is not None:
+                sys_name = serio.sys_name
+                name = get_input_sibling_name(self.pyudev, serio)
+            elif rtc is not None:
+                sys_name = rtc.sys_name
+                for parent in self.pyudev.list_devices(
+                    subsystem="platform", parent=rtc, DRIVER="alarmtimer"
+                ):
+                    name = "Real Time Clock alarm timer"
+            elif mhi is not None:
+                sys_name = mhi.sys_name
+                name = "Mobile Broadband host interface"
+            elif hid is not None:
+                name = hid.properties["HID_NAME"]
+                sys_name = hid.sys_name
+            elif pci is not None:
+                sys_name = pci.sys_name
+                if (
+                    "ID_PCI_SUBCLASS_FROM_DATABASE" in pci.properties
+                    and "ID_VENDOR_FROM_DATABASE" in pci.properties
+                ):
+                    name = "{vendor} {cls}".format(
+                        vendor=pci.properties["ID_VENDOR_FROM_DATABASE"],
+                        cls=pci.properties["ID_PCI_SUBCLASS_FROM_DATABASE"],
+                    )
+                else:
+                    name = "PCI {id}".format(id=pci.properties["PCI_CLASS"])
+            elif acpi is not None:
+                sys_name = acpi.sys_name
+                if acpi.driver == "button":
+                    for input in self.pyudev.list_devices(
+                        subsystem="input", parent=acpi
+                    ):
+                        if not "NAME" in input.properties:
+                            continue
+                        name = "ACPI {name}".format(name=input.properties["NAME"])
+                elif acpi.driver == "battery" or acpi.driver == "ac":
+                    for ps in self.pyudev.list_devices(
+                        subsystem="power_supply", parent=acpi
+                    ):
+                        if not "POWER_SUPPLY_NAME" in ps.properties:
+                            continue
+                        name = "ACPI {type}".format(
+                            type=ps.properties["POWER_SUPPLY_TYPE"]
+                        )
+            elif pnp is not None:
+                name = "Plug-n-play"
+                if pnp.driver == "rtc_cmos":
+                    name = "{} Real Time Clock".format(name)
+                sys_name = pnp.sys_name
+
+            devices.append(
+                "{name} [{sys_name}]: {wakeup}".format(
+                    name=name.replace('"', ""), sys_name=sys_name, wakeup=wake_en
                 )
             )
-        # Check ACPI 'device' wake sources
-        p = os.path.join("/", "proc", "acpi", "wakeup")
-        for line in read_file(p).split("\n"):
-            if not line:
-                continue
-            if line.startswith("Device"):
-                continue
-            objects = line.split()
-            if len(objects) < 3:
-                continue
-            logging.debug(
-                "ACPI {name} wakeup: {state}".format(name=objects[0], state=objects[2])
-            )
+        devices.sort()
+        logging.debug("Wakeup sources:")
+        for dev in devices:
+            # set prefix if last device
+            prefix = "| " if dev != devices[-1] else "└─"
+            logging.debug("{prefix}{device}".format(prefix=prefix, device=dev))
         return True
 
     def check_amd_pmc(self):
