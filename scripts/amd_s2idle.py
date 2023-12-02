@@ -1436,7 +1436,11 @@ class S0i3Validator:
         return True
 
     def map_acpi_pci(self):
+        devices = []
         for dev in self.pyudev.list_devices(subsystem="pci"):
+            devices.append(dev)
+        logging.debug("PCI devices")
+        for dev in devices:
             pci_id = dev.properties["PCI_ID"].lower()
             pci_slot_name = dev.properties["PCI_SLOT_NAME"]
             database_class = get_property_pyudev(
@@ -1445,7 +1449,16 @@ class S0i3Validator:
             database_vendor = get_property_pyudev(
                 dev.properties, "ID_VENDOR_FROM_DATABASE", ""
             )
-            prefix = "├─ " if dev.parent.subsystem == "pci" else "| "
+            if dev.parent.subsystem != "pci":
+                if dev == devices[-1]:
+                    prefix = "└─"
+                else:
+                    prefix = "| "
+            else:
+                if dev == devices[-1]:
+                    prefix = "└─"
+                else:
+                    prefix = "├─ "
             p = os.path.join(dev.sys_path, "firmware_node", "path")
             if os.path.exists(p):
                 acpi = read_file(p)
