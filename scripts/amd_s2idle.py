@@ -385,6 +385,29 @@ class WCN6855Bug(S0i3Failure):
         self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/commit/?id=c7a57ef688f7d99d8338a5d8edddc8836ff0e6de"
 
 
+class I2CHidBug(S0i3Failure):
+    def __init__(self, name, remediation):
+        super().__init__()
+        self.description = "The {name} device has been reported to cause high power consumption and spurious wakeups".format(
+            name=name
+        )
+        self.explanation = (
+            "\tI2C devices work in an initiator/receiver relationship where the device is the receiver. In order for the receiver to indicate\n"
+            "\tthe initiator needs to read data they will assert an attention GPIO pin.\n"
+            "\tWhen a device misbehaves it may assert this pin spuriously which can cause the SoC to wakeup prematurely.\n"
+            "\tThis typically manifests as high power consumption at runtime and spurious wakeups at suspend.\n"
+            "\n"
+            "\tThis issue can be worked around by unbinding the device from the kernel using this command:\n"
+            "\n"
+            "\t{command}\n"
+            "\n"
+            "\tTo fix this issue permanently the kernel will need to avoid binding to this device.".format(
+                command=remediation
+            )
+        )
+        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/2812"
+
+
 class SpuriousWakeup(S0i3Failure):
     def __init__(self, duration):
         super().__init__()
@@ -1435,6 +1458,53 @@ class S0i3Validator:
             return False
         return True
 
+    def check_i2c_hid(self):
+        devices = []
+        for dev in self.pyudev.list_devices(subsystem="input"):
+            if "NAME" not in dev.properties:
+                continue
+            parent = dev.find_parent(subsystem="i2c")
+            if parent is None:
+                continue
+            devices.append(dev)
+        if not devices:
+            return True
+        logging.debug("I2C HID devices")
+        for dev in devices:
+            name = dev.properties["NAME"]
+            parent = dev.find_parent(subsystem="i2c")
+            p = os.path.join(parent.sys_path, "firmware_node", "path")
+            if os.path.exists(p):
+                acpi_path = read_file(p)
+            else:
+                acpi_path = ""
+            p = os.path.join(parent.sys_path, "firmware_node", "hid")
+            if os.path.exists(p):
+                acpi_hid = read_file(p)
+            else:
+                acpi_hid = ""
+            # set prefix if last device
+            prefix = "| " if dev != devices[-1] else "└─"
+            logging.debug(
+                "{prefix}{name} [{acpi_hid}] : {acpi_path}".format(
+                    prefix=prefix, name=name, acpi_hid=acpi_hid, acpi_path=acpi_path
+                )
+            )
+            if "IDEA5002" in name:
+                remediation = (
+                    "echo {} | sudo tee /sys/bus/i2c/drivers/{}/unbind".format(
+                        parent.sys_path.split("/")[-1], parent.driver
+                    )
+                )
+
+                print_color(
+                    "{name} may cause spurious wakeups".format(name=name),
+                    "❌",
+                )
+                self.failures += [I2CHidBug(name, remediation)]
+                return False
+        return True
+
     def map_acpi_pci(self):
         devices = []
         for dev in self.pyudev.list_devices(subsystem="pci"):
@@ -1720,6 +1790,7 @@ class S0i3Validator:
             self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
+            self.check_i2c_hid,
             self.check_wake_sources,
             self.capture_acpi,
         ]
