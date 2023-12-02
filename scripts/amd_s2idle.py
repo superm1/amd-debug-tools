@@ -1245,15 +1245,18 @@ class S0i3Validator:
             except PermissionError:
                 logging.debug("Unable to capture %s" % p)
                 contents = None
+            header = False
             if contents:
                 for line in contents.split("\n"):
                     if "WAKE_INT_MASTER_REG:" in line:
                         val = "en" if int(line.split()[1], 16) & BIT(15) else "dis"
                         logging.debug("Winblue GPIO 0 debounce: %sabled", val)
                         continue
-                    if line.endswith("|0x0"):
-                        continue
-                    logging.debug(line)
+                    if not header and re.search("trigger", line):
+                        logging.debug(line)
+                        header = True
+                    if re.search("edge", line) or re.search("level", line):
+                        logging.debug(line)
             return True
         print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
