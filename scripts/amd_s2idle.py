@@ -627,7 +627,7 @@ class S0i3Validator:
         message = "{message}. {action}.".format(message=message, action=action)
         print_color(message, "👀")
 
-    def __init__(self, log, acpidump, debug_ec, kernel_log):
+    def __init__(self, log, acpidump, logind, debug_ec, kernel_log):
         # for saving a log file for analysis
         logging.basicConfig(
             format="%(asctime)s %(levelname)s:\t%(message)s",
@@ -641,6 +641,9 @@ class S0i3Validator:
 
         # capture all DSDT/SSDT or just one with _AEI
         self.acpidump = acpidump
+
+        # initiate suspend cycles using logind
+        self.logind = logind
 
         # turn on EC debug messages
         self.debug_ec = debug_ec
@@ -1840,6 +1843,26 @@ class S0i3Validator:
                 return False
         return True
 
+    def check_logind(self):
+        if not self.logind:
+            return True
+        try:
+            import dbus
+        except ImportError:
+            print_color("Unable to import dbus", "❌")
+            return False
+        try:
+            bus = dbus.SystemBus()
+            obj = bus.get_object("org.freedesktop.login1", "/org/freedesktop/login1")
+            intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
+            if intf.CanSuspend() != "yes":
+                print_color("Unable to suspend with logind", "❌")
+                return False
+        except dbus.exceptions.DBusException as e:
+            print_color("Unable to communicate with logind", "❌")
+            return False
+        return True
+
     def prerequisites(self):
         print_color(headers.Info, colors.HEADER)
         info = [
@@ -1876,6 +1899,7 @@ class S0i3Validator:
             self.check_i2c_hid,
             self.check_wake_sources,
             self.capture_acpi,
+            self.check_logind,
         ]
         result = True
         for check in checks:
@@ -2137,9 +2161,44 @@ class S0i3Validator:
 
     @pm_debugging
     def execute_suspend(self):
-        p = os.path.join("/", "sys", "power", "state")
-        with open(p, "w") as w:
-            w.write("mem")
+        if self.logind:
+            try:
+                import dbus
+
+                bus = dbus.SystemBus()
+                obj = bus.get_object(
+                    "org.freedesktop.login1", "/org/freedesktop/login1"
+                )
+                intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
+                propf = dbus.Interface(obj, "org.freedesktop.DBus.Properties")
+                intf.Suspend(True)
+                while propf.Get("org.freedesktop.login1.Manager", "PreparingForSleep"):
+                    time.sleep(1)
+                return True
+            except dbus.exceptions.DBusException as e:
+                print_color("Unable to communicate with logind", "❌")
+                return False
+        else:
+            p = os.path.join("/", "sys", "power", "state")
+            with open(p, "w") as w:
+                w.write("mem")
+        return True
+
+    def unlock_session(self):
+        if self.logind:
+            try:
+                import dbus
+
+                bus = dbus.SystemBus()
+                obj = bus.get_object(
+                    "org.freedesktop.login1", "/org/freedesktop/login1"
+                )
+                intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
+                intf.UnlockSessions()
+            except dbus.exceptions.DBusException as e:
+                print_color("Unable to communicate with logind", "❌")
+                return False
+        return True
 
     def test_suspend(self, duration, count, wait):
         if not count:
@@ -2197,6 +2256,7 @@ class S0i3Validator:
             self.run_countdown("Collecting data", wait / 2)
             self.analyze_results()
         self.toggle_dynamic_debugging(False)
+        self.unlock_session()
         return True
 
     def get_failure_report(self):
@@ -2290,6 +2350,9 @@ def parse_args():
         action="store_true",
         help="Include and extract full ACPI dump in report",
     )
+    parser.add_argument(
+        "--logind", action="store_true", help="Use logind to suspend system"
+    )
     parser.add_argument("--debug-ec", action="store_true", help=headers.EcDebugging)
     return parser.parse_args()
 
@@ -2343,11 +2406,13 @@ if __name__ == "__main__":
     if args.offline:
         if not os.path.exists(log):
             sys.exit("{log} is missing".format(log=log))
-        app = S0i3Validator("/dev/null", False, False, None)
+        app = S0i3Validator("/dev/null", False, False, False, None)
         app.check_offline(log)
         app.get_failure_report()
     else:
-        app = S0i3Validator(log, args.acpidump, args.debug_ec, args.kernel_log_provider)
+        app = S0i3Validator(
+            log, args.acpidump, args.logind, args.debug_ec, args.kernel_log_provider
+        )
         test = app.prerequisites()
         if test or args.force:
             duration, wait, count = configure_suspend(
