@@ -2126,12 +2126,11 @@ class S0i3Validator:
                 )
             else:
                 percent = 0
-            print_color(
+            logging.debug(
                 "Kernel suspended for total of {time} ({percent:.2%})".format(
                     time=timedelta(seconds=self.kernel_duration),
                     percent=percent,
                 ),
-                "✅",
             )
 
     def analyze_results(self):
