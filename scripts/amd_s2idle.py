@@ -611,7 +611,7 @@ class PyUdevPackage(DistroPackage):
 
 class IaslPackage(DistroPackage):
     def __init__(self, root):
-        super().__init__(deb="acpica-tools", rpm="python3-pyudev", pip=None, root=root)
+        super().__init__(deb="acpica-tools", rpm="acpica-tools", pip=None, root=root)
 
 
 class PackagingPackage(DistroPackage):
