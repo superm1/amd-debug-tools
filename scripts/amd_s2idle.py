@@ -776,9 +776,13 @@ class S0i3Validator:
 
             logging.debug("Fetching low power idle bit directly from FADT")
             target = os.path.join("/", "sys", "firmware", "acpi", "tables", "FACP")
-            with open(target, "rb") as r:
-                r.seek(0x70)
-                found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
+            try:
+                with open(target, "rb") as r:
+                    r.seek(0x70)
+                    found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
+            except PermissionError:
+                print_color("FADT check unavailable", colors.WARNING)
+                return True
         if found:
             message = "ACPI FADT supports Low-power S0 idle"
             print_color(message, "✅")
