@@ -593,12 +593,12 @@ class DistroPackage:
         elif distro == "fedora":
             if not self.rpm:
                 return False
-            release = read_file('/usr/lib/os-release')
+            release = read_file("/usr/lib/os-release")
             variant = None
-            for line in release.split('\n'):
-                if line.startswith('VARIANT_ID'):
-                    variant = line.split('=')[-1]
-            if variant != 'workstation':
+            for line in release.split("\n"):
+                if line.startswith("VARIANT_ID"):
+                    variant = line.split("=")[-1]
+            if variant != "workstation":
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
         else:
