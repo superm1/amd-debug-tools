@@ -1874,6 +1874,15 @@ class S0i3Validator:
             return False
         return True
 
+    def check_power_profile(self):
+        cmd = ["/usr/bin/powerprofilesctl"]
+        if os.path.exists(cmd[0]):
+            logging.debug("Power profiles:")
+            output = subprocess.check_output(cmd).decode("utf-8")
+            for line in output.split("\n"):
+                logging.debug(f" {line}")
+        return True
+
     def prerequisites(self):
         print_color(headers.Info, colors.HEADER)
         info = [
@@ -1911,6 +1920,7 @@ class S0i3Validator:
             self.check_wake_sources,
             self.capture_acpi,
             self.check_logind,
+            self.check_power_profile,
         ]
         result = True
         for check in checks:
