@@ -19,7 +19,7 @@ class colors:
     DEBUG = "\033[90m"
     HEADER = "\033[95m"
     OK = "\033[94m"
-    WARNING = "\033[93m"
+    WARNING = "\033[32m"
     FAIL = "\033[91m"
     ENDC = "\033[0m"
     UNDERLINE = "\033[4m"
