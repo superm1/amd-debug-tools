@@ -91,6 +91,7 @@ def get_property_pyudev(properties, key, fallback=""):
 
 def print_color(message, group):
     prefix = "%s " % group
+    suffix = colors.ENDC
     if group == "🚦":
         color = colors.WARNING
     elif group == "🦟":
@@ -102,11 +103,7 @@ def print_color(message, group):
     else:
         color = group
         prefix = ""
-    print(
-        "{prefix}{color}{message}{suffix}".format(
-            prefix=prefix, color=color, message=message, suffix=colors.ENDC
-        )
-    )
+
     log_txt = "{prefix}{message}".format(prefix=prefix, message=message).strip()
     if any(c in color for c in [colors.OK, colors.HEADER, colors.UNDERLINE]):
         logging.info(log_txt)
@@ -116,6 +113,11 @@ def print_color(message, group):
         logging.error(log_txt)
     else:
         logging.debug(log_txt)
+
+    if "TERM" in os.environ and os.environ["TERM"] == "dumb":
+        suffix = ""
+        color = ""
+    print(f"{prefix}{color}{message}{suffix}")
 
 
 def pm_debugging(func):
