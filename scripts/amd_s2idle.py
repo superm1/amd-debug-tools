@@ -448,6 +448,17 @@ class MSRFailure(S0i3Failure):
         )
 
 
+class TaintedKernel(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "Kernel is tainted"
+        self.explanation = (
+            "\tA tainted kernel may exhibit unpredictable bugs that are difficult for this script to characterize.\n"
+            "\tIf this is intended behavior run the tool with --force.\n"
+        )
+        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3089"
+
+
 class KernelLogger:
     def __init__(self):
         pass
@@ -1885,6 +1896,15 @@ class S0i3Validator:
                 logging.debug(f" {line}")
         return True
 
+    def check_taint(self):
+        fn = os.path.join("/", "proc", "sys", "kernel", "tainted")
+        taint = read_file(fn)
+        if taint != "0":
+            print_color("Kernel is tainted", "❌")
+            self.failures += [TaintedKernel()]
+            return False
+        return True
+
     def prerequisites(self):
         print_color(headers.Info, colors.HEADER)
         info = [
@@ -1923,6 +1943,7 @@ class S0i3Validator:
             self.capture_acpi,
             self.check_logind,
             self.check_power_profile,
+            self.check_taint,
         ]
         result = True
         for check in checks:
