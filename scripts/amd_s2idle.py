@@ -792,7 +792,7 @@ class S0i3Validator:
             try:
                 with open(target, "rb") as r:
                     r.seek(0x70)
-                    found = struct.unpack("<I", r.read(4))[0] & (1 << 21)
+                    found = struct.unpack("<I", r.read(4))[0] & BIT(21)
             except PermissionError:
                 print_color("FADT check unavailable", colors.WARNING)
                 return True
@@ -2111,10 +2111,10 @@ class S0i3Validator:
                         )
             if bit_changed:
                 for bit in range(0, 31):
-                    if bit_changed & (1 << bit):
+                    if bit_changed & BIT(bit):
                         print_color(
                             "Idle mask bit %d (0x%x) changed during suspend"
-                            % (bit, (1 << bit)),
+                            % (bit, BIT(bit)),
                             "○",
                         )
         if self.upep:
