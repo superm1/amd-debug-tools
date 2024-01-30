@@ -5,6 +5,7 @@ import sys
 import os
 
 PSR_SUPPORT = {
+    0: "PSR Unsupported",
     1: "PSR 1",
     2: "PSR 2 (eDP 1.4)",
     3: "PSR 2 with Y coordinates (eDP 1.4a)",
