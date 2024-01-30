@@ -1395,15 +1395,6 @@ class S0i3Validator:
             return False
         return True
 
-    def _process_ath11k_line(self, line) -> bool:
-        if re.search("ath11k_pci.*fw_version", line):
-            logging.debug("WCN6855 version string: %s", line)
-            objects = line.split()
-            for i in range(0, len(objects)):
-                if objects[i] == "fw_version":
-                    return int(objects[i + 1], 16)
-        return False
-
     def check_wcn6855_bug(self):
         if not self.kernel_log:
             message = "Unable to test for wcn6855 bug from kernel log"
@@ -1417,20 +1408,19 @@ class S0i3Validator:
                 logging.debug("WCN6855 version string: %s", match)
                 objects = match.split()
                 for i in range(0, len(objects)):
-                    if objects[i] == "fw_version":
-                        wcn6855 = int(objects[i + 1], 16)
+                    if objects[i] == "fw_build_id":
+                        wcn6855 = objects[i + 1]
 
         if wcn6855:
-            if wcn6855 >= 0x110B196E:
+            components = wcn6855.split(".")
+            if int(components[-1]) >= 37 or int(components[-1]) == 23:
                 print_color(
-                    "WCN6855 WLAN (fw version {version})".format(version=hex(wcn6855)),
+                    f"WCN6855 WLAN (fw build id {wcn6855})",
                     "✅",
                 )
             else:
                 print_color(
-                    "WCN6855 WLAN may cause spurious wakeups (fw version {version})".format(
-                        version=hex(wcn6855)
-                    ),
+                    f"WCN6855 WLAN may cause spurious wakeups (fw build id {wcn6855})",
                     "❌",
                 )
                 self.failures += [WCN6855Bug()]
