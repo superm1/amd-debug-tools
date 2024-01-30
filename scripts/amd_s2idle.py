@@ -1888,9 +1888,11 @@ class S0i3Validator:
 
     def check_taint(self):
         fn = os.path.join("/", "proc", "sys", "kernel", "tainted")
-        taint = read_file(fn)
-        if taint != "0":
-            print_color("Kernel is tainted", "❌")
+        taint = int(read_file(fn))
+        # ignore kernel warnings
+        taint &= ~BIT(9)
+        if taint != 0:
+            print_color(f"Kernel is tainted: {taint}", "❌")
             self.failures += [TaintedKernel()]
             return False
         return True
