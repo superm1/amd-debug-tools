@@ -66,10 +66,6 @@ def read_file(fn):
         return r.read().strip()
 
 
-def compare_sysfs(fn, expect):
-    return read_file(fn) == expect
-
-
 def capture_file_to_debug(fn):
     """Reads and captures all contents of fn"""
     try:
@@ -1031,7 +1027,7 @@ class S0i3Validator:
         if not os.path.exists(fn):
             print_color("Kernel doesn't support sleep", "❌")
             return False
-        if not compare_sysfs(fn, "[s2idle]"):
+        if "[s2idle]" not in read_file(fn):
             self.failures += [SleepModeWrong()]
             print_color("System isn't configured for s2idle in firmware setup", "❌")
             return False
