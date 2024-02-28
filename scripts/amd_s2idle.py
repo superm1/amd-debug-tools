@@ -1504,7 +1504,7 @@ class S0i3Validator:
             except PermissionError:
                 if self.lockdown:
                     print_color(
-                        "Unable to gather hardware sleep data with lockdown engaged",
+                        "Unable to gather hardware sleep data.",
                         colors.WARNING,
                     )
                 else:
