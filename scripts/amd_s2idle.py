@@ -2284,10 +2284,10 @@ class S0i3Validator:
             else:
                 print_color("No RTC device found, please manually wake system", "🚦")
             self.execute_suspend()
+            self.unlock_session()
             self.run_countdown("Collecting data", wait / 2)
             self.analyze_results()
         self.toggle_dynamic_debugging(False)
-        self.unlock_session()
         return True
 
     def get_failure_report(self):
