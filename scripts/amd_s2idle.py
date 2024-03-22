@@ -2282,10 +2282,16 @@ class S0i3Validator:
                 colors.HEADER,
             )
             if wakealarm:
-                with open(wakealarm, "w") as w:
-                    w.write("0")
-                with open(wakealarm, "w") as w:
-                    w.write("+%s\n" % self.requested_duration)
+                try:
+                    with open(wakealarm, "w") as w:
+                        w.write("0")
+                    with open(wakealarm, "w") as w:
+                        w.write("+%s\n" % self.requested_duration)
+                except OSError as e:
+                    print_color(
+                        "Failed to program wakealarm, please manually wake system", "🚦"
+                    )
+                    logging.debug(e)
             else:
                 print_color("No RTC device found, please manually wake system", "🚦")
             if self.execute_suspend():
