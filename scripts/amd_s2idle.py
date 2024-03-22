@@ -651,7 +651,7 @@ class WakeIRQ:
         # This is an IRQ tied to _AEI
         if self.chip_name == "amd_gpio":
             hw_gpio = read_file(os.path.join(p, "hwirq"))
-            self.name = "GPIO {hw_gpio}".format(hw_gpio=hw_gpio)
+            self.name = f"GPIO {hw_gpio}"
         # legacy IRQs
         elif "IR-IO-APIC" in self.chip_name:
             if self.actions == "acpi":
@@ -664,6 +664,7 @@ class WakeIRQ:
                 self.name = "RTC"
             elif self.actions == "timer":
                 self.name = "Timer"
+            self.actions = ""
         elif "PCI-MSI" in self.chip_name:
             bdf = self.chip_name.split("-")[-1]
             for dev in context.list_devices(subsystem="pci"):
@@ -679,7 +680,7 @@ class WakeIRQ:
                     )
                     break
 
-        # might look like an ACPI device, try to follow it
+        # "might" look like an ACPI device, try to follow it
         if not self.name and self.actions:
             p = os.path.join("/", "sys", "bus", "acpi", "devices", self.actions)
             if os.path.exists(p):
@@ -706,11 +707,11 @@ class WakeIRQ:
 
         # check if it's disabled
         if not self.name and wakeup == "disabled":
-            actions = f" (for {self.actions})" if self.actions else ""
-            self.name = f"Disabled interrupt{actions}"
+            self.name = "Disabled interrupt"
 
     def __str__(self):
-        return "%s" % self.name
+        actions = f" ({self.actions})" if self.actions else ""
+        return f"{self.name}{actions}"
 
 
 class S0i3Validator:
