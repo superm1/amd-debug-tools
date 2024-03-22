@@ -2211,8 +2211,13 @@ class S0i3Validator:
                 return False
         else:
             p = os.path.join("/", "sys", "power", "state")
-            with open(p, "w") as w:
-                w.write("mem")
+            try:
+                with open(p, "w") as w:
+                    w.write("mem")
+            except OSError as e:
+                print_color("Failed to suspend", "❌")
+                logging.debug(e)
+                return False
         return True
 
     def unlock_session(self):
