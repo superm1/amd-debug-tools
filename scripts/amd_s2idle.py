@@ -43,6 +43,7 @@ class headers:
     RootError = "Suspend must be initiated by root user"
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
+    WakeTriggeredIrq = "Wakeup triggered from IRQ"
     MissingPyudev = "Udev access library `pyudev` is missing"
     MissingPackaging = "Python library `packaging` is missing"
     MissingIasl = "ACPI extraction tool `iasl` is missing"
@@ -1526,21 +1527,12 @@ class S0i3Validator:
     def check_wakeup_irq(self):
         p = os.path.join("/", "sys", "power", "pm_wakeup_irq")
         try:
-            n = read_file(p)
-            p = os.path.join("/", "sys", "kernel", "irq", n)
-            chip_name = read_file(os.path.join(p, "chip_name"))
-            name = read_file(os.path.join(p, "name"))
-            hw = read_file(os.path.join(p, "hwirq"))
-            actions = read_file(os.path.join(p, "actions"))
-            message = "{header} {number} ({chip_name} {hw}-{name} {actions})".format(
-                header=headers.WokeFromIrq,
-                number=n,
-                chip_name=chip_name,
-                hw=hw,
-                name=name,
-                actions=actions,
-            )
-            print_color(message, "○")
+            n = int(read_file(p))
+            for irq in self.irqs:
+                if irq[0] == n:
+                    message = f"{headers.WokeFromIrq} {irq[0]}: {irq[1]}"
+                    print_color(message, "○")
+                    break
         except OSError:
             pass
         return True
@@ -1727,16 +1719,16 @@ class S0i3Validator:
 
     def capture_irq(self):
         p = os.path.join("/sys", "kernel", "irq")
-        irqs = []
+        self.irqs = []
         for d in os.listdir(p):
             if os.path.isdir(os.path.join(p, d)):
                 w = WakeIRQ(d, self.pyudev)
-                irqs.append([int(d), str(w)])
-        irqs.sort()
+                self.irqs.append([int(d), str(w)])
+        self.irqs.sort()
         logging.debug("Interrupts")
-        for irq in irqs:
-            # set prefix if last device
-            prefix = "| " if irq != irqs[-1] else "└─"
+        for irq in self.irqs:
+            # set prefix if last IRQ
+            prefix = "| " if irq != self.irqs[-1] else "└─"
             logging.debug(f"{prefix}{irq[0]}: {irq[1]}")
         return True
 
@@ -2181,7 +2173,12 @@ class S0i3Validator:
         if self.active_gpios:
             print_color("GPIOs active: %s" % self.active_gpios, "○")
         if self.wakeup_irqs:
-            print_color("Wakeups triggered from IRQs: %s" % self.wakeup_irqs, "○")
+            for n in self.wakeup_irqs:
+                for irq in self.irqs:
+                    if irq[0] == int(n):
+                        print_color(
+                            f"{headers.WakeTriggeredIrq} {irq[0]}: {irq[1]}", "○"
+                        )
             if 1 in self.wakeup_irqs and self.cpu_needs_irq1_wa():
                 if self.irq1_workaround:
                     print_color("Kernel workaround for IRQ1 issue utilized")
