@@ -637,6 +637,81 @@ class PackagingPackage(DistroPackage):
         )
 
 
+class WakeIRQ:
+    def __init__(self, num, context):
+        self.num = num
+        p = os.path.join("/", "sys", "kernel", "irq", str(num))
+        self.chip_name = read_file(os.path.join(p, "chip_name"))
+        self.actions = read_file(os.path.join(p, "actions"))
+        self.driver = ""
+        self.name = ""
+        wakeup = read_file(os.path.join(p, "wakeup"))
+
+        # This is an IRQ tied to _AEI
+        if self.chip_name == "amd_gpio":
+            hw_gpio = read_file(os.path.join(p, "hwirq"))
+            self.name = "GPIO {hw_gpio}".format(hw_gpio=hw_gpio)
+        # legacy IRQs
+        elif "IR-IO-APIC" in self.chip_name:
+            if self.actions == "acpi":
+                self.name = "ACPI SCI"
+            elif self.actions == "i8042":
+                self.name = "PS/2 controller"
+            elif self.actions == "pinctrl_amd":
+                self.name = "GPIO Controller"
+            elif self.actions == "rtc0":
+                self.name = "RTC"
+            elif self.actions == "timer":
+                self.name = "Timer"
+        elif "PCI-MSI" in self.chip_name:
+            bdf = self.chip_name.split("-")[-1]
+            for dev in context.list_devices(subsystem="pci"):
+                if dev.device_path.endswith(bdf):
+                    vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE")
+                    desc = dev.properties.get("ID_PCI_CLASS_FROM_DATABASE")
+                    if not desc:
+                        desc = dev.properties.get("ID_PCI_INTERFACE_FROM_DATABASE")
+                    name = dev.properties.get("PCI_SLOT_NAME")
+                    self.driver = dev.properties.get("DRIVER")
+                    self.name = "{vendor} {desc} ({name})".format(
+                        vendor=vendor, desc=desc, name=name
+                    )
+                    break
+
+        # might look like an ACPI device, try to follow it
+        if not self.name and self.actions:
+            p = os.path.join("/", "sys", "bus", "acpi", "devices", self.actions)
+            if os.path.exists(p):
+                for d in os.listdir(p):
+                    if "physical_node" not in d:
+                        continue
+
+                    for root, dirs, files in os.walk(
+                        os.path.join(p, d), followlinks=True
+                    ):
+                        if "name" in files:
+                            self.name = read_file(os.path.join(root, "name"))
+                            t = os.path.join(root, "driver")
+                            if os.path.exists(t):
+                                self.driver = os.path.basename(os.readlink(t))
+                            break
+                    if self.name:
+                        break
+
+        # If the name isn't descriptive try to guess further
+        if self.driver and self.actions == self.name:
+            if self.driver == "i2c_hid_acpi":
+                self.name = "%s I2C HID device" % self.name
+
+        # check if it's disabled
+        if not self.name and wakeup == "disabled":
+            actions = f" (for {self.actions})" if self.actions else ""
+            self.name = f"Disabled interrupt{actions}"
+
+    def __str__(self):
+        return "%s" % self.name
+
+
 class S0i3Validator:
     def show_install_message(self, message):
         action = headers.InstallAction if self.root_user else headers.RerunAction
@@ -1650,6 +1725,21 @@ class S0i3Validator:
                 )
         return True
 
+    def capture_irq(self):
+        p = os.path.join("/sys", "kernel", "irq")
+        irqs = []
+        for d in os.listdir(p):
+            if os.path.isdir(os.path.join(p, d)):
+                w = WakeIRQ(d, self.pyudev)
+                irqs.append([int(d), str(w)])
+        irqs.sort()
+        logging.debug("Interrupts")
+        for irq in irqs:
+            # set prefix if last device
+            prefix = "| " if irq != irqs[-1] else "└─"
+            logging.debug(f"{prefix}{irq[0]}: {irq[1]}")
+        return True
+
     def capture_acpi(self):
         if not self.iasl:
             print_color(headers.MissingIasl, colors.WARNING)
@@ -1926,6 +2016,7 @@ class S0i3Validator:
             self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
+            self.capture_irq,
             self.check_i2c_hid,
             self.check_wake_sources,
             self.capture_acpi,
