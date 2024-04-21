@@ -182,6 +182,17 @@ class MissingAmdgpuFirmware(S0i3Failure):
             self.explanation += "\t%s" % error
 
 
+class AmdgpuPpFeatureMask(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "AMDGPU ppfeaturemask changed"
+        self.explanation = (
+            "\tThe ppfeaturemask for the amdgpu driver has been changed\n"
+            "\tModifying this from the defaults may cause the system to not enter hardware sleep.\n"
+        )
+        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/2808#note_2379968"
+
+
 class MissingAmdPmc(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -1466,6 +1477,13 @@ class S0i3Validator:
             print_color("GPU firmware missing", "❌")
             self.failures += [MissingAmdgpuFirmware([match])]
             return False
+        p = os.path.join("/", "sys", "module", "amdgpu", "parameters", "ppfeaturemask")
+        if os.path.exists(p):
+            v = read_file(p)
+            if v != "0xfff7bfff":
+                print_color(f"AMDGPU ppfeaturemask overridden to {v}", "❌")
+                self.failures += [AmdgpuPpFeatureMask()]
+                return False
         return True
 
     def check_wcn6855_bug(self):
