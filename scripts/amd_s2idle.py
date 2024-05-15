@@ -467,6 +467,26 @@ class TaintedKernel(S0i3Failure):
         self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3089"
 
 
+class DMArNotEnabled(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "Pre-boot DMA protection disabled"
+        self.explanation = (
+            "\tPre-boot IOMMU DMA protection has been disabled.\n"
+            "\tWhen the IOMMU is enabled this platform requires pre-boot DMA protection for suspend to work.\n"
+        )
+
+
+class MissingIommuACPI(S0i3Failure):
+    def __init__(self, device):
+        super().__init__()
+        self.description = f"Device {device} missing from ACPI tables"
+        self.explanation = (
+            "\tThe ACPI device {device} is required for suspend to work when the IOMMU is enabled.\n"
+            "\tPlease raise a bug with details of your system for next steps.\n"
+        )
+
+
 class KernelLogger:
     def __init__(self):
         pass
@@ -1265,6 +1285,39 @@ class S0i3Validator:
             )
         return True
 
+    def check_iommu(self):
+        if self.cpu_family == 0x1A and self.cpu_model in [0x24]:
+            found_iommu = False
+            found_acpi = False
+            found_dmar = False
+            for dev in self.pyudev.list_devices(subsystem="iommu"):
+                found_iommu = True
+                logging.debug(f"Found IOMMU {dev.sys_path}")
+                break
+            if not found_iommu:
+                print_color("IOMMU disabled", "✅")
+                return True
+            for dev in self.pyudev.list_devices(
+                subsystem="thunderbolt", DEVTYPE="thunderbolt_domain"
+            ):
+                p = os.path.join(dev.sys_path, "iommu_dma_protection")
+                v = int(read_file(p))
+                logging.debug(f"{p}:{v}")
+                found_dmar = v == 1
+            if not found_dmar:
+                print_color("Pre-boot DMA protection not enabled", "❌")
+                self.failures += [DMArNotEnabled()]
+                return False
+            for dev in self.pyudev.list_devices(subsystem="acpi"):
+                if "MSFT0201" in dev.sys_path:
+                    found_acpi = True
+            if not found_acpi:
+                print_color("Missing ACPI device", "❌")
+                self.failures += [MissingIommuACPI("MSFT0201")]
+                return False
+            print_color("IOMMU properly configured", "✅")
+        return True
+
     def check_port_pm_override(self):
         from packaging import version
 
@@ -2024,6 +2077,7 @@ class S0i3Validator:
             self.check_wcn6855_bug,
             self.check_lockdown,
             self.check_msr,
+            self.check_iommu,
             self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
