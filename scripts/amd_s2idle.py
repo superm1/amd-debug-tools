@@ -2004,7 +2004,7 @@ class S0i3Validator:
     def check_logger(self):
         if isinstance(self.kernel_log, SystemdLogger):
             print_color("Logs are provided via systemd", "✅")
-        if isinstance(self.kernel_log, DmesgLogger):
+        elif isinstance(self.kernel_log, DmesgLogger):
             print_color(
                 "🚦Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
                 colors.WARNING,
@@ -2017,6 +2017,8 @@ class S0i3Validator:
                 )
                 self.failures += [KernelRingBufferWrapped()]
                 return False
+        else:
+            return False
         return True
 
     def check_logind(self):
