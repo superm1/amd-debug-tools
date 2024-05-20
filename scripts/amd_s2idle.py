@@ -47,6 +47,7 @@ class headers:
     MissingPyudev = "Udev access library `pyudev` is missing"
     MissingPackaging = "Python library `packaging` is missing"
     MissingIasl = "ACPI extraction tool `iasl` is missing"
+    MissingJournald = "Python systemd/journald module is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
     DurationDescription = "How long should suspend cycles last in seconds"
     WaitDescription = "How long to wait in between suspend cycles in seconds"
@@ -618,9 +619,10 @@ class SystemdLogger(KernelLogger):
 
 
 class DistroPackage:
-    def __init__(self, deb, rpm, pip, root):
+    def __init__(self, deb, rpm, arch, pip, root):
         self.deb = deb
         self.rpm = rpm
+        self.arch = arch
         self.pip = pip
         self.root = root
 
@@ -642,6 +644,8 @@ class DistroPackage:
             if variant != "workstation":
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
+        elif distro == "cachyos" or distro == "arch":
+            installer = ["pacman", "-Sy", self.arch]
         else:
             if not self.pip:
                 return False
@@ -653,19 +657,26 @@ class DistroPackage:
 class PyUdevPackage(DistroPackage):
     def __init__(self, root):
         super().__init__(
-            deb="python3-pyudev", rpm="python3-pyudev", pip="pyudev", root=root
+            deb="python3-pyudev", rpm="python3-pyudev", arch="python-pyudev", pip="pyudev", root=root
         )
 
 
 class IaslPackage(DistroPackage):
     def __init__(self, root):
-        super().__init__(deb="acpica-tools", rpm="acpica-tools", pip=None, root=root)
+        super().__init__(deb="acpica-tools", rpm="acpica-tools", arch="acpica", pip=None, root=root)
 
 
 class PackagingPackage(DistroPackage):
     def __init__(self, root):
         super().__init__(
             deb="python3-packaging", rpm=None, pip="python3-setuptools", root=root
+        )
+
+
+class JournaldPackage(DistroPackage):
+    def __init__(self, root):
+        super().__init__(
+            deb="python3-pyudev", rpm="python3-pyudev", arch="python-systemd", pip=None, root=root
         )
 
 
@@ -785,6 +796,8 @@ class S0i3Validator:
                 self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
         except AttributeError:
             self.pretty_distro = ""
+        if not self.distro:
+            print_color("Missing python-distro package, unable to identify distro", "👀")
         try:
             from pyudev import Context
 
@@ -810,11 +823,18 @@ class S0i3Validator:
 
         # for analyzing kernel logs
         if kernel_log == "auto":
-            try:
-                self.kernel_log = SystemdLogger()
-            except ImportError:
-                self.kernel_log = None
-            if not self.kernel_log:
+            init_daemon = read_file("/proc/1/comm")
+            if "systemd" in init_daemon:
+                try:
+                    self.kernel_log = SystemdLogger()
+                except ImportError:
+                    self.kernel_log = None
+                if not self.kernel_log:
+                    self.show_install_message(headers.MissingJournald)
+                    package = JournaldPackage(self.root_user)
+                    package.install(self.distro)
+                    self.kernel_log = SystemdLogger()
+            else:
                 try:
                     self.kernel_log = DmesgLogger()
                 except subprocess.CalledProcessError:
@@ -1525,12 +1545,6 @@ class S0i3Validator:
         if not found:
             print_color("GPU driver `amdgpu` not loaded", "❌")
             self.failures += [MissingAmdgpu()]
-            return False
-        self.kernel_log.seek()
-        match = self.kernel_log.match_pattern("Direct firmware load for amdgpu.*failed")
-        if match:
-            print_color("GPU firmware missing", "❌")
-            self.failures += [MissingAmdgpuFirmware([match])]
             return False
         p = os.path.join("/", "sys", "module", "amdgpu", "parameters", "ppfeaturemask")
         if os.path.exists(p):
