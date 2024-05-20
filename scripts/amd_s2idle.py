@@ -1471,9 +1471,6 @@ class S0i3Validator:
         has_usb4 = False
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
             has_usb4 = True
-        if not has_usb4:
-            return True
-        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
             if device.properties.get("DRIVER") != "thunderbolt":
                 slot = device.properties["PCI_SLOT_NAME"]
                 print_color(
@@ -1481,7 +1478,8 @@ class S0i3Validator:
                 )
                 self.failures += [MissingThunderbolt()]
                 return False
-        print_color("USB4 driver `thunderbolt` loaded", "✅")
+        if has_usb4:
+            print_color("USB4 driver `thunderbolt` loaded", "✅")
         return True
 
     def check_pinctrl_amd(self):
