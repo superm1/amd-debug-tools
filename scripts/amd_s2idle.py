@@ -1539,6 +1539,16 @@ class S0i3Validator:
                 print_color(f"AMDGPU ppfeaturemask overridden to {v}", "❌")
                 self.failures += [AmdgpuPpFeatureMask()]
                 return False
+        if not self.kernel_log:
+            message = "Unable to test for amdgpu from kernel log"
+            print_color(message, "🚦")
+            return True
+        self.kernel_log.seek()
+        match = self.kernel_log.match_pattern("Direct firmware load for amdgpu.*failed")
+        if match:
+            print_color("GPU firmware missing", "❌")
+            self.failures += [MissingAmdgpuFirmware([match])]
+            return False
         return True
 
     def check_wcn6855_bug(self):
