@@ -1535,14 +1535,16 @@ class S0i3Validator:
             self.failures += [RtcAlarmWrong()]
 
     def check_amdgpu(self):
-        found = False
-        for device in self.pyudev.list_devices(subsystem="pci", DRIVER="amdgpu"):
-            print_color("GPU driver `amdgpu` available", "✅")
-            found = True
-        if not found:
-            print_color("GPU driver `amdgpu` not loaded", "❌")
-            self.failures += [MissingAmdgpu()]
-            return False
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="30000"):
+            pci_id = device.properties.get("PCI_ID")
+            if not pci_id.startswith("1002"):
+                continue
+            if device.properties.get("DRIVER") != "amdgpu":
+                print_color("GPU driver `amdgpu` not loaded", "❌")
+                self.failures += [MissingAmdgpu()]
+                return False
+            slot = device.properties.get("PCI_SLOT_NAME")
+            print_color(f"GPU driver `amdgpu` bound to {slot}", "✅")
         p = os.path.join("/", "sys", "module", "amdgpu", "parameters", "ppfeaturemask")
         if os.path.exists(p):
             v = read_file(p)
