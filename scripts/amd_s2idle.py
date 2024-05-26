@@ -1265,6 +1265,38 @@ class S0i3Validator:
             and (valid_ahci or not has_sata)
         )
 
+    def check_device_firmware(self):
+        try:
+            import gi
+            from gi.repository import GLib
+
+            gi.require_version("Fwupd", "2.0")
+            from gi.repository import Fwupd  # pylint: disable=wrong-import-position
+
+        except ImportError:
+            print_color("Device firmware checks unavailable", colors.WARNING)
+            return True
+
+        client = Fwupd.Client()
+        devices = client.get_devices()
+        for device in devices:
+            # Dictionary of instance id to firmware version mappings that
+            # have been "reported" to be problematic
+            map = {}
+            if "nvme" in device.get_plugin():
+                logging.debug(f"{device.get_name()} firmware version: '{device.get_version()}'")
+                logging.debug(f"└─{device.get_instance_ids()}")
+            for item in map:
+                if (
+                    item in device.get_instance_ids()
+                    and map[item] in device.get_version()
+                ):
+                    print_color(
+                        f"Platform may hang resuming.  Upgrade the firmware for your {device.get_name()} if you have problems.",
+                        colors.WARNING,
+                    )
+        return True
+
     def check_amd_hsmp(self):
         if self.offline:
             for line in self.offline:
@@ -2101,6 +2133,7 @@ class S0i3Validator:
             self.check_sleep_mode,
             self.check_storage,
             self.check_pinctrl_amd,
+            self.check_device_firmware,
             self.check_wcn6855_bug,
             self.check_lockdown,
             self.check_msr,
