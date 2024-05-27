@@ -1092,13 +1092,18 @@ class S0i3Validator:
         return True
 
     def check_lps0(self):
-        p = os.path.join("/", "sys", "module", "acpi", "parameters", "sleep_no_lps0")
-        fail = read_file(p) == "Y"
-        if fail:
-            print_color("LPS0 _DSM disabled", "❌")
-        else:
-            print_color("LPS0 _DSM enabled", "✅")
-        return not fail
+        for m in ["acpi", "acpi_x86"]:
+            p = os.path.join("/", "sys", "module", m, "parameters", "sleep_no_lps0")
+            if not os.path.exists(p):
+                continue
+            fail = read_file(p) == "Y"
+            if fail:
+                print_color("LPS0 _DSM disabled", "❌")
+            else:
+                print_color("LPS0 _DSM enabled", "✅")
+            return not fail
+        print_color("LPS0 _DSM mpt found", "👀")
+        return False
 
     def check_cpu_vendor(self):
         p = os.path.join("/", "proc", "cpuinfo")
