@@ -657,13 +657,19 @@ class DistroPackage:
 class PyUdevPackage(DistroPackage):
     def __init__(self, root):
         super().__init__(
-            deb="python3-pyudev", rpm="python3-pyudev", arch="python-pyudev", pip="pyudev", root=root
+            deb="python3-pyudev",
+            rpm="python3-pyudev",
+            arch="python-pyudev",
+            pip="pyudev",
+            root=root,
         )
 
 
 class IaslPackage(DistroPackage):
     def __init__(self, root):
-        super().__init__(deb="acpica-tools", rpm="acpica-tools", arch="acpica", pip=None, root=root)
+        super().__init__(
+            deb="acpica-tools", rpm="acpica-tools", arch="acpica", pip=None, root=root
+        )
 
 
 class PackagingPackage(DistroPackage):
@@ -676,7 +682,11 @@ class PackagingPackage(DistroPackage):
 class JournaldPackage(DistroPackage):
     def __init__(self, root):
         super().__init__(
-            deb="python3-pyudev", rpm="python3-pyudev", arch="python-systemd", pip=None, root=root
+            deb="python3-pyudev",
+            rpm="python3-pyudev",
+            arch="python-systemd",
+            pip=None,
+            root=root,
         )
 
 
@@ -1284,7 +1294,9 @@ class S0i3Validator:
             # have been "reported" to be problematic
             map = {}
             if "nvme" in device.get_plugin():
-                logging.debug(f"{device.get_name()} firmware version: '{device.get_version()}'")
+                logging.debug(
+                    f"{device.get_name()} firmware version: '{device.get_version()}'"
+                )
                 logging.debug(f"└─{device.get_instance_ids()}")
             for item in map:
                 if (
