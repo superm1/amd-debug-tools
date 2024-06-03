@@ -1307,7 +1307,16 @@ class S0i3Validator:
             from gi.repository import Fwupd  # pylint: disable=wrong-import-position
 
         except ImportError:
-            print_color("Device firmware checks unavailable", colors.WARNING)
+            print_color(
+                "Device firmware checks unavailable without gobject introspection",
+                "🚦",
+            )
+            return True
+        except ValueError:
+            print_color(
+                "Device firmware checks unavailable without fwupd gobject introspection",
+                "🚦",
+            )
             return True
 
         client = Fwupd.Client()
