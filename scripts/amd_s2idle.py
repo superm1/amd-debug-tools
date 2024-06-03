@@ -488,6 +488,15 @@ class MissingIommuACPI(S0i3Failure):
         )
 
 
+class SMTNotEnabled(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "SMT is not enabled"
+        self.explanation = (
+            "\tDisabling SMT prevents cores from going into the correct state.\n"
+        )
+
+
 class KernelLogger:
     def __init__(self):
         pass
@@ -1136,6 +1145,15 @@ class S0i3Validator:
                 "❌",
             )
         return valid
+
+    def check_smt(self):
+        p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "active")
+        v = read_file(p)
+        if v == "0":
+            self.failures += [SMTNotEnabled()]
+            print_color("SMT is not enabled", "❌")
+            return False
+        return True
 
     def capture_system_vendor(self):
         p = os.path.join("/", "sys", "class", "dmi", "id")
@@ -2137,6 +2155,7 @@ class S0i3Validator:
         checks = [
             self.check_logger,
             self.check_cpu_vendor,
+            self.check_smt,
             self.check_lps0,
             self.check_fadt,
             self.capture_disabled_pins,
