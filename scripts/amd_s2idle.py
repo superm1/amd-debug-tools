@@ -978,7 +978,7 @@ class S0i3Validator:
             print_color("Unabled to check MSRs: MSR kernel module not loaded", "❌")
             return False
         except PermissionError:
-            print_color("MSR checks unavailable", colors.WARNING)
+            print_color("MSR checks unavailable", "🚦")
 
         return True
 
