@@ -118,6 +118,11 @@ def print_color(message, group):
     print(f"{prefix}{color}{message}{suffix}")
 
 
+def fatal_error(message):
+    print_color(message, "👀")
+    sys.exit(1)
+
+
 def pm_debugging(func):
     def runner(*args, **kwargs):
         fn = os.path.join("/", "sys", "power", "pm_debug_messages")
@@ -802,21 +807,15 @@ class S0i3Validator:
         # turn on EC debug messages
         self.debug_ec = debug_ec
 
-        # for analyzing devices
+        # for matching against distro specific packages or bugs
         try:
             import distro
 
             self.distro = distro.id()
+            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
         except ModuleNotFoundError:
-            self.distro = ""
-            self.pretty_distro = ""
-        try:
-            if self.distro:
-                self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
-        except AttributeError:
-            self.pretty_distro = ""
-        if not self.distro:
-            print_color("Missing python-distro package, unable to identify distro", "👀")
+            fatal_error("Missing python-distro package, unable to identify distro")
+        # for analyzing devices
         try:
             from pyudev import Context
 
@@ -828,7 +827,10 @@ class S0i3Validator:
             self.show_install_message(headers.MissingPyudev)
             package = PyUdevPackage(self.root_user)
             package.install(self.distro)
-            from pyudev import Context
+            try:
+                from pyudev import Context
+            except ModuleNotFoundError:
+                fatal_error("Missing python-pyudev package, unable to identify devices")
 
             self.pyudev = Context()
 
