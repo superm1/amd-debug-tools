@@ -691,7 +691,7 @@ class PackagingPackage(DistroPackage):
 class JournaldPackage(DistroPackage):
     def __init__(self, root):
         super().__init__(
-            deb="python3-pyudev",
+            deb="python3-systemd",
             rpm="python3-pyudev",
             arch="python-systemd",
             pip=None,
