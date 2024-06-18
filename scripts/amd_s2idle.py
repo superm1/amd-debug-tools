@@ -1149,12 +1149,18 @@ class S0i3Validator:
         return valid
 
     def check_smt(self):
+        p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "control")
+        v = read_file(p)
+        logging.debug(f"SMT control: {v}")
+        if v == "notsupported":
+            return True
         p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "active")
         v = read_file(p)
         if v == "0":
             self.failures += [SMTNotEnabled()]
             print_color("SMT is not enabled", "❌")
             return False
+        print_color("SMT enabled", "✅")
         return True
 
     def capture_system_vendor(self):
