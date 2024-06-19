@@ -1333,9 +1333,10 @@ class S0i3Validator:
             # Dictionary of instance id to firmware version mappings that
             # have been "reported" to be problematic
             map = {}
-            if "nvme" in device.get_plugin():
+            interesting_plugins = ["nvme", "tpm"]
+            if device.get_plugin() in interesting_plugins:
                 logging.debug(
-                    f"{device.get_name()} firmware version: '{device.get_version()}'"
+                    f"{device.get_vendor()} {device.get_name()} firmware version: '{device.get_version()}'"
                 )
                 logging.debug(f"└─{device.get_instance_ids()}")
             for item in map:
