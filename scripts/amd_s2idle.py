@@ -48,6 +48,7 @@ class headers:
     MissingPackaging = "Python library `packaging` is missing"
     MissingIasl = "ACPI extraction tool `iasl` is missing"
     MissingJournald = "Python systemd/journald module is missing"
+    MissingEthtool = "Ethtool is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
     DurationDescription = "How long should suspend cycles last in seconds"
     WaitDescription = "How long to wait in between suspend cycles in seconds"
@@ -704,6 +705,17 @@ class JournaldPackage(DistroPackage):
         )
 
 
+class EthtoolPackage(DistroPackage):
+    def __init__(self, root):
+        super().__init__(
+            deb="ethtool",
+            rpm="ethtool",
+            arch="ethtool",
+            pip=None,
+            root=root,
+        )
+
+
 class WakeIRQ:
     def __init__(self, num, context):
         self.num = num
@@ -1305,6 +1317,46 @@ class S0i3Validator:
             and (valid_sata or not has_sata)
             and (valid_ahci or not has_sata)
         )
+
+    def install_ethtool(self):
+        try:
+            subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
+            return True
+        except FileNotFoundError:
+            self.show_install_message(headers.MissingEthtool)
+            package = EthtoolPackage(self.root_user)
+            return package.install(self.distro)
+
+    def check_network(self):
+        ethtool = False
+        for device in self.pyudev.list_devices(subsystem="net", ID_NET_DRIVER="r8169"):
+            if not ethtool:
+                ethtool = self.install_ethtool()
+            if not ethtool:
+                print_color("Ethernet checks unavailable without `ethtool`", "🚦")
+                return True
+            interface = device.properties.get("INTERFACE")
+            cmd = ["ethtool", interface]
+            wol_supported = False
+            output = subprocess.check_output(cmd).decode("utf-8")
+            for line in output.split("\n"):
+                if "Supports Wake-on" in line:
+                    val = line.split(":")[1].strip()
+                    if "g" in val:
+                        logging.debug(f"{interface} supports WoL")
+                        wol_supported = True
+                    else:
+                        logging.debug(f"{interface} doesn't support WoL ({val})")
+                elif "Wake-on" in line and wol_supported:
+                    val = line.split(":")[1].strip()
+                    if "g" in val:
+                        print_color(f"{interface} has WoL enabled", "✅")
+                    else:
+                        print_color(
+                            f"Platform may have low hardware sleep residency with Wake-on-lan disabled. Run `ethtool -s {interface} wol g` to enable it if necessary.",
+                            colors.WARNING,
+                        )
+        return True
 
     def check_device_firmware(self):
         try:
@@ -2188,6 +2240,7 @@ class S0i3Validator:
             self.check_storage,
             self.check_pinctrl_amd,
             self.check_device_firmware,
+            self.check_network,
             self.check_wcn6855_bug,
             self.check_lockdown,
             self.check_msr,
