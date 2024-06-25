@@ -793,6 +793,13 @@ class WakeIRQ:
 
 
 class S0i3Validator:
+    def check_selinux(self):
+        p = os.path.join("/", "sys", "fs", "selinux", "enforce")
+        if os.path.exists(p):
+            v = read_file(p)
+            if v == "1" and not self.root_user:
+                fatal_error("Unable to run with SELinux enabled without root")
+
     def show_install_message(self, message):
         action = headers.InstallAction if self.root_user else headers.RerunAction
         message = "{message}. {action}.".format(message=message, action=action)
@@ -809,6 +816,7 @@ class S0i3Validator:
 
         # for installing and running suspend
         self.root_user = os.geteuid() == 0
+        self.check_selinux()
 
         # capture all DSDT/SSDT or just one with _AEI
         self.acpidump = acpidump
