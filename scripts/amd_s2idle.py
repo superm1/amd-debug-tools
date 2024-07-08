@@ -1392,20 +1392,22 @@ class S0i3Validator:
         for device in devices:
             # Dictionary of instance id to firmware version mappings that
             # have been "reported" to be problematic
-            map = {}
-            interesting_plugins = ["nvme", "tpm"]
+            map = {
+                "8c36f7ee-cc11-4a36-b090-6363f54ecac2": "0.1.26",  # https://gitlab.freedesktop.org/drm/amd/-/issues/3443
+            }
+            interesting_plugins = ["nvme", "tpm", "uefi_capsule"]
             if device.get_plugin() in interesting_plugins:
                 logging.debug(
                     f"{device.get_vendor()} {device.get_name()} firmware version: '{device.get_version()}'"
                 )
+                logging.debug(f"| {device.get_guids()}")
                 logging.debug(f"└─{device.get_instance_ids()}")
             for item in map:
                 if (
-                    item in device.get_instance_ids()
-                    and map[item] in device.get_version()
-                ):
+                    item in device.get_guids() or item in device.get_instance_ids()
+                ) and map[item] in device.get_version():
                     print_color(
-                        f"Platform may hang resuming.  Upgrade the firmware for your {device.get_name()} if you have problems.",
+                        f"Platform may have problems resuming.  Upgrade the firmware for '{device.get_name()}' if you have problems.",
                         colors.WARNING,
                     )
         return True
