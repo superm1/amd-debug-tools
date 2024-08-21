@@ -1453,7 +1453,7 @@ class S0i3Validator:
         return True
 
     def check_iommu(self):
-        if self.cpu_family == 0x1A and self.cpu_model in [0x24]:
+        if self.cpu_family == 0x1A and self.cpu_model in [0x24, 0x60, 0x70]:
             found_iommu = False
             found_acpi = False
             found_dmar = False
