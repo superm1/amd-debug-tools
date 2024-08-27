@@ -1705,7 +1705,7 @@ class S0i3Validator:
             return True
         self.kernel_log.seek()
         match = self.kernel_log.match_pattern("Direct firmware load for amdgpu.*failed")
-        if match:
+        if match and not "amdgpu/isp" in match:
             print_color("GPU firmware missing", "❌")
             self.failures += [MissingAmdgpuFirmware([match])]
             return False
