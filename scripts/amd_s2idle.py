@@ -1085,7 +1085,7 @@ class S0i3Validator:
                         battery=name, charge=charge
                     )
                 )
-                if not name in self.energy:
+                if not name in self.charge:
                     print_color(
                         "Battery {name} ({man} {model}) is operating at {percent:.2%} of design".format(
                             name=name,
