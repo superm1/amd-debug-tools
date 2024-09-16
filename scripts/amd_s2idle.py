@@ -253,6 +253,16 @@ class VendorWrong(S0i3Failure):
         )
 
 
+class UserNvmeConfiguration(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "NVME ACPI support is disabled"
+        self.explanation = (
+            "\tThe kernel command line has been configured to not support NVME ACPI support.\n"
+            "\tThis is required for the NVME device to enter the proper power state.\n"
+        )
+
+
 class AcpiNvmeStorageD3Enable(S0i3Failure):
     def __init__(self, disk, num_ssds):
         super().__init__()
@@ -1254,6 +1264,14 @@ class S0i3Validator:
                     return True
 
         else:
+            cmdline = read_file(os.path.join("/proc", "cmdline"))
+            p = os.path.join("/", "sys", "module", "nvme", "parameters", "noacpi")
+            c = os.path.exists(p) and read_file(p) == "Y"
+            if ("nvme.noacpi" in cmdline) and c:
+                print_color("NVME ACPI support is blocked by kernel command line", "❌")
+                self.failures += [UserNvmeConfiguration()]
+                return False
+
             if not self.kernel_log:
                 message = "Unable to test storage from kernel log"
                 print_color(message, "🚦")
