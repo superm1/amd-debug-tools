@@ -513,6 +513,16 @@ class SMTNotEnabled(S0i3Failure):
         )
 
 
+class ASpmWrong(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = "ASPM is overridden"
+        self.explanation = (
+            "\t Modifying ASPM may prevent PCIe devices from going into the\n"
+            "\t correct state and lead to system stability issues.\n"
+        )
+
+
 class KernelLogger:
     def __init__(self):
         pass
@@ -1652,6 +1662,21 @@ class S0i3Validator:
         print_color("PMC driver `amd_pmc` did not bind to any ACPI device", "❌")
         return False
 
+    def check_aspm(self):
+        p = os.path.join("/", "sys", "module", "pcie_aspm", "parameters", "policy")
+        contents = read_file(p)
+        policy = ""
+        for word in contents.split(" "):
+            if word.startswith("["):
+                policy = word
+                break
+        if policy != "[default]":
+            print_color(f"ASPM policy set to {policy}", "❌")
+            self.failures += [ASpmWrong()]
+            return False
+        print_color("ASPM policy set to 'default'", "✅")
+        return True
+
     def check_usb4(self):
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
             slot = device.properties["PCI_SLOT_NAME"]
@@ -2253,6 +2278,7 @@ class S0i3Validator:
         checks = [
             self.check_logger,
             self.check_cpu_vendor,
+            self.check_aspm,
             self.check_smt,
             self.check_lps0,
             self.check_fadt,
