@@ -710,7 +710,11 @@ class IaslPackage(DistroPackage):
 class PackagingPackage(DistroPackage):
     def __init__(self, root):
         super().__init__(
-            deb="python3-packaging", rpm=None, pip="python3-setuptools", root=root
+            deb="python3-packaging",
+            rpm=None,
+            arch="python-packaging",
+            pip="python3-setuptools",
+            root=root,
         )
 
 
