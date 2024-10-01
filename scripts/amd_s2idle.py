@@ -1507,14 +1507,16 @@ class S0i3Validator:
                 logging.debug(f"{p}:{v}")
                 found_dmar = v == 1
             if not found_dmar:
-                print_color("Pre-boot DMA protection not enabled", "❌")
+                print_color(
+                    "IOMMU is misconfigured: Pre-boot DMA protection not enabled", "❌"
+                )
                 self.failures += [DMArNotEnabled()]
                 return False
             for dev in self.pyudev.list_devices(subsystem="acpi"):
                 if "MSFT0201" in dev.sys_path:
                     found_acpi = True
             if not found_acpi:
-                print_color("Missing ACPI device", "❌")
+                print_color("IOMMU is misconfigured: missing MSFT0201 ACPI device", "❌")
                 self.failures += [MissingIommuACPI("MSFT0201")]
                 return False
             print_color("IOMMU properly configured", "✅")
