@@ -1396,7 +1396,9 @@ class S0i3Validator:
             interface = device.properties.get("INTERFACE")
             cmd = ["ethtool", interface]
             wol_supported = False
-            output = subprocess.check_output(cmd).decode("utf-8")
+            output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(
+                "utf-8"
+            )
             for line in output.split("\n"):
                 if "Supports Wake-on" in line:
                     val = line.split(":")[1].strip()
