@@ -319,6 +319,18 @@ class SleepModeWrong(S0i3Failure):
         )
 
 
+class DeepSleep(S0i3Failure):
+    def __init__(self):
+        super().__init__()
+        self.description = (
+            "The kernel command line is asserting the system to use deep sleep"
+        )
+        self.explanation = (
+            "\tAdding mem_sleep_default=deep doesn't work on AMD systems.\n"
+            "\tPlease remove it from the kernel command line."
+        )
+
+
 class FadtWrong(S0i3Failure):
     def __init__(self):
         super().__init__()
@@ -1239,6 +1251,12 @@ class S0i3Validator:
         fn = os.path.join("/", "sys", "power", "mem_sleep")
         if not os.path.exists(fn):
             print_color("Kernel doesn't support sleep", "❌")
+            return False
+
+        cmdline = read_file(os.path.join("/proc", "cmdline"))
+        if "mem_sleep_default=deep" in cmdline:
+            print_color("Kernel command line is configured for 'deep' sleep", "❌")
+            self.failures += [DeepSleep()]
             return False
         if "[s2idle]" not in read_file(fn):
             self.failures += [SleepModeWrong()]
