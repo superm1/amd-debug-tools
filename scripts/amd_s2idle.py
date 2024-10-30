@@ -1100,7 +1100,7 @@ class S0i3Validator:
                     avg = round(
                         diff
                         / 1000000
-                        / (self.userspace_duration.total_seconds() / 360),
+                        / (self.userspace_duration.total_seconds() / 3600),
                         2,
                     )
                     print_color(
@@ -1141,7 +1141,7 @@ class S0i3Validator:
                     avg = round(
                         diff
                         / 1000000
-                        / (self.userspace_duration.total_seconds() / 360),
+                        / (self.userspace_duration.total_seconds() / 3600),
                         2,
                     )
                     print_color(
