@@ -95,7 +95,7 @@ def print_color(message, group):
         color = colors.WARNING
     elif group == "🦟":
         color = colors.DEBUG
-    elif any(mk in group for mk in ["❌", "👀"]):
+    elif any(mk in group for mk in ["❌", "👀", "🌡️"]):
         color = colors.FAIL
     elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○"]):
         color = colors.OK
@@ -957,6 +957,9 @@ class S0i3Validator:
         self.energy = {}
         self.charge = {}
 
+        # for monitoring thermals across suspend
+        self.thermal = {}
+
         # If we're locked down, a lot less errors make sense
         self.lockdown = False
 
@@ -1048,6 +1051,53 @@ class S0i3Validator:
         if self.pretty_distro:
             print_color("{distro}".format(distro=self.pretty_distro), "🐧")
         print_color("Kernel {version}".format(version=kernel), "🐧")
+
+    def check_thermal(self):
+        devs = []
+        for dev in self.pyudev.list_devices(subsystem="acpi", DRIVER="thermal"):
+            devs.append(dev)
+
+        logging.debug("Thermal zones")
+        for dev in devs:
+            prefix = "├─ " if dev != devs[-1] else "└─"
+            detail_prefix = "│ \t" if dev != devs[-1] else "  \t"
+            name = os.path.basename(dev.device_path)
+            p = os.path.join(dev.sys_path, "thermal_zone")
+            temp = int(read_file(os.path.join(p, "temp"))) / 1000
+
+            logging.debug(f"{prefix} {name}")
+            if name not in self.thermal:
+                logging.debug(f"{detail_prefix} temp: {temp}°C")
+            else:
+                logging.debug(f"{detail_prefix} {self.thermal[name]}°C -> {temp}°C")
+
+            # handle all trip points
+            count = 0
+            for f in os.listdir(p):
+                if "trip_point" not in f:
+                    continue
+                if "temp" not in f:
+                    continue
+                count = count + 1
+
+            for i in range(0, count):
+                f = os.path.join(p, "trip_point_%d_type" % i)
+                trip_type = read_file(f)
+                f = os.path.join(p, "trip_point_%d_temp" % i)
+                trip = int(read_file(f)) / 1000
+
+                if name not in self.thermal:
+                    logging.debug(f"{detail_prefix} {trip_type} trip: {trip}°C")
+
+                if temp > trip:
+                    print_color(
+                        f"Thermal zone {name} past trip point {trip_type}: {trip}°C",
+                        "🌡️",
+                    )
+                    return False
+            self.thermal[name] = temp
+
+        return True
 
     def check_battery(self):
         for dev in self.pyudev.list_devices(
@@ -1963,7 +2013,7 @@ class S0i3Validator:
             else:
                 acpi_hid = ""
             # set prefix if last device
-            prefix = "| " if dev != devices[-1] else "└─"
+            prefix = "│ " if dev != devices[-1] else "└─"
             logging.debug(
                 "{prefix}{name} [{acpi_hid}] : {acpi_path}".format(
                     prefix=prefix, name=name, acpi_hid=acpi_hid, acpi_path=acpi_path
@@ -2299,6 +2349,7 @@ class S0i3Validator:
             self.capture_system_vendor,
             self.capture_kernel_version,
             self.check_battery,
+            self.check_thermal,
         ]
         for i in info:
             i()
@@ -2587,6 +2638,7 @@ class S0i3Validator:
             self.analyze_duration,
             self.check_hw_sleep,
             self.check_battery,
+            self.check_thermal,
             self.check_rtc_cmos,
         ]
         for check in checks:
