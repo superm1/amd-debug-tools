@@ -1665,7 +1665,7 @@ class S0i3Validator:
         logging.debug("Wakeup sources:")
         for dev in devices:
             # set prefix if last device
-            prefix = "| " if dev != devices[-1] else "└─"
+            prefix = "│ " if dev != devices[-1] else "└─"
             logging.debug("{prefix}{device}".format(prefix=prefix, device=dev))
         return True
 
@@ -2002,7 +2002,7 @@ class S0i3Validator:
                 if dev == devices[-1]:
                     prefix = "└─"
                 else:
-                    prefix = "| "
+                    prefix = "│ "
             else:
                 if dev == devices[-1]:
                     prefix = "└─"
@@ -2044,7 +2044,7 @@ class S0i3Validator:
         logging.debug("Interrupts")
         for irq in self.irqs:
             # set prefix if last IRQ
-            prefix = "| " if irq != self.irqs[-1] else "└─"
+            prefix = "│ " if irq != self.irqs[-1] else "└─"
             logging.debug(f"{prefix}{irq[0]}: {irq[1]}")
         return True
 
