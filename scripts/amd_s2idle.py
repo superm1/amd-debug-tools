@@ -1868,6 +1868,23 @@ class S0i3Validator:
 
         return True
 
+    def capture_amdgpu_ips_status(self):
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="38000"):
+            pci_id = device.properties.get("PCI_ID")
+            if not pci_id.startswith("1002"):
+                continue
+            slot = device.properties.get("PCI_SLOT_NAME")
+            p = os.path.join(
+                "/", "sys", "kernel", "debug", "dri", slot, "amdgpu_dm_ips_status"
+            )
+            if not os.path.exists(p):
+                continue
+            logging.debug("IPS status")
+            lines = read_file(p).split("\n")
+            for line in lines:
+                prefix = "│ " if line != lines[-1] else "└─"
+                logging.debug(f"{prefix} {line}")
+
     def capture_lid(self):
         p = os.path.join("/", "proc", "acpi", "button", "lid")
         for root, dirs, files in os.walk(p):
@@ -2730,6 +2747,7 @@ class S0i3Validator:
         for i in range(1, count + 1):
             self.capture_gpes()
             self.capture_lid()
+            self.capture_amdgpu_ips_status()
             self.run_countdown("Suspending system", wait / 2)
             self.last_suspend = datetime.now()
             self.kernel_duration = 0
