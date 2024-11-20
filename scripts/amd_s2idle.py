@@ -939,10 +939,6 @@ class S0i3Validator:
         # failure reasons to display at the end
         self.failures = []
 
-        # for analyzing offline reports
-        self.offline = None
-        self.offline_report = False
-
         # for comparing GPEs before/after sleep
         self.gpes = {}
 
@@ -960,22 +956,13 @@ class S0i3Validator:
     def check_fadt(self):
         """Check the kernel emitted a message specific to 6.0 or later indicating FADT had a bit set."""
         found = False
-        if self.offline:
-            for line in self.offline:
-                if "Low-power S0 idle used by default for system suspend" in line:
-                    found = True
-                    break
-                # re-entrant; don't re-run
-                if "ACPI FADT supports Low-power S0 idle" in line:
-                    return
+        if not self.kernel_log:
+            message = "Unable to test FADT from kernel log"
+            print_color(message, "🚦")
         else:
-            if not self.kernel_log:
-                message = "Unable to test FADT from kernel log"
-                print_color(message, "🚦")
-            else:
-                self.kernel_log.seek()
-                matches = ["Low-power S0 idle used by default for system suspend"]
-                found = self.kernel_log.match_line(matches)
+            self.kernel_log.seek()
+            matches = ["Low-power S0 idle used by default for system suspend"]
+            found = self.kernel_log.match_line(matches)
         # try to look at FACP directly if not found (older kernel compat)
         if not found:
             if not self.root_user:
@@ -1276,59 +1263,30 @@ class S0i3Validator:
         invalid_nvme = {}
         valid_sata = False
         valid_ahci = False
+        cmdline = read_file(os.path.join("/proc", "cmdline"))
+        p = os.path.join("/", "sys", "module", "nvme", "parameters", "noacpi")
+        c = os.path.exists(p) and read_file(p) == "Y"
+        if ("nvme.noacpi" in cmdline) and c:
+            print_color("NVME ACPI support is blocked by kernel command line", "❌")
+            self.failures += [UserNvmeConfiguration()]
+            return False
 
-        if self.offline:
-            for line in self.offline:
-                if "nvme" in line:
-                    has_nvme = True
-                if "SATA link up" in line:
-                    has_sata = True
-                if headers.NvmeSimpleSuspend in line:
-                    objects = line.split()
-                    for i in range(0, len(objects)):
-                        if objects[i] == "nvme":
-                            valid_nvme[objects[i + 1]] = objects[i + 1]
-                if has_sata:
-                    valid_ahci = True
-                # re-entrant; don't re-run
-                if "NVME" in line:
-                    return True
-                if "NVME" in line:
-                    return True
-                if "AHCI" in line:
-                    return True
-                if "SATA" in line:
-                    return True
+        if not self.kernel_log:
+            message = "Unable to test storage from kernel log"
+            print_color(message, "🚦")
+            return True
 
-        else:
-            cmdline = read_file(os.path.join("/proc", "cmdline"))
-            p = os.path.join("/", "sys", "module", "nvme", "parameters", "noacpi")
-            c = os.path.exists(p) and read_file(p) == "Y"
-            if ("nvme.noacpi" in cmdline) and c:
-                print_color("NVME ACPI support is blocked by kernel command line", "❌")
-                self.failures += [UserNvmeConfiguration()]
-                return False
-
-            if not self.kernel_log:
-                message = "Unable to test storage from kernel log"
-                print_color(message, "🚦")
-                return True
-
-            for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
-                pci_slot_name = dev.properties["PCI_SLOT_NAME"]
-                vendor = get_property_pyudev(
-                    dev.properties, "ID_VENDOR_FROM_DATABASE", ""
-                )
-                model = get_property_pyudev(
-                    dev.properties, "ID_MODEL_FROM_DATABASE", ""
-                )
-                message = f"{vendor} {model}"
-                self.kernel_log.seek()
-                pattern = f"{pci_slot_name}.*{headers.NvmeSimpleSuspend}"
-                if self.kernel_log.match_pattern(pattern):
-                    valid_nvme[pci_slot_name] = message
-                if pci_slot_name not in valid_nvme:
-                    invalid_nvme[pci_slot_name] = message
+        for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
+            pci_slot_name = dev.properties["PCI_SLOT_NAME"]
+            vendor = get_property_pyudev(dev.properties, "ID_VENDOR_FROM_DATABASE", "")
+            model = get_property_pyudev(dev.properties, "ID_MODEL_FROM_DATABASE", "")
+            message = f"{vendor} {model}"
+            self.kernel_log.seek()
+            pattern = f"{pci_slot_name}.*{headers.NvmeSimpleSuspend}"
+            if self.kernel_log.match_pattern(pattern):
+                valid_nvme[pci_slot_name] = message
+            if pci_slot_name not in valid_nvme:
+                invalid_nvme[pci_slot_name] = message
 
             for dev in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
                 has_sata = True
@@ -1468,39 +1426,30 @@ class S0i3Validator:
         return True
 
     def check_amd_hsmp(self):
-        if self.offline:
-            for line in self.offline:
-                if re.search("amd_hsmp.*HSMP is not supported", line):
-                    print_color(
-                        "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
-                        "❌",
-                    )
-                    break
-        else:
-            f = os.path.join("/", "boot", f"config-{platform.uname().release}")
-            if os.path.exists(f):
-                kconfig = read_file(f)
-                if "CONFIG_AMD_HSMP=y" in kconfig:
-                    print_color(
-                        "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
-                        "❌",
-                    )
-                    self.failures += [AmdHsmpBug()]
-                    return False
-
-            cmdline = read_file(os.path.join("/proc", "cmdline"))
-            blocked = "initcall_blacklist=hsmp_plt_init" in cmdline
-
-            p = os.path.join("/", "sys", "module", "amd_hsmp")
-            if os.path.exists(p) and not blocked:
-                print_color("`amd_hsmp` driver may conflict with amd_pmc", "❌")
+        f = os.path.join("/", "boot", f"config-{platform.uname().release}")
+        if os.path.exists(f):
+            kconfig = read_file(f)
+            if "CONFIG_AMD_HSMP=y" in kconfig:
+                print_color(
+                    "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
+                    "❌",
+                )
                 self.failures += [AmdHsmpBug()]
                 return False
 
-            print_color(
-                f"HSMP driver `amd_hsmp` not detected (blocked: {blocked})",
-                "✅",
-            )
+        cmdline = read_file(os.path.join("/proc", "cmdline"))
+        blocked = "initcall_blacklist=hsmp_plt_init" in cmdline
+
+        p = os.path.join("/", "sys", "module", "amd_hsmp")
+        if os.path.exists(p) and not blocked:
+            print_color("`amd_hsmp` driver may conflict with amd_pmc", "❌")
+            self.failures += [AmdHsmpBug()]
+            return False
+
+        print_color(
+            f"HSMP driver `amd_hsmp` not detected (blocked: {blocked})",
+            "✅",
+        )
         return True
 
     def check_iommu(self):
@@ -1868,11 +1817,6 @@ class S0i3Validator:
         result = False
         if self.hw_sleep_duration:
             result = True
-        if self.offline:
-            for line in self.offline:
-                # re-entrant; don't re-run
-                if "In a hardware sleep state" in line or "Did not reach" in line:
-                    return
         if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
             if os.path.exists(p):
@@ -2462,15 +2406,8 @@ class S0i3Validator:
         self.acpi_errors = []
         self.active_gpios = []
         self.irq1_workaround = False
-        if self.offline:
-            for line in self.offline:
-                self._analyze_kernel_log_line(line)
-        else:
-            self.kernel_log.seek(self.last_suspend)
-            self.kernel_log.process_callback(self._analyze_kernel_log_line)
-
-        if self.offline_report:
-            return True
+        self.kernel_log.seek(self.last_suspend)
+        self.kernel_log.process_callback(self._analyze_kernel_log_line)
 
         if self.suspend_count:
             print_color(
@@ -2703,53 +2640,6 @@ class S0i3Validator:
         for item in self.failures:
             item.get_failure()
 
-    def replay_checks(self):
-        for line in self.offline:
-            # don't run on regular dmesg
-            if headers.Prerequisites in line or headers.Info in line:
-                self.offline_report = True
-            if not self.offline_report:
-                return
-            # replay s0i3 reports
-            if "INFO:" in line:
-                line = line.split("INFO:\t")[-1].strip()
-                if (
-                    headers.Prerequisites in line
-                    or headers.Info in line
-                    or headers.CycleCount in line
-                    or headers.LastCycleResults in line
-                ):
-                    print_color(line, colors.HEADER)
-                else:
-                    print_color(line, colors.OK)
-                if re.search(".*(family.* model.*)", line):
-                    nums = re.findall(r"\d+", line)
-                    self.cpu_model = int(nums[-1], 16)
-                    self.cpu_family = int(nums[-2], 16)
-            elif "ERROR:" in line:
-                line = line.split("ERROR:\t")[-1].strip()
-                print_color(line, colors.FAIL)
-            elif "WARNING:" in line:
-                line = line.split("WARNING:\t")[-1].strip()
-                print_color(line, colors.WARNING)
-            elif "DEBUG:" in line:
-                line = line.split("DEBUG:\t")[-1].rstrip()
-                print_color(line, "🦟")
-
-    def check_offline(self, input):
-        with open(input, "r") as r:
-            self.offline = r.readlines()
-        checks = [
-            self.replay_checks,
-            self.check_storage,
-            self.check_fadt,
-            self.analyze_kernel_log,
-            self.check_hw_sleep,
-            self.analyze_masks,
-        ]
-        for check in checks:
-            check()
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -2757,7 +2647,6 @@ def parse_args():
         epilog="Arguments are optional, and if they are not provided will prompted.\n"
         "To use non-interactively, please populate all optional arguments.",
     )
-    parser.add_argument("--offline", action="store_true", help="Analyze shared logs")
     parser.add_argument(
         "--log",
         help=headers.LogDescription,
@@ -2824,20 +2713,14 @@ def configure_suspend(duration, wait, count):
 if __name__ == "__main__":
     args = parse_args()
     log = configure_log(args.log)
-    if args.offline:
-        if not os.path.exists(log):
-            sys.exit(f"{log} is missing")
-        app = S0i3Validator("/dev/null", False, False, False, None)
-        app.check_offline(log)
-        app.get_failure_report()
-    else:
-        app = S0i3Validator(
-            log, args.acpidump, args.logind, args.debug_ec, args.kernel_log_provider
+
+    app = S0i3Validator(
+        log, args.acpidump, args.logind, args.debug_ec, args.kernel_log_provider
+    )
+    test = app.prerequisites()
+    if test or args.force:
+        duration, wait, count = configure_suspend(
+            duration=args.duration, wait=args.wait, count=args.count
         )
-        test = app.prerequisites()
-        if test or args.force:
-            duration, wait, count = configure_suspend(
-                duration=args.duration, wait=args.wait, count=args.count
-            )
-            app.test_suspend(duration=duration, wait=wait, count=count)
-        app.get_failure_report()
+        app.test_suspend(duration=duration, wait=wait, count=count)
+    app.get_failure_report()
