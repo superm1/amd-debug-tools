@@ -1804,7 +1804,10 @@ class S0i3Validator:
             self.failures += [RtcAlarmWrong()]
 
     def check_amdgpu(self):
-        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="30000"):
+        for device in self.pyudev.list_devices(subsystem="pci"):
+            klass = device.properties.get("PCI_CLASS")
+            if klass != "38000" and klass != "30000":
+                continue
             pci_id = device.properties.get("PCI_ID")
             if not pci_id.startswith("1002"):
                 continue
@@ -2723,10 +2726,10 @@ class S0i3Validator:
         for device in self.pyudev.list_devices(subsystem="rtc"):
             wakealarm = os.path.join(device.sys_path, "wakealarm")
         self.toggle_dynamic_debugging(True)
-        self.capture_gpes()
-        self.capture_lid()
 
         for i in range(1, count + 1):
+            self.capture_gpes()
+            self.capture_lid()
             self.run_countdown("Suspending system", wait / 2)
             self.last_suspend = datetime.now()
             self.kernel_duration = 0
