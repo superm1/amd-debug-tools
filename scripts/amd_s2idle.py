@@ -97,7 +97,7 @@ def print_color(message, group):
         color = colors.DEBUG
     elif any(mk in group for mk in ["❌", "👀", "🌡️"]):
         color = colors.FAIL
-    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○"]):
+    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱"]):
         color = colors.OK
     else:
         color = group
@@ -1794,9 +1794,8 @@ class S0i3Validator:
                 with open(target, "r") as r:
                     val = int(r.read().split()[0])
                 if fname in self.gpes and self.gpes[fname] != val:
-                    print_color(
-                        "%s increased from %d to %d" % (fname, self.gpes[fname], val),
-                        "○",
+                    logging.debug(
+                        "%s increased from %d to %d" % (fname, self.gpes[fname], val)
                     )
                 self.gpes[fname] = val
 
@@ -1807,7 +1806,7 @@ class S0i3Validator:
             for irq in self.irqs:
                 if irq[0] == n:
                     message = f"{headers.WokeFromIrq} {irq[0]}: {irq[1]}"
-                    print_color(message, "○")
+                    print_color(message, "🥱")
                     break
         except OSError:
             pass
@@ -1867,7 +1866,7 @@ class S0i3Validator:
                         )
                     ]
             else:
-                symbol = "✅"
+                symbol = "💤"
             percent_msg = "" if not percent else f"({percent:.2%})"
             print_color(
                 f"In a hardware sleep state for {timedelta(seconds=self.hw_sleep_duration)} {percent_msg}",
@@ -2412,13 +2411,13 @@ class S0i3Validator:
         if self.suspend_count:
             print_color(
                 f"Suspend count: {self.suspend_count}",
-                "○",
+                "💤",
             )
 
         if self.cycle_count:
             print_color(
                 f"Hardware sleep cycle count: {self.cycle_count}",
-                "○",
+                "💤",
             )
         if self.active_gpios:
             print_color(f"GPIOs active: {self.active_gpios}", "○")
@@ -2427,7 +2426,7 @@ class S0i3Validator:
                 for irq in self.irqs:
                     if irq[0] == int(n):
                         print_color(
-                            f"{headers.WakeTriggeredIrq} {irq[0]}: {irq[1]}", "○"
+                            f"{headers.WakeTriggeredIrq} {irq[0]}: {irq[1]}", "🥱"
                         )
             if 1 in self.wakeup_irqs and self.cpu_needs_irq1_wa():
                 if self.irq1_workaround:
@@ -2476,10 +2475,7 @@ class S0i3Validator:
         min_suspend_duration = timedelta(seconds=self.requested_duration * 0.9)
         expected_wake_time = self.last_suspend + min_suspend_duration
         if now > expected_wake_time:
-            print_color(
-                f"Userspace suspended for {self.userspace_duration}",
-                "✅",
-            )
+            logging.debug(f"Userspace suspended for {self.userspace_duration}")
         else:
             print_color(
                 f"Userspace suspended for {self.userspace_duration} (< minimum expected {min_suspend_duration})",
