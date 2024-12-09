@@ -1770,10 +1770,19 @@ class S0i3Validator:
             if not os.path.exists(p):
                 continue
             logging.debug("IPS status")
-            lines = read_file(p).split("\n")
-            for line in lines:
-                prefix = "│ " if line != lines[-1] else "└─"
-                logging.debug(f"{prefix} {line}")
+            try:
+                lines = read_file(p).split("\n")
+                for line in lines:
+                    prefix = "│ " if line != lines[-1] else "└─"
+                    logging.debug(f"{prefix} {line}")
+            except PermissionError:
+                if self.lockdown:
+                    print_color(
+                        "Unable to gather IPS state data due to kernel lockdown.",
+                        colors.WARNING,
+                    )
+                else:
+                    print_color("Failed to read IPS state data", colors.WARNING)
 
     def capture_lid(self):
         p = os.path.join("/", "proc", "acpi", "button", "lid")
