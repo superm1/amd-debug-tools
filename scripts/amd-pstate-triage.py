@@ -275,6 +275,8 @@ class AmdPstateTriage:
 
         for device in self.context.list_devices(subsystem="cpu"):
             p = os.path.join(device.sys_path, "cpufreq")
+            if not os.path.exists(p):
+                continue
             row = [
                 int(re.findall(r"\d+", f"{device.sys_name}")[0]),
                 read_file(os.path.join(p, "cpuinfo_min_freq")),
