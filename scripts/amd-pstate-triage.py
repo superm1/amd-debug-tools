@@ -334,19 +334,47 @@ class AmdPstateTriage:
             ]
         )
 
+        msr_df = pd.DataFrame(
+            columns=[
+                "CPU #",
+                "Enable",
+                "Status",
+                "Cap 1",
+                "Cap 2",
+                "Request",
+            ]
+        )
+
         try:
             for cpu in cpus:
-                val = read_msr(MSR.MSR_AMD_CPPC_REQ, cpu)
+                enable = read_msr(MSR.MSR_AMD_CPPC_ENABLE, cpu)
+                status = read_msr(MSR.MSR_AMD_CPPC_STATUS, cpu)
+                cap1 = read_msr(MSR.MSR_AMD_CPPC_CAP1, cpu)
+                cap2 = read_msr(MSR.MSR_AMD_CPPC_CAP2, cpu)
+
+                req = read_msr(MSR.MSR_AMD_CPPC_REQ, cpu)
                 row = [
                     cpu,
-                    AMD_CPPC_MIN_PERF(val),
-                    AMD_CPPC_MAX_PERF(val),
-                    AMD_CPPC_DES_PERF(val),
-                    AMD_CPPC_EPP_PERF(val),
+                    AMD_CPPC_MIN_PERF(req),
+                    AMD_CPPC_MAX_PERF(req),
+                    AMD_CPPC_DES_PERF(req),
+                    AMD_CPPC_EPP_PERF(req),
                 ]
-                logging.debug(f"CPU{cpu}\tMSR_AMD_CPPC_REQ: 0x{val:016x}")
                 df = pd.concat(
                     [pd.DataFrame([row], columns=df.columns), df], ignore_index=True
+                )
+
+                row = [
+                    cpu,
+                    enable,
+                    status,
+                    hex(cap1),
+                    hex(cap2),
+                    hex(req),
+                ]
+                msr_df = pd.concat(
+                    [pd.DataFrame([row], columns=msr_df.columns), msr_df],
+                    ignore_index=True,
                 )
 
         except FileNotFoundError:
@@ -359,9 +387,16 @@ class AmdPstateTriage:
                 print_color("MSR checks unavailable", "🚦")
             return
 
+        msr_df = msr_df.sort_values(by="CPU #")
+        print_color(
+            "CPPC MSRs\n%s"
+            % tabulate(msr_df, headers="keys", tablefmt="psql", showindex=False),
+            "🔋",
+        )
+
         df = df.sort_values(by="CPU #")
         print_color(
-            "MSR_AMD_CPPC_REQ\n%s"
+            "MSR_AMD_CPPC_REQ (decoded)\n%s"
             % tabulate(df, headers="keys", tablefmt="psql", showindex=False),
             "🔋",
         )
