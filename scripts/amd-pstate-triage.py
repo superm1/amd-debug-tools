@@ -254,6 +254,13 @@ class AmdPstateTriage:
         """Gather kernel information"""
         print_color(f"Kernel:\t{os.uname().release}", "🐧")
 
+    def gather_scheduler_info(self):
+        """Gather information about the scheduler"""
+        p = os.path.join("/", "proc", "sys", "kernel", "sched_itmt_enabled")
+        if os.path.exists(p):
+            val = read_file(p)
+            print_color(f"ITMT:\t{val}", "🐧")
+
     def gather_cpu_info(self):
         """Gather a dataframe of CPU information"""
         import pandas as pd
@@ -403,6 +410,7 @@ class AmdPstateTriage:
 
     def run(self):
         self.gather_kernel_info()
+        self.gather_scheduler_info()
         self.gather_cpu_info()
         self.gather_msrs()
 
