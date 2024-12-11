@@ -1602,7 +1602,11 @@ class S0i3Validator:
                     name = f"{name} Real Time Clock"
                 sys_name = pnp.sys_name
 
-            devices.append(f"{name.replace('\"', '')} [{sys_name}]: {wake_en}")
+            devices.append(
+                "{name} [{sys_name}]: {wakeup}".format(
+                    name=name.replace('"', ""), sys_name=sys_name, wakeup=wake_en
+                )
+            )
         devices.sort()
         logging.debug("Wakeup sources:")
         for dev in devices:
