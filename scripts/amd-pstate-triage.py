@@ -256,10 +256,14 @@ class AmdPstateTriage:
 
     def gather_scheduler_info(self):
         """Gather information about the scheduler"""
-        p = os.path.join("/", "proc", "sys", "kernel", "sched_itmt_enabled")
-        if os.path.exists(p):
-            val = read_file(p)
-            print_color(f"ITMT:\t{val}", "🐧")
+        procfs = os.path.join("/", "proc", "sys", "kernel", "sched_itmt_enabled")
+        debugfs = os.path.join(
+            "/", "sys", "kernel", "debug", "x86", "sched_itmt_enabled"
+        )
+        for p in [procfs, debugfs]:
+            if os.path.exists(p):
+                val = read_file(p)
+                print_color(f"ITMT:\t{val}", "🐧")
 
     def gather_cpu_info(self):
         """Gather a dataframe of CPU information"""
