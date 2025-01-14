@@ -130,6 +130,7 @@ class TabulatePackage(DistroPackage):
 
 
 def read_file(fn):
+    """Read the contents of a file and return it as a string."""
     with open(fn, "r") as r:
         return r.read().strip()
 
@@ -149,7 +150,7 @@ def print_color(message, group):
         color = group
         prefix = ""
 
-    log_txt = "{prefix}{message}".format(prefix=prefix, message=message).strip()
+    log_txt = f"{prefix}{message}".strip()
     if any(c in color for c in [colors.OK, colors.HEADER, colors.UNDERLINE]):
         logging.info(log_txt)
     elif color == colors.WARNING:
@@ -166,21 +167,23 @@ def print_color(message, group):
 
 
 def fatal_error(message):
+    """Print an error message and exit the program."""
     print_color(message, "👀")
     sys.exit(1)
 
 
 class AmdPstateTriage:
     def show_install_message(self, message):
+        """Show a message indicating the installation action."""
         action = headers.InstallAction if self.root_user else headers.RerunAction
         message = "{message}. {action}.".format(message=message, action=action)
         print_color(message, "👀")
 
-    def __init__(self):
+    def __init__(self, arg):
         # for saving a log file for analysis
         logging.basicConfig(
             format="%(asctime)s %(levelname)s:\t%(message)s",
-            filename=log,
+            filename=arg,
             filemode="w",
             level=logging.DEBUG,
         )
@@ -216,9 +219,9 @@ class AmdPstateTriage:
             from pandas import DataFrame
 
             self.pandas = True
-        except ImportError:
-            self.pandas = False
         except ModuleNotFoundError:
+            self.pandas = False
+        except ImportError:
             self.pandas = False
 
         if not self.pandas:
@@ -304,7 +307,8 @@ class AmdPstateTriage:
             )
 
         cpuinfo = read_file("/proc/cpuinfo")
-        print_color(f"CPU:\t{re.findall(r'model name\s+:\s+(.*)', cpuinfo)[0]}", "💻")
+        model = re.findall(r"model name\s+:\s+(.*)", cpuinfo)[0]
+        print_color(f"CPU:\t\t{model}", "💻")
 
         df = df.sort_values(by="CPU #")
         print_color(
@@ -317,7 +321,7 @@ class AmdPstateTriage:
         """Gather MSR information"""
 
         def read_msr(msr, cpu):
-            p = "/dev/cpu/%d/msr" % cpu
+            p = f"/dev/cpu/{cpu}/msr"
             if not os.path.exists(p) and self.root_user:
                 os.system("modprobe msr")
             try:
@@ -430,6 +434,7 @@ class AmdPstateTriage:
 
 
 def parse_args():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Collect useful information for debugging amd-pstate issues.",
         epilog="Arguments are optional, and if they are not provided will prompted.\n"
@@ -442,23 +447,18 @@ def parse_args():
     return parser.parse_args()
 
 
-def configure_log(log):
-    if not log:
-        fname = "{prefix}-{date}.{suffix}".format(
-            prefix=defaults.log_prefix, suffix=defaults.log_suffix, date=date.today()
-        )
-        log = input(
-            "{question} (default {fname})? ".format(
-                question=headers.LogDescription, fname=fname
-            )
-        )
-        if not log:
-            log = fname
-    return log
+def configure_log(arg):
+    """Configure the log file name based on the provided argument or user input."""
+    if not arg:
+        fname = f"{defaults.log_prefix}-{date.today()}.{defaults.log_suffix}"
+        arg = input(f"{headers.LogDescription} (default {fname})? ")
+        if not arg:
+            arg = fname
+    return arg
 
 
 if __name__ == "__main__":
     args = parse_args()
     log = configure_log(args.log)
-    triage = AmdPstateTriage()
+    triage = AmdPstateTriage(log)
     triage.run()
