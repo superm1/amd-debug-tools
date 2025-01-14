@@ -1426,6 +1426,11 @@ class S0i3Validator:
         return True
 
     def check_amd_hsmp(self):
+        # not needed to check in newer kernels
+        # see https://github.com/torvalds/linux/commit/77f1972bdcf7513293e8bbe376b9fe837310ee9c
+        if self.minimum_kernel(6, 10):
+            logging.debug("New enough kernel to avoid HSMP check")
+            return True
         f = os.path.join("/", "boot", f"config-{platform.uname().release}")
         if os.path.exists(f):
             kconfig = read_file(f)
