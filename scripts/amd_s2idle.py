@@ -689,6 +689,10 @@ class DistroPackage:
         elif distro == "cachyos" or distro == "arch":
             installer = ["pacman", "-Sy", self.arch]
         else:
+            try:
+                import pip
+            except ModuleNotFoundError:
+                self.pip = False
             if not self.pip:
                 return False
             installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
