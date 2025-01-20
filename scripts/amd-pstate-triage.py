@@ -86,9 +86,13 @@ class DistroPackage:
             if variant != "workstation":
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
-        elif distro == "cachyos" or distro == "arch":
+        elif distro == "arch" or os.path.exists("/etc/arch-release"):
             installer = ["pacman", "-Sy", self.arch]
         else:
+            try:
+                import pip
+            except ModuleNotFoundError:
+                self.pip = False
             if not self.pip:
                 return False
             installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
