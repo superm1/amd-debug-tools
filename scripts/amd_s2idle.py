@@ -686,7 +686,7 @@ class DistroPackage:
             if variant != "workstation":
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
-        elif distro == "cachyos" or distro == "arch":
+        elif distro == "arch" or os.path.exists("/etc/arch-release"):
             installer = ["pacman", "-Sy", self.arch]
         else:
             try:
