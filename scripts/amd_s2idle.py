@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """S0i3/s2idle analysis script for AMD systems"""
 import argparse
+import configparser
 import logging
 import os
 import platform
@@ -2179,7 +2180,6 @@ class S0i3Validator:
         base = os.path.join("/", "etc", "systemd", "logind.conf")
         if not os.path.exists(base):
             return True
-        import configparser
 
         config = configparser.ConfigParser()
         config.read(base)
