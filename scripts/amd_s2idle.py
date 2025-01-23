@@ -64,8 +64,18 @@ try:
 except ModuleNotFoundError:
     VERSION = False
 
+# used to identify the distro
+try:
+    import distro
+
+    DISTRO = True
+except ModuleNotFoundError:
+    DISTRO = False
+
 
 class colors:
+    """Colors for terminal output"""
+
     DEBUG = "\033[90m"
     HEADER = "\033[95m"
     OK = "\033[94m"
@@ -76,6 +86,8 @@ class colors:
 
 
 class defaults:
+    """Default values for the script"""
+
     duration = 10
     wait = 4
     count = 1
@@ -111,10 +123,12 @@ class headers:
 
 
 def BIT(num):
+    """Returns a bit shifted by num"""
     return 1 << num
 
 
 def read_file(fn):
+    """Reads and returns the contents of fn"""
     with open(fn, "r") as r:
         return r.read().strip()
 
@@ -127,7 +141,8 @@ def capture_file_to_debug(fn):
             logging.debug(line.rstrip())
         return contents
     except PermissionError:
-        logging.debug(f"Unable to capture {fn}")
+        logging.debug("Unable to capture %s", fn)
+        return None
 
 
 def get_property_pyudev(properties, key, fallback=""):
@@ -139,6 +154,7 @@ def get_property_pyudev(properties, key, fallback=""):
 
 
 def print_color(message, group):
+    """Prints a message with a color"""
     prefix = f"{group} "
     suffix = colors.ENDC
     if group == "🚦":
@@ -170,11 +186,14 @@ def print_color(message, group):
 
 
 def fatal_error(message):
+    """Prints a fatal error message and exits"""
     print_color(message, "👀")
     sys.exit(1)
 
 
 def pm_debugging(func):
+    """Turn on pm_debug_messages for the duration of the function"""
+
     def runner(*args, **kwargs):
         fn = os.path.join("/", "sys", "power", "pm_debug_messages")
         with open(fn, "w") as w:
@@ -189,12 +208,15 @@ def pm_debugging(func):
 
 
 class S0i3Failure:
+    """Base class for all S0i3 failures"""
+
     def __init__(self):
         self.explanation = ""
         self.url = ""
         self.description = ""
 
     def get_failure(self):
+        """Prints the failure message"""
         if self.description:
             print_color(self.description, "🚦")
         if self.explanation:
@@ -204,6 +226,8 @@ class S0i3Failure:
 
 
 class RtcAlarmWrong(S0i3Failure):
+    """RTC alarm is not configured to use ACPI"""
+
     def __init__(self):
         super().__init__()
         self.description = "rtc_cmos is not configured to use ACPI alarm"
@@ -215,6 +239,8 @@ class RtcAlarmWrong(S0i3Failure):
 
 
 class MissingAmdgpu(S0i3Failure):
+    """AMDGPU driver is missing"""
+
     def __init__(self):
         super().__init__()
         self.description = "AMDGPU driver is missing"
@@ -226,6 +252,8 @@ class MissingAmdgpu(S0i3Failure):
 
 
 class MissingAmdgpuFirmware(S0i3Failure):
+    """AMDGPU firmware is missing"""
+
     def __init__(self, errors):
         super().__init__()
         self.description = "AMDGPU firmware is missing"
@@ -240,6 +268,8 @@ class MissingAmdgpuFirmware(S0i3Failure):
 
 
 class AmdgpuPpFeatureMask(S0i3Failure):
+    """AMDGPU ppfeaturemask has been changed"""
+
     def __init__(self):
         super().__init__()
         self.description = "AMDGPU ppfeaturemask changed"
@@ -251,6 +281,8 @@ class AmdgpuPpFeatureMask(S0i3Failure):
 
 
 class MissingAmdPmc(S0i3Failure):
+    """AMD-PMC driver is missing"""
+
     def __init__(self):
         super().__init__()
         self.description = "AMD-PMC driver is missing"
@@ -265,6 +297,8 @@ class MissingAmdPmc(S0i3Failure):
 
 
 class MissingThunderbolt(S0i3Failure):
+    """Thunderbolt driver is missing"""
+
     def __init__(self):
         super().__init__()
         self.description = "thunderbolt driver is missing"
@@ -276,6 +310,8 @@ class MissingThunderbolt(S0i3Failure):
 
 
 class AcpiBiosError(S0i3Failure):
+    """ACPI BIOS errors detected"""
+
     def __init__(self, errors):
         super().__init__()
         self.description = "ACPI BIOS Errors detected"
@@ -293,6 +329,8 @@ class AcpiBiosError(S0i3Failure):
 
 
 class VendorWrong(S0i3Failure):
+    """Unsupported CPU vendor"""
+
     def __init__(self):
         super().__init__()
         self.description = "Unsupported CPU vendor"
@@ -304,6 +342,8 @@ class VendorWrong(S0i3Failure):
 
 
 class UserNvmeConfiguration(S0i3Failure):
+    """User has disabled NVME ACPI support"""
+
     def __init__(self):
         super().__init__()
         self.description = "NVME ACPI support is disabled"
@@ -314,6 +354,8 @@ class UserNvmeConfiguration(S0i3Failure):
 
 
 class AcpiNvmeStorageD3Enable(S0i3Failure):
+    """NVME device is missing ACPI attributes"""
+
     def __init__(self, disk, num_ssds):
         super().__init__()
         self.description = f"{disk} missing ACPI attributes"
@@ -335,6 +377,8 @@ class AcpiNvmeStorageD3Enable(S0i3Failure):
 
 
 class DevSlpHostIssue(S0i3Failure):
+    """AHCI controller doesn't support DevSlp"""
+
     def __init__(self):
         super().__init__()
         self.description = "AHCI controller doesn't support DevSlp"
@@ -345,6 +389,8 @@ class DevSlpHostIssue(S0i3Failure):
 
 
 class DevSlpDiskIssue(S0i3Failure):
+    """SATA disk doesn't support DevSlp"""
+
     def __init__(self):
         super().__init__()
         self.description = "SATA disk doesn't support DevSlp"
@@ -355,6 +401,8 @@ class DevSlpDiskIssue(S0i3Failure):
 
 
 class SleepModeWrong(S0i3Failure):
+    """System is not configured for Modern Standby"""
+
     def __init__(self):
         super().__init__()
         self.description = (
@@ -370,6 +418,8 @@ class SleepModeWrong(S0i3Failure):
 
 
 class DeepSleep(S0i3Failure):
+    """Deep sleep is configured on the kernel command line"""
+
     def __init__(self):
         super().__init__()
         self.description = (
@@ -382,6 +432,8 @@ class DeepSleep(S0i3Failure):
 
 
 class FadtWrong(S0i3Failure):
+    """FADT doesn't support low power idle"""
+
     def __init__(self):
         super().__init__()
         self.description = (
@@ -398,6 +450,8 @@ class FadtWrong(S0i3Failure):
 
 
 class Irq1Workaround(S0i3Failure):
+    """IRQ1 wakeup source is active"""
+
     def __init__(self):
         super().__init__()
         self.description = "The wakeup showed an IRQ1 wakeup source, which might be a platform firmware bug"
@@ -418,6 +472,8 @@ class Irq1Workaround(S0i3Failure):
 
 
 class KernelRingBufferWrapped(S0i3Failure):
+    """Kernel ringbuffer has wrapped"""
+
     def __init__(self):
         super().__init__()
         self.description = "Kernel ringbuffer has wrapped"
@@ -435,6 +491,8 @@ class KernelRingBufferWrapped(S0i3Failure):
 
 
 class AmdHsmpBug(S0i3Failure):
+    """AMD HSMP is built into the kernel"""
+
     def __init__(self):
         super().__init__()
         self.description = "amd-hsmp built in to kernel"
@@ -450,6 +508,8 @@ class AmdHsmpBug(S0i3Failure):
 
 
 class WCN6855Bug(S0i3Failure):
+    """WCN6855 firmware causes spurious wakeups"""
+
     def __init__(self):
         super().__init__()
         self.description = "The firmware loaded for the WCN6855 causes spurious wakeups"
@@ -475,6 +535,8 @@ class WCN6855Bug(S0i3Failure):
 
 
 class I2CHidBug(S0i3Failure):
+    """I2C HID device causes spurious wakeups"""
+
     def __init__(self, name, remediation):
         super().__init__()
         self.description = f"The {name} device has been reported to cause high power consumption and spurious wakeups"
@@ -494,6 +556,8 @@ class I2CHidBug(S0i3Failure):
 
 
 class SpuriousWakeup(S0i3Failure):
+    """System woke up prematurely"""
+
     def __init__(self, duration):
         super().__init__()
         self.description = (
@@ -508,6 +572,8 @@ class SpuriousWakeup(S0i3Failure):
 
 
 class LowHardwareSleepResidency(S0i3Failure):
+    """System had low hardware sleep residency"""
+
     def __init__(self, duration, percent):
         super().__init__()
         self.description = "System had low hardware sleep residency"
@@ -520,6 +586,8 @@ class LowHardwareSleepResidency(S0i3Failure):
 
 
 class MSRFailure(S0i3Failure):
+    """MSR access failed"""
+
     def __init__(self):
         super().__init__()
         self.description = "PC6 or CC6 state disabled"
@@ -530,6 +598,8 @@ class MSRFailure(S0i3Failure):
 
 
 class TaintedKernel(S0i3Failure):
+    """Kernel is tainted"""
+
     def __init__(self):
         super().__init__()
         self.description = "Kernel is tainted"
@@ -541,6 +611,8 @@ class TaintedKernel(S0i3Failure):
 
 
 class DMArNotEnabled(S0i3Failure):
+    """DMAr is not enabled"""
+
     def __init__(self):
         super().__init__()
         self.description = "Pre-boot DMA protection disabled"
@@ -551,6 +623,8 @@ class DMArNotEnabled(S0i3Failure):
 
 
 class MissingIommuACPI(S0i3Failure):
+    """IOMMU ACPI table errors"""
+
     def __init__(self, device):
         super().__init__()
         self.description = f"Device {device} missing from ACPI tables"
@@ -562,6 +636,8 @@ class MissingIommuACPI(S0i3Failure):
 
 
 class SMTNotEnabled(S0i3Failure):
+    """SMT is not enabled"""
+
     def __init__(self):
         super().__init__()
         self.description = "SMT is not enabled"
@@ -571,6 +647,8 @@ class SMTNotEnabled(S0i3Failure):
 
 
 class ASpmWrong(S0i3Failure):
+    """ASPM is overridden"""
+
     def __init__(self):
         super().__init__()
         self.description = "ASPM is overridden"
@@ -581,22 +659,25 @@ class ASpmWrong(S0i3Failure):
 
 
 class KernelLogger:
+    """Base class for kernel loggers"""
+
     def __init__(self):
         pass
 
     def seek(self):
-        pass
+        """Seek to the beginning of the log"""
 
-    def process_callback(self, validator, callback):
-        pass
+    def process_callback(self, callback):
+        """Process the log"""
 
     def match_line(self, matches):
-        pass
+        """Find lines that match all matches"""
 
     def match_pattern(self, pattern):
-        pass
+        """Find lines that match a pattern"""
 
     def capture_full_dmesg(self, line):
+        """Capture the full dmesg"""
         logging.debug(line)
 
 
@@ -625,11 +706,12 @@ class DmesgLogger(KernelLogger):
         if result.returncode == 0:
             self.buffer = result.stdout.decode("utf-8")
 
-    def seek(self, time=None):
-        if time:
+    def seek(self, tim=None):
+        """Seek to the beginning of the log"""
+        if tim:
             if self.since_support:
                 # look 10 seconds back because dmesg time isn't always accurate
-                fuzz = time - timedelta(seconds=10)
+                fuzz = tim - timedelta(seconds=10)
                 cmd = self.command + [
                     "--time-format=iso",
                     f"--since={fuzz.strftime('%Y-%m-%dT%H:%M:%S')}",
@@ -645,6 +727,7 @@ class DmesgLogger(KernelLogger):
             self._refresh_head()
 
     def process_callback(self, callback):
+        """Process the log"""
         for entry in self.buffer.split("\n"):
             callback(entry)
 
@@ -664,11 +747,13 @@ class DmesgLogger(KernelLogger):
         return None
 
     def capture_full_dmesg(self, line=None):
+        """Capture the full dmesg"""
         self.seek()
         for entry in self.buffer.split("\n"):
             super().capture_full_dmesg(entry)
 
     def capture_header(self):
+        """Capture the header of the log"""
         return self.buffer.split("\n")[0]
 
 
@@ -682,13 +767,14 @@ class SystemdLogger(KernelLogger):
         self.journal.add_match(_TRANSPORT="kernel")
         self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
 
-    def seek(self, time=None):
+    def seek(self, tim=None):
         if time:
-            self.journal.seek_realtime(time)
+            self.journal.seek_realtime(tim)
         else:
             self.journal.seek_head()
 
     def process_callback(self, callback):
+        """Process the log"""
         for entry in self.journal:
             callback(entry["MESSAGE"])
 
@@ -702,18 +788,22 @@ class SystemdLogger(KernelLogger):
         return None
 
     def match_pattern(self, pattern):
+        """Find lines that match a pattern"""
         for entry in self.journal:
             if re.search(pattern, entry["MESSAGE"]):
                 return entry["MESSAGE"]
         return None
 
     def capture_full_dmesg(self, line=None):
+        """Capture the full dmesg"""
         self.seek()
         for entry in self.journal:
             super().capture_full_dmesg(entry["MESSAGE"])
 
 
 class DistroPackage:
+    """Base class for distro packages"""
+
     def __init__(self, deb, rpm, arch, pip, root):
         self.deb = deb
         self.rpm = rpm
@@ -721,14 +811,15 @@ class DistroPackage:
         self.pip = pip
         self.root = root
 
-    def install(self, distro):
+    def install(self, dist):
+        """Install the package for a given distro"""
         if not self.root:
             sys.exit(1)
-        if distro == "ubuntu" or distro == "debian":
+        if dist == "ubuntu" or dist == "debian":
             if not self.deb:
                 return False
             installer = ["apt", "install", self.deb]
-        elif distro == "fedora":
+        elif dist == "fedora":
             if not self.rpm:
                 return False
             release = read_file("/usr/lib/os-release")
@@ -739,17 +830,20 @@ class DistroPackage:
             if variant != "workstation":
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
-        elif distro == "arch" or os.path.exists("/etc/arch-release"):
+        elif dist == "arch" or os.path.exists("/etc/arch-release"):
             installer = ["pacman", "-Sy", self.arch]
         else:
             if not PIP or not self.pip:
                 return False
             installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
+
         subprocess.check_call(installer)
         return True
 
 
 class PyUdevPackage(DistroPackage):
+    """Pyudev package"""
+
     def __init__(self, root):
         super().__init__(
             deb="python3-pyudev",
@@ -761,6 +855,8 @@ class PyUdevPackage(DistroPackage):
 
 
 class IaslPackage(DistroPackage):
+    """Iasl package"""
+
     def __init__(self, root):
         super().__init__(
             deb="acpica-tools", rpm="acpica-tools", arch="acpica", pip=None, root=root
@@ -768,6 +864,8 @@ class IaslPackage(DistroPackage):
 
 
 class PackagingPackage(DistroPackage):
+    """Packaging package"""
+
     def __init__(self, root):
         super().__init__(
             deb="python3-packaging",
@@ -779,6 +877,8 @@ class PackagingPackage(DistroPackage):
 
 
 class JournaldPackage(DistroPackage):
+    """Journald package"""
+
     def __init__(self, root):
         super().__init__(
             deb="python3-systemd",
@@ -790,6 +890,8 @@ class JournaldPackage(DistroPackage):
 
 
 class EthtoolPackage(DistroPackage):
+    """Ethtool package"""
+
     def __init__(self, root):
         super().__init__(
             deb="ethtool",
@@ -801,6 +903,8 @@ class EthtoolPackage(DistroPackage):
 
 
 class WakeIRQ:
+    """Class for wake IRQs"""
+
     def __init__(self, num, context):
         self.num = num
         p = os.path.join("/", "sys", "kernel", "irq", str(num))
@@ -844,12 +948,12 @@ class WakeIRQ:
         if not self.name and self.actions:
             p = os.path.join("/", "sys", "bus", "acpi", "devices", self.actions)
             if os.path.exists(p):
-                for d in os.listdir(p):
-                    if "physical_node" not in d:
+                for directory in os.listdir(p):
+                    if "physical_node" not in directory:
                         continue
 
-                    for root, dirs, files in os.walk(
-                        os.path.join(p, d), followlinks=True
+                    for root, _dirs, files in os.walk(
+                        os.path.join(p, directory), followlinks=True
                     ):
                         if "name" in files:
                             self.name = read_file(os.path.join(root, "name"))
@@ -875,7 +979,12 @@ class WakeIRQ:
 
 
 class S0i3Validator:
+    """
+    S0i3Validator class performs various checks and validations for S0i3/s2idle analysis on AMD systems.
+    """
+
     def check_selinux(self):
+        """Check if SELinux is enabled and enforce mode is active."""
         p = os.path.join("/", "sys", "fs", "selinux", "enforce")
         if os.path.exists(p):
             v = read_file(p)
@@ -883,6 +992,7 @@ class S0i3Validator:
                 fatal_error("Unable to run with SELinux enabled without root")
 
     def show_install_message(self, message):
+        """Show a message to install a package"""
         action = headers.InstallAction if self.root_user else headers.RerunAction
         message = f"{message}. {action}."
         print_color(message, "👀")
@@ -891,15 +1001,11 @@ class S0i3Validator:
         """Guess the distro based on heuristics"""
         self.distro = None
         self.pretty_distro = None
-        try:
-            import distro
 
+        if DISTRO:
             self.distro = distro.id()
             self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
-        except ModuleNotFoundError:
-            pass
-
-        if not self.distro:
+        else:
             p = os.path.join("/", "etc", "os-release")
             if os.path.exists(p):
                 v = read_file(p)
@@ -981,8 +1087,7 @@ class S0i3Validator:
 
         try:
             self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
-        except:
-            installer = False
+        except FileNotFoundError:
             self.show_install_message(headers.MissingIasl)
             package = IaslPackage(self.root_user)
             self.iasl = package.install(self.distro)
@@ -1014,6 +1119,7 @@ class S0i3Validator:
 
         # for comparing GPEs before/after sleep
         self.gpes = {}
+        self.irqs = []
 
         # for monitoring battery levels across suspend
         self.energy = {}
@@ -1029,6 +1135,17 @@ class S0i3Validator:
         self.kernel = platform.uname().release
         self.kernel_major = int(self.kernel.split(".")[0])
         self.kernel_minor = int(self.kernel.split(".")[1])
+
+        # used to analyze the suspend cycle
+        self.suspend_count = 0
+        self.cycle_count = 0
+        self.upep = False
+        self.upep_microsoft = False
+        self.wakeup_irqs = []
+        self.idle_masks = []
+        self.acpi_errors = []
+        self.active_gpios = []
+        self.irq1_workaround = False
 
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
@@ -1108,6 +1225,7 @@ class S0i3Validator:
         print_color(f"Kernel {self.kernel}", "🐧")
 
     def check_thermal(self):
+        """Capture thermal zone information"""
         devs = []
         for dev in self.pyudev.list_devices(subsystem="acpi", DRIVER="thermal"):
             devs.append(dev)
@@ -1120,25 +1238,27 @@ class S0i3Validator:
             p = os.path.join(dev.sys_path, "thermal_zone")
             temp = int(read_file(os.path.join(p, "temp"))) / 1000
 
-            logging.debug(f"{prefix} {name}")
+            logging.debug("%s %s", prefix, name)
             if name not in self.thermal:
-                logging.debug(f"{detail_prefix} temp: {temp}°C")
+                logging.debug("%s temp: %s°C", detail_prefix, temp)
             else:
-                logging.debug(f"{detail_prefix} {self.thermal[name]}°C -> {temp}°C")
+                logging.debug(
+                    "%s %s°C -> %s°C", detail_prefix, self.thermal[name], temp
+                )
 
             # handle all trip points
-            count = 0
+            trip_count = 0
             for f in os.listdir(p):
                 if "trip_point" not in f:
                     continue
                 if "temp" not in f:
                     continue
-                count = count + 1
+                trip_count = trip_count + 1
 
-            for i in range(0, count):
-                f = os.path.join(p, "trip_point_%d_type" % i)
+            for i in range(0, trip_count):
+                f = os.path.join(p, f"trip_point_{i}_type")
                 trip_type = read_file(f)
-                f = os.path.join(p, "trip_point_%d_temp" % i)
+                f = os.path.join(p, f"trip_point_{i}_temp")
                 trip = int(read_file(f)) / 1000
 
                 if name not in self.thermal:
@@ -1155,6 +1275,7 @@ class S0i3Validator:
         return True
 
     def check_battery(self):
+        """Check battery level"""
         for dev in self.pyudev.list_devices(
             subsystem="power_supply", POWER_SUPPLY_TYPE="Battery"
         ):
@@ -1180,8 +1301,8 @@ class S0i3Validator:
             name = get_property_pyudev(dev.properties, "POWER_SUPPLY_NAME", "Unknown")
 
             if energy_full_design:
-                logging.debug(f"{name} energy level is {energy} µWh")
-                if not name in self.energy:
+                logging.debug("%s energy level is %s µWh", name, energy)
+                if name not in self.energy:
                     print_color(
                         f"Battery {name} ({man} {model}) is operating at {float(energy_full) / int(energy_full_design):.2%} of design",
                         "🔋",
@@ -1206,8 +1327,8 @@ class S0i3Validator:
                 self.energy[name] = int(energy)
 
             if charge_full_design:
-                logging.debug(f"{name} charge level is {charge} µAh")
-                if not name in self.charge:
+                logging.debug("%s charge level is %s µAh", name, charge)
+                if name not in self.charge:
                     print_color(
                         f"Battery {name} ({man} {model}) is operating at {float(charge_full) / int(charge_full_design):.2%} of design",
                         "🔋",
@@ -1234,6 +1355,7 @@ class S0i3Validator:
         return True
 
     def check_lps0(self):
+        """Check if LPS0 is enabled"""
         for m in ["acpi", "acpi_x86"]:
             p = os.path.join("/", "sys", "module", m, "parameters", "sleep_no_lps0")
             if not os.path.exists(p):
@@ -1248,6 +1370,7 @@ class S0i3Validator:
         return False
 
     def check_cpu_vendor(self):
+        """Check if the CPU vendor is AMD"""
         p = os.path.join("/", "proc", "cpuinfo")
         valid = False
         cpu = read_file(p)
@@ -1255,13 +1378,13 @@ class S0i3Validator:
             if "AuthenticAMD" in line:
                 valid = True
                 continue
-            elif "cpu family" in line:
+            if "cpu family" in line:
                 self.cpu_family = int(line.split()[-1])
                 continue
-            elif "model name" in line:
+            if "model name" in line:
                 self.cpu_model_string = line.split(":")[-1].strip()
                 continue
-            elif "model" in line:
+            if "model" in line:
                 self.cpu_model = int(line.split()[-1])
                 continue
             if self.cpu_family and self.cpu_model and self.cpu_model_string:
@@ -1280,9 +1403,10 @@ class S0i3Validator:
         return valid
 
     def check_smt(self):
+        """Check if SMT is enabled"""
         p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "control")
         v = read_file(p)
-        logging.debug(f"SMT control: {v}")
+        logging.debug("SMT control: %s", v)
         if v == "notsupported":
             return True
         p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "active")
@@ -1295,6 +1419,7 @@ class S0i3Validator:
         return True
 
     def capture_system_vendor(self):
+        """Capture the system vendor information"""
         p = os.path.join("/", "sys", "class", "dmi", "id")
         try:
             ec = read_file(os.path.join(p, "ec_firmware_release"))
@@ -1305,16 +1430,17 @@ class S0i3Validator:
             product = read_file(os.path.join(p, "product_name"))
             family = read_file(os.path.join(p, "product_family"))
             release = read_file(os.path.join(p, "bios_release"))
-            version = read_file(os.path.join(p, "bios_version"))
-            date = read_file(os.path.join(p, "bios_date"))
+            ver = read_file(os.path.join(p, "bios_version"))
+            dt = read_file(os.path.join(p, "bios_date"))
             print_color(
-                f"{vendor} {product} ({family}) running BIOS {release} ({version}) released {date} and EC {ec}",
+                f"{vendor} {product} ({family}) running BIOS {release} ({ver}) released {dt} and EC {ec}",
                 "💻",
             )
         except FileNotFoundError:
             pass
 
     def check_sleep_mode(self):
+        """Check if the system is configured for s2idle"""
         fn = os.path.join("/", "sys", "power", "mem_sleep")
         if not os.path.exists(fn):
             print_color("Kernel doesn't support sleep", "❌")
@@ -1333,6 +1459,7 @@ class S0i3Validator:
         return True
 
     def check_storage(self):
+        """Check storage devices for s2idle support"""
         has_sata = False
         valid_nvme = {}
         invalid_nvme = {}
@@ -1340,8 +1467,8 @@ class S0i3Validator:
         valid_ahci = False
         cmdline = read_file(os.path.join("/proc", "cmdline"))
         p = os.path.join("/", "sys", "module", "nvme", "parameters", "noacpi")
-        c = os.path.exists(p) and read_file(p) == "Y"
-        if ("nvme.noacpi" in cmdline) and c:
+        check = os.path.exists(p) and read_file(p) == "Y"
+        if ("nvme.noacpi" in cmdline) and check:
             print_color("NVME ACPI support is blocked by kernel command line", "❌")
             self.failures += [UserNvmeConfiguration()]
             return False
@@ -1379,17 +1506,17 @@ class S0i3Validator:
                 if self.kernel_log.match_line(matches):
                     valid_sata = True
         if invalid_nvme:
-            for disk in invalid_nvme:
+            for disk, name in invalid_nvme.items():
                 print_color(
-                    f"NVME {invalid_nvme[disk].strip()} is not configured for s2idle in BIOS",
+                    f"NVME {name.strip()} is not configured for s2idle in BIOS",
                     "❌",
                 )
                 num = len(invalid_nvme) + len(valid_nvme)
                 self.failures += [AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)]
         if valid_nvme:
-            for disk in valid_nvme:
+            for disk, name in valid_nvme.items():
                 print_color(
-                    f"NVME {valid_nvme[disk].strip()} is configured for s2idle in BIOS",
+                    f"NVME {name.strip()} is configured for s2idle in BIOS",
                     "✅",
                 )
         if has_sata:
@@ -1413,8 +1540,9 @@ class S0i3Validator:
         )
 
     def install_ethtool(self):
+        """Install ethtool if necessary"""
         try:
-            subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
+            _ = subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
             return True
         except FileNotFoundError:
             self.show_install_message(headers.MissingEthtool)
@@ -1422,6 +1550,7 @@ class S0i3Validator:
             return package.install(self.distro)
 
     def check_network(self):
+        """Check network devices for s2idle support"""
         ethtool = False
         for device in self.pyudev.list_devices(subsystem="net", ID_NET_DRIVER="r8169"):
             if not ethtool:
@@ -1439,10 +1568,10 @@ class S0i3Validator:
                 if "Supports Wake-on" in line:
                     val = line.split(":")[1].strip()
                     if "g" in val:
-                        logging.debug(f"{interface} supports WoL")
+                        logging.debug("%s supports WoL", interface)
                         wol_supported = True
                     else:
-                        logging.debug(f"{interface} doesn't support WoL ({val})")
+                        logging.debug("%s doesn't support WoL (%s)", interface, val)
                 elif "Wake-on" in line and wol_supported:
                     val = line.split(":")[1].strip()
                     if "g" in val:
@@ -1468,20 +1597,23 @@ class S0i3Validator:
         for device in devices:
             # Dictionary of instance id to firmware version mappings that
             # have been "reported" to be problematic
-            map = {
+            device_map = {
                 "8c36f7ee-cc11-4a36-b090-6363f54ecac2": "0.1.26",  # https://gitlab.freedesktop.org/drm/amd/-/issues/3443
             }
             interesting_plugins = ["nvme", "tpm", "uefi_capsule"]
             if device.get_plugin() in interesting_plugins:
                 logging.debug(
-                    f"{device.get_vendor()} {device.get_name()} firmware version: '{device.get_version()}'"
+                    "%s %s firmware version: '%s'",
+                    device.get_vendor(),
+                    device.get_name(),
+                    device.get_version(),
                 )
-                logging.debug(f"| {device.get_guids()}")
-                logging.debug(f"└─{device.get_instance_ids()}")
-            for item in map:
+                logging.debug("| %s", device.get_guids())
+                logging.debug("└─%s", device.get_instance_ids())
+            for item, version in device_map.items():
                 if (
                     item in device.get_guids() or item in device.get_instance_ids()
-                ) and map[item] in device.get_version():
+                ) and version in device.get_version():
                     print_color(
                         f"Platform may have problems resuming.  Upgrade the firmware for '{device.get_name()}' if you have problems.",
                         colors.WARNING,
@@ -1489,6 +1621,7 @@ class S0i3Validator:
         return True
 
     def check_amd_hsmp(self):
+        """Check for AMD HSMP driver"""
         # not needed to check in newer kernels
         # see https://github.com/torvalds/linux/commit/77f1972bdcf7513293e8bbe376b9fe837310ee9c
         if self.minimum_kernel(6, 10):
@@ -1521,6 +1654,7 @@ class S0i3Validator:
         return True
 
     def check_iommu(self):
+        """Check IOMMU configuration"""
         affected_1a = (
             list(range(0x20, 0x2F)) + list(range(0x60, 0x6F)) + list(range(0x70, 0x7F))
         )
@@ -1530,7 +1664,7 @@ class S0i3Validator:
             found_dmar = False
             for dev in self.pyudev.list_devices(subsystem="iommu"):
                 found_iommu = True
-                logging.debug(f"Found IOMMU {dev.sys_path}")
+                logging.debug("Found IOMMU %s", dev.sys_path)
                 break
             if not found_iommu:
                 print_color("IOMMU disabled", "✅")
@@ -1540,7 +1674,7 @@ class S0i3Validator:
             ):
                 p = os.path.join(dev.sys_path, "iommu_dma_protection")
                 v = int(read_file(p))
-                logging.debug(f"{p}:{v}")
+                logging.debug("%s:%s", p, v)
                 found_dmar = v == 1
             if not found_dmar:
                 print_color(
@@ -1625,10 +1759,11 @@ class S0i3Validator:
                 name = get_input_sibling_name(self.pyudev, serio)
             elif rtc is not None:
                 sys_name = rtc.sys_name
-                for parent in self.pyudev.list_devices(
+                for _parent in self.pyudev.list_devices(
                     subsystem="platform", parent=rtc, DRIVER="alarmtimer"
                 ):
                     name = "Real Time Clock alarm timer"
+                    break
             elif mhi is not None:
                 sys_name = mhi.sys_name
                 name = "Mobile Broadband host interface"
@@ -1641,22 +1776,18 @@ class S0i3Validator:
                     "ID_PCI_SUBCLASS_FROM_DATABASE" in pci.properties
                     and "ID_VENDOR_FROM_DATABASE" in pci.properties
                 ):
-                    name = "{vendor} {cls}".format(
-                        vendor=pci.properties["ID_VENDOR_FROM_DATABASE"],
-                        cls=pci.properties["ID_PCI_SUBCLASS_FROM_DATABASE"],
-                    )
+                    name = f'{pci.properties["ID_VENDOR_FROM_DATABASE"]} {pci.properties["ID_PCI_SUBCLASS_FROM_DATABASE"]}'
                 else:
                     name = f"PCI {pci.properties['PCI_CLASS']}"
             elif acpi is not None:
                 sys_name = acpi.sys_name
                 if acpi.driver == "button":
-                    for input in self.pyudev.list_devices(
-                        subsystem="input", parent=acpi
-                    ):
-                        if not "NAME" in input.properties:
+                    for inp in self.pyudev.list_devices(subsystem="input", parent=acpi):
+                        if not "NAME" in inp.properties:
                             continue
-                        name = f"ACPI {input.properties['NAME']}"
-                elif acpi.driver == "battery" or acpi.driver == "ac":
+                        name = f"ACPI {inp.properties['NAME']}"
+                        break
+                elif acpi.driver in ["battery", "ac"]:
                     for ps in self.pyudev.list_devices(
                         subsystem="power_supply", parent=acpi
                     ):
@@ -1669,11 +1800,8 @@ class S0i3Validator:
                     name = f"{name} Real Time Clock"
                 sys_name = pnp.sys_name
 
-            devices.append(
-                "{name} [{sys_name}]: {wakeup}".format(
-                    name=name.replace('"', ""), sys_name=sys_name, wakeup=wake_en
-                )
-            )
+            name = name.replace('"', "")
+            devices.append(f"{name} [{sys_name}]: {wake_en}")
         devices.sort()
         logging.debug("Wakeup sources:")
         for dev in devices:
@@ -1683,6 +1811,7 @@ class S0i3Validator:
         return True
 
     def check_amd_pmc(self):
+        """Check for the AMD PMC driver"""
         for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_pmc"):
             message = "PMC driver `amd_pmc` loaded"
             p = os.path.join(device.sys_path, "smu_program")
@@ -1703,6 +1832,7 @@ class S0i3Validator:
         return False
 
     def check_aspm(self):
+        """Check if ASPM has been overriden"""
         p = os.path.join("/", "sys", "module", "pcie_aspm", "parameters", "policy")
         contents = read_file(p)
         policy = ""
@@ -1718,6 +1848,7 @@ class S0i3Validator:
         return True
 
     def check_usb4(self):
+        """Check for the USB4 controller"""
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
             slot = device.properties["PCI_SLOT_NAME"]
             if device.properties.get("DRIVER") != "thunderbolt":
@@ -1730,13 +1861,16 @@ class S0i3Validator:
         return True
 
     def check_pinctrl_amd(self):
-        for device in self.pyudev.list_devices(subsystem="platform", DRIVER="amd_gpio"):
+        """Check for the pinctrl_amd driver"""
+        for _device in self.pyudev.list_devices(
+            subsystem="platform", DRIVER="amd_gpio"
+        ):
             print_color("GPIO driver `pinctrl_amd` available", "✅")
             p = os.path.join("/", "sys", "kernel", "debug", "gpio")
             try:
                 contents = read_file(p)
             except PermissionError:
-                logging.debug(f"Unable to capture {p}")
+                logging.debug("Unable to capture %s", p)
                 contents = None
             header = False
             if contents:
@@ -1755,7 +1889,7 @@ class S0i3Validator:
         return False
 
     def check_rtc_cmos(self):
-        # check /sys/module/rtc_cmos/parameters/use_acpi_alarm
+        """Check for the RTC CMOS driver configuration"""
         p = os.path.join(
             "/", "sys", "module", "rtc_cmos", "parameters", "use_acpi_alarm"
         )
@@ -1765,9 +1899,10 @@ class S0i3Validator:
             self.failures += [RtcAlarmWrong()]
 
     def check_amdgpu(self):
+        """Check for the AMDGPU driver"""
         for device in self.pyudev.list_devices(subsystem="pci"):
             klass = device.properties.get("PCI_CLASS")
-            if klass != "38000" and klass != "30000":
+            if klass not in ["30000", "38000"]:
                 continue
             pci_id = device.properties.get("PCI_ID")
             if not pci_id.startswith("1002"):
@@ -1798,6 +1933,7 @@ class S0i3Validator:
         return True
 
     def check_wcn6855_bug(self):
+        """Check for the WCN6855 bug"""
         if not self.kernel_log:
             message = "Unable to test for wcn6855 bug from kernel log"
             print_color(message, "🚦")
@@ -1830,6 +1966,7 @@ class S0i3Validator:
         return True
 
     def capture_amdgpu_ips_status(self):
+        """Capture the AMDGPU IPS status"""
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="38000"):
             pci_id = device.properties.get("PCI_ID")
             if not pci_id.startswith("1002"):
@@ -1845,7 +1982,7 @@ class S0i3Validator:
                 lines = read_file(p).split("\n")
                 for line in lines:
                     prefix = "│ " if line != lines[-1] else "└─"
-                    logging.debug(f"{prefix} {line}")
+                    logging.debug("%s %s", prefix, line)
             except PermissionError:
                 if self.lockdown:
                     print_color(
@@ -1856,16 +1993,20 @@ class S0i3Validator:
                     print_color("Failed to read IPS state data", colors.WARNING)
 
     def capture_lid(self):
+        """Capture lid status"""
         p = os.path.join("/", "proc", "acpi", "button", "lid")
-        for root, dirs, files in os.walk(p):
+        if not os.path.exists(p):
+            return
+        for root, _dirs, files in os.walk(p):
             for fname in files:
                 p = os.path.join(root, fname)
                 state = read_file(p).split(":")[1].strip()
-                logging.debug(f"ACPI Lid ({p}): {state}")
+                logging.debug("ACPI Lid (%s): %s", p, state)
 
     def capture_gpes(self):
+        """Capture general purpose event count"""
         base = os.path.join("/", "sys", "firmware", "acpi", "interrupts")
-        for root, dirs, files in os.walk(base, topdown=False):
+        for root, _dirs, files in os.walk(base, topdown=False):
             for fname in files:
                 if not fname.startswith("gpe") or fname == "gpe_all":
                     continue
@@ -1875,11 +2016,12 @@ class S0i3Validator:
                     val = int(r.read().split()[0])
                 if fname in self.gpes and self.gpes[fname] != val:
                     logging.debug(
-                        "%s increased from %d to %d" % (fname, self.gpes[fname], val)
+                        "%s increased from %d to %d", fname, self.gpes[fname], val
                     )
                 self.gpes[fname] = val
 
     def check_wakeup_irq(self):
+        """Capture the wakeup IRQ to the log"""
         p = os.path.join("/", "sys", "power", "pm_wakeup_irq")
         try:
             n = int(read_file(p))
@@ -1893,6 +2035,7 @@ class S0i3Validator:
         return True
 
     def check_hw_sleep(self):
+        """Check for hardware sleep state"""
         result = False
         if self.hw_sleep_duration:
             result = True
@@ -1904,7 +2047,9 @@ class S0i3Validator:
                     if self.hw_sleep_duration > 0:
                         result = True
                 except FileNotFoundError as e:
-                    logging.debug(f"Failed to read hardware sleep data from {p}: {e}")
+                    logging.debug(
+                        "Failed to read hardware sleep data from %s: %s", p, e
+                    )
         if not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
@@ -1957,6 +2102,7 @@ class S0i3Validator:
         return result
 
     def check_permissions(self):
+        """Check for permissions"""
         p = os.path.join("/", "sys", "power", "state")
         try:
             with open(p, "w") as w:
@@ -1967,6 +2113,7 @@ class S0i3Validator:
         return True
 
     def check_i2c_hid(self):
+        """Check for I2C HID devices"""
         devices = []
         for dev in self.pyudev.list_devices(subsystem="input"):
             if "NAME" not in dev.properties:
@@ -1993,7 +2140,7 @@ class S0i3Validator:
                 acpi_hid = ""
             # set prefix if last device
             prefix = "│ " if dev != devices[-1] else "└─"
-            logging.debug(f"{prefix}{name} [{acpi_hid}] : {acpi_path}")
+            logging.debug("%s%s [%s] : %s", prefix, name, acpi_hid, acpi_path)
             if "IDEA5002" in name:
                 remediation = (
                     "echo {} | sudo tee /sys/bus/i2c/drivers/{}/unbind".format(
@@ -2010,6 +2157,7 @@ class S0i3Validator:
         return True
 
     def map_acpi_pci(self):
+        """Map ACPI devices to PCI devices"""
         devices = []
         for dev in self.pyudev.list_devices(subsystem="pci"):
             devices.append(dev)
@@ -2037,30 +2185,42 @@ class S0i3Validator:
             if os.path.exists(p):
                 acpi = read_file(p)
                 logging.debug(
-                    f"{prefix}{pci_slot_name} : {database_vendor} {database_class} [{pci_id}] : {acpi}"
+                    "%s%s : %s %s [%s] : %s",
+                    prefix,
+                    pci_slot_name,
+                    database_vendor,
+                    database_class,
+                    pci_id,
+                    acpi,
                 )
             else:
                 logging.debug(
-                    f"{prefix}{pci_slot_name} : {database_vendor} {database_class} [{pci_id}]"
+                    "%s%s : %s %s [%s]",
+                    prefix,
+                    pci_slot_name,
+                    database_vendor,
+                    database_class,
+                    pci_id,
                 )
         return True
 
     def capture_irq(self):
+        """Capture the IRQs to the log"""
         p = os.path.join("/sys", "kernel", "irq")
-        self.irqs = []
-        for d in os.listdir(p):
-            if os.path.isdir(os.path.join(p, d)):
-                w = WakeIRQ(d, self.pyudev)
-                self.irqs.append([int(d), str(w)])
+        for directory in os.listdir(p):
+            if os.path.isdir(os.path.join(p, directory)):
+                wake = WakeIRQ(directory, self.pyudev)
+                self.irqs.append([int(directory), str(wake)])
         self.irqs.sort()
         logging.debug("Interrupts")
         for irq in self.irqs:
             # set prefix if last IRQ
             prefix = "│ " if irq != self.irqs[-1] else "└─"
-            logging.debug(f"{prefix}{irq[0]}: {irq[1]}")
+            logging.debug("%s%s: %s", prefix, irq[0], irq[1])
         return True
 
     def capture_acpi(self):
+        """Capture ACPI tables to debug"""
         if not self.iasl:
             print_color(headers.MissingIasl, colors.WARNING)
             return True
@@ -2068,7 +2228,7 @@ class S0i3Validator:
             logging.debug("Unable to capture ACPI tables without root")
             return True
         base = os.path.join("/", "sys", "firmware", "acpi", "tables")
-        for root, dirs, files in os.walk(base, topdown=False):
+        for root, _dirs, files in os.walk(base, topdown=False):
             for fname in files:
                 target = os.path.join(root, fname)
                 # capture all DSDT/SSDT when run with --acpidump
@@ -2081,8 +2241,8 @@ class S0i3Validator:
                         if s.find(b"_AEI") < 0:
                             continue
                 try:
-                    d = tempfile.mkdtemp()
-                    prefix = os.path.join(d, "acpi")
+                    tmpd = tempfile.mkdtemp()
+                    prefix = os.path.join(tmpd, "acpi")
                     subprocess.check_call(
                         ["iasl", "-p", prefix, "-d", target],
                         stdout=subprocess.DEVNULL,
@@ -2092,10 +2252,11 @@ class S0i3Validator:
                 except subprocess.CalledProcessError as e:
                     print_color(f"Failed to capture ACPI table: {e.output}", "👀")
                 finally:
-                    shutil.rmtree(d)
+                    shutil.rmtree(tmpd)
         return True
 
     def capture_linux_firmware(self):
+        """Capture the Linux firmware to debug"""
         if self.distro == "ubuntu" or self.distro == "debian" and APT:
             cache = apt.Cache()
             packages = ["linux-firmware"]
@@ -2119,13 +2280,14 @@ class S0i3Validator:
 
         for num in range(0, 2):
             p = os.path.join(
-                "/", "sys", "kernel", "debug", "dri", "%d" % num, "amdgpu_firmware_info"
+                "/", "sys", "kernel", "debug", "dri", f"{num}", "amdgpu_firmware_info"
             )
             if os.path.exists(p):
                 capture_file_to_debug(p)
         return True
 
     def capture_command_line(self):
+        """Capture the kernel command line to debug"""
         cmdline = read_file(os.path.join("/proc", "cmdline"))
         # borrowed from https://github.com/fwupd/fwupd/blob/1.9.5/libfwupdplugin/fu-common-linux.c#L95
         filtered = [
@@ -2200,10 +2362,11 @@ class S0i3Validator:
         cmdline = " ".join(
             [x for x in cmdline.split() if not x.startswith(tuple(filtered))]
         )
-        logging.debug(f"/proc/cmdline: {cmdline}")
+        logging.debug("/proc/cmdline: %s", cmdline)
         return True
 
     def capture_logind(self):
+        """Capture the logind configuration to debug"""
         base = os.path.join("/", "etc", "systemd", "logind.conf")
         if not os.path.exists(base):
             return True
@@ -2216,10 +2379,11 @@ class S0i3Validator:
             return True
         logging.debug("LOGIND: configuration changes:")
         for key in section.keys():
-            logging.debug(f"\t{key}: {section[key]}")
+            logging.debug("\t%s: %s", key, section[key])
         return True
 
     def capture_disabled_pins(self):
+        """Capture disabled pins from pinctrl-amd"""
         base = os.path.join("/", "sys", "module", "gpiolib_acpi", "parameters")
         for parameter in ["ignore_wake", "ignore_interrupt"]:
             f = os.path.join(base, parameter)
@@ -2228,12 +2392,13 @@ class S0i3Validator:
             with open(f, "r") as r:
                 d = r.read().rstrip()
                 if d == "(null)":
-                    logging.debug(f"{f} is not configured")
+                    logging.debug("%s is not configured", f)
                 else:
-                    logging.debug(f"{f} is configured to {d}")
+                    logging.debug("%s is configured to %s", f, d)
         return True
 
     def capture_full_dmesg(self):
+        """Capture the full dmesg output"""
         if not self.kernel_log:
             message = "Unable to analyze kernel log"
             print_color(message, colors.WARNING)
@@ -2241,6 +2406,7 @@ class S0i3Validator:
         self.kernel_log.capture_full_dmesg()
 
     def check_logger(self):
+        """Check if the kernel log is available"""
         if isinstance(self.kernel_log, SystemdLogger):
             print_color("Logs are provided via systemd", "✅")
         elif isinstance(self.kernel_log, DmesgLogger):
@@ -2261,6 +2427,7 @@ class S0i3Validator:
         return True
 
     def check_logind(self):
+        """Check if logind is available and can suspend"""
         if not self.logind:
             return True
         if not DBUS:
@@ -2279,15 +2446,17 @@ class S0i3Validator:
         return True
 
     def check_power_profile(self):
+        """Check the power profiles"""
         cmd = ["/usr/bin/powerprofilesctl"]
         if os.path.exists(cmd[0]):
             logging.debug("Power profiles:")
             output = subprocess.check_output(cmd).decode("utf-8")
             for line in output.split("\n"):
-                logging.debug(f" {line}")
+                logging.debug(" %s", line)
         return True
 
     def check_taint(self):
+        """Check if the kernel is tainted"""
         fn = os.path.join("/", "proc", "sys", "kernel", "tainted")
         taint = int(read_file(fn))
         # ignore kernel warnings
@@ -2299,6 +2468,7 @@ class S0i3Validator:
         return True
 
     def prerequisites(self):
+        """Check the prerequisites for the system"""
         print_color(headers.Info, colors.HEADER)
         info = [
             self.capture_system_vendor,
@@ -2355,13 +2525,14 @@ class S0i3Validator:
         return result
 
     def check_lockdown(self):
+        """Check if the kernel is in lockdown mode"""
         fn = os.path.join("/", "sys", "kernel", "security", "lockdown")
         try:
             lockdown = read_file(fn)
         except FileNotFoundError:
             logging.debug("Lockdown not available")
             return True
-        logging.debug(f"Lockdown: {lockdown}")
+        logging.debug("Lockdown: %s", lockdown)
         if lockdown.split()[0] != "[none]":
             self.lockdown = True
         return True
@@ -2375,6 +2546,7 @@ class S0i3Validator:
         return self.kernel_minor >= minor
 
     def toggle_dynamic_debugging(self, enable):
+        """Enable or disable dynamic debugging"""
         try:
             fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
             setting = "+" if enable else "-"
@@ -2396,6 +2568,7 @@ class S0i3Validator:
             pass
 
     def _analyze_kernel_log_line(self, line):
+        """Analyze a line from the kernel log"""
         if "Timekeeping suspended for" in line:
             self.cycle_count += 1
             for f in line.split():
@@ -2441,7 +2614,7 @@ class S0i3Validator:
         """Check if the CPU offers the HPET workaround"""
         show_warning = False
         if self.cpu_family == 0x17:
-            if self.cpu_model == 0x68 or self.cpu_model == 0x60:
+            if self.cpu_model in [0x68, 0x60]:
                 show_warning = True
         elif self.cpu_family == 0x19:
             if self.cpu_model == 0x50:
@@ -2459,7 +2632,7 @@ class S0i3Validator:
     def cpu_needs_irq1_wa(self):
         """Check if the CPU needs the IRQ1 workaround"""
         if self.cpu_family == 0x17:
-            if self.cpu_model == 0x68 or self.cpu_model == 0x60:
+            if self.cpu_model in [0x68, 0x60]:
                 return True
         elif self.cpu_family == 0x19:
             if self.cpu_model == 0x50:
@@ -2467,6 +2640,7 @@ class S0i3Validator:
         return False
 
     def analyze_kernel_log(self):
+        """Analyze the kernel log for the last cycle"""
         self.suspend_count = 0
         self.cycle_count = 0
         self.upep = False
@@ -2501,18 +2675,16 @@ class S0i3Validator:
                         )
             if 1 in self.wakeup_irqs and self.cpu_needs_irq1_wa():
                 if self.irq1_workaround:
-                    print_color("Kernel workaround for IRQ1 issue utilized")
+                    print_color("Kernel workaround for IRQ1 issue utilized", "✅")
                 else:
                     print_color("IRQ1 found during wakeup", colors.WARNING)
                     self.failures += [Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
-            for i in range(0, len(self.idle_masks)):
-                for j in range(i, len(self.idle_masks)):
-                    if self.idle_masks[i] != self.idle_masks[j]:
-                        bit_changed = bit_changed | (
-                            int(self.idle_masks[i], 16) & ~int(self.idle_masks[j], 16)
-                        )
+            for i, mask_i in enumerate(self.idle_masks):
+                for _j, mask_j in enumerate(self.idle_masks[i:], start=i):
+                    if mask_i != mask_j:
+                        bit_changed = bit_changed | (int(mask_i, 16) & ~int(mask_j, 16))
             if bit_changed:
                 for bit in range(0, 31):
                     if bit_changed & BIT(bit):
@@ -2541,6 +2713,7 @@ class S0i3Validator:
             pass
 
     def analyze_duration(self):
+        """Analyze the duration of the last cycle"""
         now = datetime.now()
         self.userspace_duration = now - self.last_suspend
         min_suspend_duration = timedelta(seconds=self.requested_duration * 0.9)
@@ -2562,12 +2735,14 @@ class S0i3Validator:
             else:
                 percent = 0
             logging.debug(
-                f"Kernel suspended for total of {timedelta(seconds=self.kernel_duration)} ({percent:.2%})"
+                "Kernel suspended for total of %s (%.2f%%)",
+                timedelta(seconds=self.kernel_duration),
+                percent * 100,
             )
 
     def analyze_results(self):
+        """Analyze the results of the last cycle"""
         print_color(headers.LastCycleResults, colors.HEADER)
-        result = True
         checks = [
             self.analyze_kernel_log,
             self.check_wakeup_irq,
@@ -2583,6 +2758,7 @@ class S0i3Validator:
             check()
 
     def run_countdown(self, prefix, t):
+        """Run a countdown timer"""
         msg = ""
         while t > 0:
             msg = f"{prefix} in {timedelta(seconds=t)}"
@@ -2593,6 +2769,7 @@ class S0i3Validator:
 
     @pm_debugging
     def execute_suspend(self):
+        """Execute the suspend operation"""
         if self.logind:
             try:
                 bus = dbus.SystemBus()
@@ -2611,8 +2788,8 @@ class S0i3Validator:
         else:
             p = os.path.join("/", "sys", "power", "state")
             try:
-                with open(p, "w") as w:
-                    w.write("mem")
+                with open(p, "w") as fd:
+                    fd.write("mem")
             except OSError as e:
                 print_color("Failed to suspend", "❌")
                 logging.debug(e)
@@ -2620,6 +2797,7 @@ class S0i3Validator:
         return True
 
     def unlock_session(self):
+        """Unlock the session after suspend"""
         if self.logind:
             try:
                 bus = dbus.SystemBus()
@@ -2634,21 +2812,20 @@ class S0i3Validator:
         return True
 
     def test_suspend(self, duration, count, wait):
+        """Test suspend for a given duration"""
         if not count:
             return True
 
         if count > 1:
             length = timedelta(seconds=(duration + wait) * count)
             print_color(
-                "Running {count} cycles (Test finish expected @ {time})".format(
-                    count=count, time=datetime.now() + length
-                ),
+                f"Running {count} cycles (Test finish expected @ {datetime.now() + length})",
                 colors.HEADER,
             )
 
         self.requested_duration = duration
         logging.debug(
-            f"{headers.SuspendDuration} {timedelta(seconds=self.requested_duration)}",
+            "%s %s", headers.SuspendDuration, timedelta(seconds=self.requested_duration)
         )
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
@@ -2697,14 +2874,17 @@ class S0i3Validator:
         return True
 
     def get_failure_report(self):
+        """Print the failure report"""
         if len(self.failures) == 0:
             return True
         print_color(headers.ExplanationReport, colors.HEADER)
         for item in self.failures:
             item.get_failure()
+        return False
 
 
 def parse_args():
+    """Parse command line arguments"""
     parser = argparse.ArgumentParser(
         description="Test for common s2idle problems on systems with AMD processors.",
         epilog="Arguments are optional, and if they are not provided will prompted.\n"
