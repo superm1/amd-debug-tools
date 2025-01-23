@@ -919,15 +919,7 @@ class S0i3Validator:
         if not self.distro:
             fatal_error("Missing python-distro package, unable to identify distro")
 
-    def __init__(self, log, acpidump, logind, debug_ec, kernel_log):
-        # for saving a log file for analysis
-        logging.basicConfig(
-            format="%(asctime)s %(levelname)s:\t%(message)s",
-            filename=log,
-            filemode="w",
-            level=logging.DEBUG,
-        )
-
+    def __init__(self, acpidump, logind, debug_ec, kernel_log):
         # for installing and running suspend
         self.root_user = os.geteuid() == 0
         self.check_selinux()
@@ -2746,16 +2738,25 @@ def parse_args():
     return parser.parse_args()
 
 
-def configure_log(log):
-    if not log:
+def configure_log(logf):
+    """Configure the log file"""
+    if not logf:
         fname = f"{defaults.log_prefix}-{date.today()}.{defaults.log_suffix}"
-        log = input(f"{headers.LogDescription} (default {fname})? ")
-        if not log:
-            log = fname
-    return log
+        logf = input(f"{headers.LogDescription} (default {fname})? ")
+        if not logf:
+            logf = fname
+
+    # for saving a log file for analysis
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s:\t%(message)s",
+        filename=logf,
+        filemode="w",
+        level=logging.DEBUG,
+    )
 
 
 def configure_suspend(duration, wait, count):
+    """Configure the suspend test arguments"""
     if not duration:
         duration = input(
             f"{headers.DurationDescription} (default {defaults.duration})? "
@@ -2774,16 +2775,16 @@ def configure_suspend(duration, wait, count):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    log = configure_log(args.log)
+    arg = parse_args()
+    configure_log(arg.log)
 
-    app = S0i3Validator(
-        log, args.acpidump, args.logind, args.debug_ec, args.kernel_log_provider
-    )
-    test = app.prerequisites()
-    if test or args.force:
-        duration, wait, count = configure_suspend(
-            duration=args.duration, wait=args.wait, count=args.count
+    if arg.logind and not DBUS:
+        fatal_error("Unable to use logind without dbus, please install python3-dbus")
+
+    app = S0i3Validator(arg.acpidump, arg.logind, arg.debug_ec, arg.kernel_log_provider)
+    if app.prerequisites() or arg.force:
+        d, w, c = configure_suspend(
+            duration=arg.duration, wait=arg.wait, count=arg.count
         )
-        app.test_suspend(duration=duration, wait=wait, count=count)
+        app.test_suspend(duration=d, wait=w, count=c)
     app.get_failure_report()
