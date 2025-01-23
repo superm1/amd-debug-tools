@@ -838,6 +838,38 @@ class S0i3Validator:
         message = f"{message}. {action}."
         print_color(message, "👀")
 
+    def guess_distro(self):
+        """Guess the distro based on heuristics"""
+        self.distro = None
+        self.pretty_distro = None
+        try:
+            import distro
+
+            self.distro = distro.id()
+            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
+        except ModuleNotFoundError:
+            pass
+
+        if not self.distro:
+            p = os.path.join("/", "etc", "os-release")
+            if os.path.exists(p):
+                v = read_file(p)
+                for line in v.split("\n"):
+                    if "ID=" in line:
+                        self.distro = line.split("=")[-1].strip().strip('"')
+                    if "PRETTY_NAME=" in line:
+                        self.pretty_distro = line.split("=")[-1].strip().strip('"')
+        if not self.distro:
+            if os.path.exists("/etc/arch-release"):
+                self.distro = "arch"
+            elif os.path.exists("/etc/fedora-release"):
+                self.distro = "fedora"
+            elif os.path.exists("/etc/debian_version"):
+                self.distro = "debian"
+
+        if not self.distro:
+            fatal_error("Missing python-distro package, unable to identify distro")
+
     def __init__(self, log, acpidump, logind, debug_ec, kernel_log):
         # for saving a log file for analysis
         logging.basicConfig(
@@ -860,14 +892,8 @@ class S0i3Validator:
         # turn on EC debug messages
         self.debug_ec = debug_ec
 
-        # for matching against distro specific packages or bugs
-        try:
-            import distro
+        self.guess_distro()
 
-            self.distro = distro.id()
-            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
-        except ModuleNotFoundError:
-            fatal_error("Missing python-distro package, unable to identify distro")
         # for analyzing devices
         try:
             from pyudev import Context
