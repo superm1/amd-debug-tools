@@ -15,6 +15,55 @@ import time
 import struct
 from datetime import datetime, timedelta, date
 
+# test if dbus is available for logind use
+try:
+    import dbus
+
+    DBUS = True
+except ModuleNotFoundError:
+    DBUS = False
+except ImportError:
+    DBUS = False
+
+# test if pip can be used to install anything
+try:
+    import pip as _
+
+    PIP = True
+except ModuleNotFoundError:
+    PIP = False
+
+# test if fwupd can report device firmware versions
+try:
+    import gi
+    from gi.repository import GLib as _
+
+    gi.require_version("Fwupd", "2.0")
+    from gi.repository import Fwupd  # pylint: disable=wrong-import-position
+
+    FWUPD = True
+except ImportError:
+    FWUPD = False
+except ValueError:
+    FWUPD = False
+
+# used to capture linux firmware versions
+try:
+    import apt
+    import gzip
+
+    APT = True
+except ModuleNotFoundError:
+    APT = False
+
+# used for various version comparison
+try:
+    from packaging import version
+
+    VERSION = True
+except ModuleNotFoundError:
+    VERSION = False
+
 
 class colors:
     DEBUG = "\033[90m"
@@ -552,16 +601,19 @@ class KernelLogger:
 
 
 class DmesgLogger(KernelLogger):
-    def __init__(self):
-        import subprocess
+    """Class for dmesg logging"""
 
+    def __init__(self):
         self.since_support = False
+        self.buffer = None
+        self.seeked = False
+
         cmd = ["dmesg", "-h"]
         result = subprocess.run(cmd, check=True, capture_output=True)
         for line in result.stdout.decode("utf-8").split("\n"):
             if "--since" in line:
                 self.since_support = True
-        logging.debug("Since support: %d" % self.since_support)
+        logging.debug("Since support: %d", self.since_support)
 
         self.command = ["dmesg", "-t", "-k"]
         self._refresh_head()
@@ -690,11 +742,7 @@ class DistroPackage:
         elif distro == "arch" or os.path.exists("/etc/arch-release"):
             installer = ["pacman", "-Sy", self.arch]
         else:
-            try:
-                import pip
-            except ModuleNotFoundError:
-                self.pip = False
-            if not self.pip:
+            if not PIP or not self.pip:
                 return False
             installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
         subprocess.check_call(installer)
@@ -946,9 +994,7 @@ class S0i3Validator:
             self.kernel_log = DmesgLogger()
 
         # for comparing SMU version
-        try:
-            from packaging import version
-        except ImportError:
+        if not VERSION:
             self.show_install_message(headers.MissingPackaging)
             package = PackagingPackage(self.root_user)
             package.install(self.distro)
@@ -999,8 +1045,6 @@ class S0i3Validator:
             if not self.root_user:
                 logging.debug("Unable to capture ACPI tables without root")
                 return True
-
-            import struct
 
             logging.debug("Fetching low power idle bit directly from FADT")
             target = os.path.join("/", "sys", "firmware", "acpi", "tables", "FACP")
@@ -1411,22 +1455,10 @@ class S0i3Validator:
         return True
 
     def check_device_firmware(self):
-        try:
-            import gi
-            from gi.repository import GLib
-
-            gi.require_version("Fwupd", "2.0")
-            from gi.repository import Fwupd  # pylint: disable=wrong-import-position
-
-        except ImportError:
+        """Check for device firmware issues"""
+        if not FWUPD:
             print_color(
                 "Device firmware checks unavailable without gobject introspection",
-                "🚦",
-            )
-            return True
-        except ValueError:
-            print_color(
-                "Device firmware checks unavailable without fwupd gobject introspection",
                 "🚦",
             )
             return True
@@ -1527,8 +1559,7 @@ class S0i3Validator:
         return True
 
     def check_port_pm_override(self):
-        from packaging import version
-
+        """Check for PCIe port power management override"""
         if self.cpu_family != 0x19:
             return
         if self.cpu_model not in [0x74, 0x78]:
@@ -2065,9 +2096,7 @@ class S0i3Validator:
         return True
 
     def capture_linux_firmware(self):
-        if self.distro == "ubuntu" or self.distro == "debian":
-            import apt
-
+        if self.distro == "ubuntu" or self.distro == "debian" and APT:
             cache = apt.Cache()
             packages = ["linux-firmware"]
             for obj in cache.get_providing_packages("amdgpu-firmware-nda"):
@@ -2079,8 +2108,6 @@ class S0i3Validator:
                 changelog = ""
                 if "amdgpu" in p:
                     for f in pkg.installed_files:
-                        import gzip
-
                         if not "changelog" in f:
                             continue
                         changelog = gzip.GzipFile(f).read().decode("utf-8")
@@ -2236,9 +2263,7 @@ class S0i3Validator:
     def check_logind(self):
         if not self.logind:
             return True
-        try:
-            import dbus
-        except ImportError:
+        if not DBUS:
             print_color("Unable to import dbus", "❌")
             return False
         try:
@@ -2249,7 +2274,7 @@ class S0i3Validator:
                 print_color("Unable to suspend with logind", "❌")
                 return False
         except dbus.exceptions.DBusException as e:
-            print_color("Unable to communicate with logind", "❌")
+            print_color(f"Unable to communicate with logind: {e}", "❌")
             return False
         return True
 
@@ -2413,8 +2438,7 @@ class S0i3Validator:
         logging.debug(line)
 
     def cpu_offers_hpet_wa(self):
-        from packaging import version
-
+        """Check if the CPU offers the HPET workaround"""
         show_warning = False
         if self.cpu_family == 0x17:
             if self.cpu_model == 0x68 or self.cpu_model == 0x60:
@@ -2433,8 +2457,7 @@ class S0i3Validator:
         return True
 
     def cpu_needs_irq1_wa(self):
-        from packaging import version
-
+        """Check if the CPU needs the IRQ1 workaround"""
         if self.cpu_family == 0x17:
             if self.cpu_model == 0x68 or self.cpu_model == 0x60:
                 return True
@@ -2572,8 +2595,6 @@ class S0i3Validator:
     def execute_suspend(self):
         if self.logind:
             try:
-                import dbus
-
                 bus = dbus.SystemBus()
                 obj = bus.get_object(
                     "org.freedesktop.login1", "/org/freedesktop/login1"
@@ -2585,7 +2606,7 @@ class S0i3Validator:
                     time.sleep(1)
                 return True
             except dbus.exceptions.DBusException as e:
-                print_color("Unable to communicate with logind", "❌")
+                print_color(f"Unable to communicate with logind: {e}", "❌")
                 return False
         else:
             p = os.path.join("/", "sys", "power", "state")
@@ -2601,8 +2622,6 @@ class S0i3Validator:
     def unlock_session(self):
         if self.logind:
             try:
-                import dbus
-
                 bus = dbus.SystemBus()
                 obj = bus.get_object(
                     "org.freedesktop.login1", "/org/freedesktop/login1"
@@ -2610,7 +2629,7 @@ class S0i3Validator:
                 intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
                 intf.UnlockSessions()
             except dbus.exceptions.DBusException as e:
-                print_color("Unable to communicate with logind", "❌")
+                print_color(f"Unable to communicate with logind: {e}", "❌")
                 return False
         return True
 
