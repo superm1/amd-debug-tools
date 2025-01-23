@@ -919,6 +919,31 @@ class S0i3Validator:
         if not self.distro:
             fatal_error("Missing python-distro package, unable to identify distro")
 
+    def setup_kernel_log(self, kernel_log):
+        """Setup the kernel log provider"""
+        self.kernel_log = None
+        if kernel_log == "auto":
+            init_daemon = read_file("/proc/1/comm")
+            if "systemd" in init_daemon:
+                try:
+                    self.kernel_log = SystemdLogger()
+                except ImportError:
+                    self.kernel_log = None
+                if not self.kernel_log:
+                    self.show_install_message(headers.MissingJournald)
+                    package = JournaldPackage(self.root_user)
+                    package.install(self.distro)
+                    self.kernel_log = SystemdLogger()
+            else:
+                try:
+                    self.kernel_log = DmesgLogger()
+                except subprocess.CalledProcessError:
+                    self.kernel_log = None
+        elif kernel_log == "systemd":
+            self.kernel_log = SystemdLogger()
+        elif kernel_log == "dmesg":
+            self.kernel_log = DmesgLogger()
+
     def __init__(self, acpidump, logind, debug_ec, kernel_log):
         # for installing and running suspend
         self.root_user = os.geteuid() == 0
@@ -962,28 +987,7 @@ class S0i3Validator:
             package = IaslPackage(self.root_user)
             self.iasl = package.install(self.distro)
 
-        # for analyzing kernel logs
-        if kernel_log == "auto":
-            init_daemon = read_file("/proc/1/comm")
-            if "systemd" in init_daemon:
-                try:
-                    self.kernel_log = SystemdLogger()
-                except ImportError:
-                    self.kernel_log = None
-                if not self.kernel_log:
-                    self.show_install_message(headers.MissingJournald)
-                    package = JournaldPackage(self.root_user)
-                    package.install(self.distro)
-                    self.kernel_log = SystemdLogger()
-            else:
-                try:
-                    self.kernel_log = DmesgLogger()
-                except subprocess.CalledProcessError:
-                    self.kernel_log = None
-        elif kernel_log == "systemd":
-            self.kernel_log = SystemdLogger()
-        elif kernel_log == "dmesg":
-            self.kernel_log = DmesgLogger()
+        self.setup_kernel_log(kernel_log)
 
         # for comparing SMU version
         if not VERSION:
