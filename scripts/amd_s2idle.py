@@ -1025,6 +1025,11 @@ class S0i3Validator:
         # If we're locked down, a lot less errors make sense
         self.lockdown = False
 
+        # kernel versioning reporting and checking
+        self.kernel = platform.uname().release
+        self.kernel_major = int(self.kernel.split(".")[0])
+        self.kernel_minor = int(self.kernel.split(".")[1])
+
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
         """Check the kernel emitted a message specific to 6.0 or later indicating FADT had a bit set."""
@@ -1098,12 +1103,9 @@ class S0i3Validator:
 
     def capture_kernel_version(self):
         """Log the kernel version used"""
-        kernel = platform.uname().release
-        self.kernel_major = int(kernel.split(".")[0])
-        self.kernel_minor = int(kernel.split(".")[1])
         if self.pretty_distro:
             print_color(f"{self.pretty_distro}", "🐧")
-        print_color(f"Kernel {kernel}", "🐧")
+        print_color(f"Kernel {self.kernel}", "🐧")
 
     def check_thermal(self):
         devs = []
