@@ -1064,7 +1064,7 @@ class S0i3Validator:
         """Check if PC6 or CC6 has been disabled"""
 
         def read_msr(msr, cpu):
-            p = "/dev/cpu/%d/msr" % cpu
+            p = f"/dev/cpu/{cpu}/msr"
             if not os.path.exists(p) and self.root_user:
                 os.system("modprobe msr")
             f = os.open(p, os.O_RDONLY)
@@ -1081,11 +1081,13 @@ class S0i3Validator:
             0xC0010296: (BIT(22) | BIT(14) | BIT(6)),  # CC6
         }
         try:
-            for reg in expect:
+            for reg, expect_val in expect.items():
                 val = read_msr(reg, 0)
-                if not check_bits(val, expect[reg]):
+                if not check_bits(val, expect_val):
                     self.failures += [MSRFailure()]
                     return False
+                logging.debug("MSR %s: %s", hex(reg), hex(val))
+            print_color("PC6 and CC6 states are enabled", "✅")
         except FileNotFoundError:
             print_color("Unabled to check MSRs: MSR kernel module not loaded", "❌")
             return False
