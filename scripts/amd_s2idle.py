@@ -768,7 +768,7 @@ class SystemdLogger(KernelLogger):
         self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
 
     def seek(self, tim=None):
-        if time:
+        if tim:
             self.journal.seek_realtime(tim)
         else:
             self.journal.seek_head()
