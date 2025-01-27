@@ -341,6 +341,19 @@ class VendorWrong(S0i3Failure):
         )
 
 
+class UnsupportedModel(S0i3Failure):
+    """Unsupported CPU model"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "Unsupported CPU model"
+        self.explanation = (
+            "\tThis model does not support hardware s2idle.\n"
+            "\tAttempting to run s2idle will use a pure software suspend\n"
+            "\tand will not yield tangible power savings."
+        )
+
+
 class UserNvmeConfiguration(S0i3Failure):
     """User has disabled NVME ACPI support"""
 
@@ -1369,8 +1382,8 @@ class S0i3Validator:
         print_color("LPS0 _DSM mpt found", "👀")
         return False
 
-    def check_cpu_vendor(self):
-        """Check if the CPU vendor is AMD"""
+    def check_cpu(self):
+        """Check if the CPU is supported"""
         p = os.path.join("/", "proc", "cpuinfo")
         valid = False
         cpu = read_file(p)
@@ -1388,19 +1401,40 @@ class S0i3Validator:
                 self.cpu_model = int(line.split()[-1])
                 continue
             if self.cpu_family and self.cpu_model and self.cpu_model_string:
-                print_color(
-                    "%s (family %x model %x)"
-                    % (self.cpu_model_string, self.cpu_family, self.cpu_model),
-                    "✅",
-                )
                 break
+
+        # check for supported vendor
         if not valid:
             self.failures += [VendorWrong()]
             print_color(
                 "This tool is not designed for parts from this CPU vendor",
                 "❌",
             )
-        return valid
+            return False
+
+        # check for supported models
+        if self.cpu_family == 0x17:
+            if self.cpu_model in range(0x30, 0x3F):
+                valid = False
+        if self.cpu_family == 0x19:
+            if self.cpu_model in [0x08, 0x18]:
+                valid = False
+
+        if not valid:
+            self.failures += [UnsupportedModel()]
+            print_color(
+                "This CPU model does not support hardware sleep over s2idle",
+                "❌",
+            )
+            return False
+
+        if valid:
+            print_color(
+                f"{self.cpu_model_string} (family {self.cpu_family:x} model {self.cpu_model:x})",
+                "✅",
+            )
+
+        return True
 
     def check_smt(self):
         """Check if SMT is enabled"""
@@ -2482,7 +2516,7 @@ class S0i3Validator:
         print_color(headers.Prerequisites, colors.HEADER)
         checks = [
             self.check_logger,
-            self.check_cpu_vendor,
+            self.check_cpu,
             self.check_aspm,
             self.check_smt,
             self.check_lps0,
