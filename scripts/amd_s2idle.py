@@ -2483,10 +2483,15 @@ class S0i3Validator:
         """Check the power profiles"""
         cmd = ["/usr/bin/powerprofilesctl"]
         if os.path.exists(cmd[0]):
-            logging.debug("Power profiles:")
-            output = subprocess.check_output(cmd).decode("utf-8")
-            for line in output.split("\n"):
-                logging.debug(" %s", line)
+            try:
+                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(
+                    "utf-8"
+                )
+                logging.debug("Power profiles:")
+                for line in output.split("\n"):
+                    logging.debug(" %s", line)
+            except subprocess.CalledProcessError as e:
+                logging.debug(f"Failed to run powerprofilesctl: {e.output}")
         return True
 
     def check_taint(self):
