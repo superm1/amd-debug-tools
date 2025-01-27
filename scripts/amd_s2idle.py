@@ -2787,7 +2787,6 @@ class S0i3Validator:
             self.check_wakeup_irq,
             self.capture_gpes,
             self.capture_lid,
-            self.analyze_duration,
             self.check_hw_sleep,
             self.check_battery,
             self.check_thermal,
@@ -2907,6 +2906,7 @@ class S0i3Validator:
                 print_color("No RTC device found, please manually wake system", "🚦")
             if self.execute_suspend():
                 self.unlock_session()
+                self.analyze_duration()
                 self.run_countdown("Collecting data", wait / 2)
                 self.analyze_results()
         self.toggle_dynamic_debugging(False)
