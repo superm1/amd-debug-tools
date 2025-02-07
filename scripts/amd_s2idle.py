@@ -3,6 +3,7 @@
 """S0i3/s2idle analysis script for AMD systems"""
 import argparse
 import configparser
+import glob
 import logging
 import os
 import platform
@@ -2416,6 +2417,30 @@ class S0i3Validator:
             logging.debug("\t%s: %s", key, section[key])
         return True
 
+    def capture_running_compositors(self):
+        """Capture information about known compositor processes found"""
+
+        known_compositors = [
+            "kwin_wayland",
+            "gnome-shell",
+            "cosmic-session",
+            "hyprland",
+        ]
+
+        # Get a list of all process directories in /proc
+        process_dirs = glob.glob("/proc/[0-9]*")
+
+        # Extract and print the process names
+        for proc_dir in process_dirs:
+            p = os.path.join(proc_dir, "exe")
+            if not os.path.exists(p):
+                continue
+            exe = os.path.basename(os.readlink(p)).split()[0]
+            if exe in known_compositors:
+                logging.debug("%s compositor is running", exe)
+
+        return True
+
     def capture_disabled_pins(self):
         """Capture disabled pins from pinctrl-amd"""
         base = os.path.join("/", "sys", "module", "gpiolib_acpi", "parameters")
@@ -2529,6 +2554,7 @@ class S0i3Validator:
             self.capture_disabled_pins,
             self.capture_command_line,
             self.capture_logind,
+            self.capture_running_compositors,
             self.check_amd_hsmp,
             self.check_amd_pmc,
             self.check_usb4,
