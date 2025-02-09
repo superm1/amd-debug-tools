@@ -1960,9 +1960,8 @@ class S0i3Validator:
         """verify that rtc-cmos will be able to quirk properly"""
         p = os.path.join("/", "sys", "class", "dmi", "id")
         if not os.path.exists(p):
-            print_color("DMI data was not setup", "❌")
+            print_color("DMI data was not setup", "🚦")
             self.failures += [DmiNotSetup()]
-            return False
         return True
 
     def check_rtc_cmos(self):
