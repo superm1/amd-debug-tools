@@ -2640,7 +2640,6 @@ class S0i3Validator:
             self.check_lockdown,
             self.check_msr,
             self.check_iommu,
-            self.check_permissions,
             self.capture_linux_firmware,
             self.map_acpi_pci,
             self.capture_irq,
@@ -2652,6 +2651,7 @@ class S0i3Validator:
             self.check_dmi_data,
             self.check_rtc_cmos,
             self.check_taint,
+            self.check_permissions,
         ]
         result = True
         for check in checks:
