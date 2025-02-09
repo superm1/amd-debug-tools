@@ -310,6 +310,19 @@ class MissingThunderbolt(S0i3Failure):
         )
 
 
+class MissingXhciHcd(S0i3Failure):
+    """xhci_hcd driver is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "xhci_hcd driver is missing"
+        self.explanation = (
+            "\tThe xhci_hcd driver is required for the USB3 controllers included\n"
+            "\twith the SOC to enter the proper power states.\n"
+            "\tBe sure that you have enabled CONFIG_XHCI_PCI in your kernel.\n"
+        )
+
+
 class AcpiBiosError(S0i3Failure):
     """ACPI BIOS errors detected"""
 
@@ -1911,6 +1924,19 @@ class S0i3Validator:
         print_color("ASPM policy set to 'default'", "✅")
         return True
 
+    def check_usb3(self):
+        """Check for the USB4 controller"""
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0330"):
+            slot = device.properties["PCI_SLOT_NAME"]
+            if device.properties.get("DRIVER") != "xhci_hcd":
+                print_color(
+                    f"USB3 controller for {slot} not using `xhci_hcd` driver", "❌"
+                )
+                self.failures += [MissingXhciHcd()]
+                return False
+            print_color(f"USB3 driver `xhci_hcd` bound to {slot}", "✅")
+        return True
+
     def check_usb4(self):
         """Check for the USB4 controller"""
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
@@ -2601,6 +2627,7 @@ class S0i3Validator:
             self.capture_running_compositors,
             self.check_amd_hsmp,
             self.check_amd_pmc,
+            self.check_usb3,
             self.check_usb4,
             self.cpu_offers_hpet_wa,
             self.check_amdgpu,
