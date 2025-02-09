@@ -687,6 +687,20 @@ class UnservicedGpio(S0i3Failure):
         )
 
 
+class DmiNotSetup(S0i3Failure):
+    """DMI isn't setup"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "DMI data was not scanned"
+        self.explanation = (
+            "\t If DMI data hasn't been scanned then quirks that are dependent\n"
+            "\t upon DMI won't be loaded.\n"
+            "\t Most notably, this will prevent the rtc-cmos driver from setting.\n"
+            "\t up properly by default. It may also prevent other drivers from working.\n"
+        )
+
+
 class KernelLogger:
     """Base class for kernel loggers"""
 
@@ -1942,6 +1956,15 @@ class S0i3Validator:
         print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
 
+    def check_dmi_data(self):
+        """verify that rtc-cmos will be able to quirk properly"""
+        p = os.path.join("/", "sys", "class", "dmi", "id")
+        if not os.path.exists(p):
+            print_color("DMI data was not setup", "❌")
+            self.failures += [DmiNotSetup()]
+            return False
+        return True
+
     def check_rtc_cmos(self):
         """Check for the RTC CMOS driver configuration"""
         p = os.path.join(
@@ -1951,6 +1974,9 @@ class S0i3Validator:
         if val == "N":
             print_color("RTC driver `rtc_cmos` configured to use ACPI alarm", "🚦")
             self.failures += [RtcAlarmWrong()]
+            return False
+        print_color("RTC driver `rtc_cmos` configured to use CMOS alarm", "✅")
+        return True
 
     def check_amdgpu(self):
         """Check for the AMDGPU driver"""
@@ -2597,6 +2623,8 @@ class S0i3Validator:
             self.capture_acpi,
             self.check_logind,
             self.check_power_profile,
+            self.check_dmi_data,
+            self.check_rtc_cmos,
             self.check_taint,
         ]
         result = True
@@ -2835,7 +2863,6 @@ class S0i3Validator:
             self.check_hw_sleep,
             self.check_battery,
             self.check_thermal,
-            self.check_rtc_cmos,
         ]
         for check in checks:
             check()
