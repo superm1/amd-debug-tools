@@ -672,6 +672,21 @@ class ASpmWrong(S0i3Failure):
         )
 
 
+class UnservicedGpio(S0i3Failure):
+    """GPIO is not serviced"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "GPIO interrupt is not serviced"
+        self.explanation = (
+            "\t All GPIO controllers interrupts must be serviced to enter\n"
+            "\t hardware sleep.\n"
+            "\t Make sure that all drivers necessary to service GPIOs are loaded.\n"
+            "\t The most common cause is that i2c-hid-acpi is not loaded but the.\n"
+            "\t machine contains an I2C touchpad.\n"
+        )
+
+
 class KernelLogger:
     """Base class for kernel loggers"""
 
@@ -1919,6 +1934,10 @@ class S0i3Validator:
                         header = True
                     if re.search("edge", line) or re.search("level", line):
                         logging.debug(line)
+                    if "🔥" in line:
+                        self.failures += [UnservicedGpio()]
+                        return False
+
             return True
         print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
