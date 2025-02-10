@@ -727,6 +727,20 @@ class DmiNotSetup(S0i3Failure):
         )
 
 
+class LimitedCores(S0i3Failure):
+    """Number of CPU cores limited"""
+
+    def __init__(self, actual_cores, max_cores):
+        super().__init__()
+        self.description = f"CPU cores have been limited"
+        self.explanation = (
+            f"\tThe CPU cores have been limited to {max_cores}, but the system\n"
+            f"\tactually has {actual_cores}. Limiting the cores will prevent the\n"
+            "\tthe system from going into a hardware sleep state.\n"
+            "\tThis is typically solved by increasing the kernel config CONFIG_NR_CPUS.\n"
+        )
+
+
 class KernelLogger:
     """Base class for kernel loggers"""
 
@@ -1440,6 +1454,16 @@ class S0i3Validator:
 
     def check_cpu(self):
         """Check if the CPU is supported"""
+
+        def read_cpuid(leaf, subleaf):
+            """Read CPUID using kernel userspace interface"""
+            with open("/dev/cpu/0/cpuid", "rb") as f:
+                position = (subleaf << 32) | leaf
+                f.seek(position)
+                data = f.read(16)
+                eax, ebx, ecx, edx = struct.unpack("4I", data)
+                return eax, ebx, ecx, edx
+
         p = os.path.join("/", "proc", "cpuinfo")
         valid = False
         cpu = read_file(p)
@@ -1483,6 +1507,23 @@ class S0i3Validator:
                 "❌",
             )
             return False
+
+        # check for artificially limited CPUs
+        if self.root_user:
+            p = os.path.join("/", "sys", "devices", "system", "cpu", "kernel_max")
+            max_cpus = int(read_file(p)) + 1  # 0 indexed
+            # https://www.amd.com/content/dam/amd/en/documents/processor-tech-docs/programmer-references/24594.pdf
+            # Extended Topology Enumeration (NumLogCores)
+            # CPUID 0x80000026 subleaf 1
+            _, cpu_count, _, _ = read_cpuid(0x80000026, 1)
+            if cpu_count > max_cpus:
+                print_color(
+                    f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
+                    "❌",
+                )
+                self.failures += [LimitedCores(cpu_count, max_cpus)]
+                return False
+            logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
 
         if valid:
             print_color(
