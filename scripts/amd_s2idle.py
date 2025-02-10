@@ -331,7 +331,8 @@ class MissingDriver(S0i3Failure):
         self.description = f"{slot} driver is missing"
         self.explanation = (
             f"\tNo driver has been bound to PCI device {slot}\n"
-            "\tWithout a driver, the hardware can't enter a low power state.\n"
+            "\tWithout a driver, the hardware may be able to enter a low power.\n"
+            "\tstate, but there may be spurious wake up events.\n"
         )
 
 
@@ -1942,9 +1943,8 @@ class S0i3Validator:
             slot = device.properties["PCI_SLOT_NAME"]
             driver = device.properties.get("DRIVER")
             if not driver:
-                print_color(f"WLAN device in {slot} missing driver", "❌")
+                print_color(f"WLAN device in {slot} missing driver", "🚦")
                 self.failures += [MissingDriver(slot)]
-                return False
             print_color(f"WLAN driver `{driver}` bound to {slot}", "✅")
         return True
 
