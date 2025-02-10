@@ -323,6 +323,18 @@ class MissingXhciHcd(S0i3Failure):
         )
 
 
+class MissingDriver(S0i3Failure):
+    """driver is missing"""
+
+    def __init__(self, slot):
+        super().__init__()
+        self.description = f"{slot} driver is missing"
+        self.explanation = (
+            f"\tNo driver has been bound to PCI device {slot}\n"
+            "\tWithout a driver, the hardware can't enter a low power state.\n"
+        )
+
+
 class AcpiBiosError(S0i3Failure):
     """ACPI BIOS errors detected"""
 
@@ -1924,6 +1936,18 @@ class S0i3Validator:
         print_color("ASPM policy set to 'default'", "✅")
         return True
 
+    def check_wlan(self):
+        """Checks for WLAN device"""
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="28000"):
+            slot = device.properties["PCI_SLOT_NAME"]
+            driver = device.properties.get("DRIVER")
+            if not driver:
+                print_color(f"WLAN device in {slot} missing driver", "❌")
+                self.failures += [MissingDriver(slot)]
+                return False
+            print_color(f"WLAN driver `{driver}` bound to {slot}", "✅")
+        return True
+
     def check_usb3(self):
         """Check for the USB4 controller"""
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0330"):
@@ -2629,6 +2653,7 @@ class S0i3Validator:
             self.check_amd_pmc,
             self.check_usb3,
             self.check_usb4,
+            self.check_wlan,
             self.cpu_offers_hpet_wa,
             self.check_amdgpu,
             self.check_sleep_mode,
