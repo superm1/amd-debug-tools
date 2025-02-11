@@ -1275,7 +1275,7 @@ class S0i3Validator:
         """Check if PC6 or CC6 has been disabled"""
 
         def read_msr(msr, cpu):
-            p = f"/dev/cpu/{cpu}/msr"
+            p = os.path.join("/", "dev", "cpu", f"{cpu}", "msr")
             if not os.path.exists(p) and self.root_user:
                 os.system("modprobe msr")
             f = os.open(p, os.O_RDONLY)
@@ -1463,15 +1463,14 @@ class S0i3Validator:
 
         def read_cpuid(cpu, leaf, subleaf):
             """Read CPUID using kernel userspace interface"""
-            p = os.path.join("/", "dev", "cpu", "%d" % cpu, "cpuid")
-            if not os.path.exists(p):
+            p = os.path.join("/", "dev", "cpu", f"{cpu}", "cpuid")
+            if not os.path.exists(p) and self.root_user:
                 os.system("modprobe cpuid")
             with open(p, "rb") as f:
                 position = (subleaf << 32) | leaf
                 f.seek(position)
                 data = f.read(16)
-                eax, ebx, ecx, edx = struct.unpack("4I", data)
-                return eax, ebx, ecx, edx
+                return struct.unpack("4I", data)
 
         p = os.path.join("/", "proc", "cpuinfo")
         valid = False
@@ -1518,27 +1517,28 @@ class S0i3Validator:
             return False
 
         # check for artificially limited CPUs
-        if self.root_user:
-            p = os.path.join("/", "sys", "devices", "system", "cpu", "kernel_max")
-            max_cpus = int(read_file(p)) + 1  # 0 indexed
-            # https://www.amd.com/content/dam/amd/en/documents/processor-tech-docs/programmer-references/24594.pdf
-            # Extended Topology Enumeration (NumLogCores)
-            # CPUID 0x80000026 subleaf 1
-            try:
-                _, cpu_count, _, _ = read_cpuid(0, 0x80000026, 1)
-                if cpu_count > max_cpus:
-                    print_color(
-                        f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
-                        "❌",
-                    )
-                    self.failures += [LimitedCores(cpu_count, max_cpus)]
-                    return False
-                logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
-            except FileNotFoundError:
+        p = os.path.join("/", "sys", "devices", "system", "cpu", "kernel_max")
+        max_cpus = int(read_file(p)) + 1  # 0 indexed
+        # https://www.amd.com/content/dam/amd/en/documents/processor-tech-docs/programmer-references/24594.pdf
+        # Extended Topology Enumeration (NumLogCores)
+        # CPUID 0x80000026 subleaf 1
+        try:
+            _, cpu_count, _, _ = read_cpuid(0, 0x80000026, 1)
+            if cpu_count > max_cpus:
                 print_color(
-                    "Unable to accurately count CPUs from topology, verify CONFIG_X86_CPUID is enabled",
-                    Colors.WARNING,
+                    f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
+                    "❌",
                 )
+                self.failures += [LimitedCores(cpu_count, max_cpus)]
+                return False
+            logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
+        except FileNotFoundError:
+            print_color(
+                "Unabled to check CPU topology: cpuid kernel module not loaded", "❌"
+            )
+            return False
+        except PermissionError:
+            print_color("CPUID checks unavailable", "🚦")
 
         if valid:
             print_color(
