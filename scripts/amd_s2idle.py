@@ -1533,7 +1533,8 @@ class S0i3Validator:
                 logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
             except FileNotFoundError:
                 print_color(
-                    "Unable to accurately count CPUs from topology", Colors.WARNING
+                    "Unable to accurately count CPUs from topology, verify CONFIG_X86_CPUID is enabled",
+                    Colors.WARNING,
                 )
 
         if valid:
