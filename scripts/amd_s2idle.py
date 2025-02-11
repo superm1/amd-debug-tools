@@ -1506,7 +1506,7 @@ class S0i3Validator:
             if self.cpu_model in [0x08, 0x18]:
                 valid = False
 
-        if not valid:
+        if valid:
             self.failures += [UnsupportedModel()]
             print_color(
                 "This CPU model does not support hardware sleep over s2idle",
@@ -1521,15 +1521,20 @@ class S0i3Validator:
             # https://www.amd.com/content/dam/amd/en/documents/processor-tech-docs/programmer-references/24594.pdf
             # Extended Topology Enumeration (NumLogCores)
             # CPUID 0x80000026 subleaf 1
-            _, cpu_count, _, _ = read_cpuid(0x80000026, 1)
-            if cpu_count > max_cpus:
+            try:
+                _, cpu_count, _, _ = read_cpuid(0x80000026, 1)
+                if cpu_count > max_cpus:
+                    print_color(
+                        f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
+                        "❌",
+                    )
+                    self.failures += [LimitedCores(cpu_count, max_cpus)]
+                    return False
+                logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
+            except FileNotFoundError:
                 print_color(
-                    f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
-                    "❌",
+                    "Unable to accurately count CPUs from topology", Colors.WARNING
                 )
-                self.failures += [LimitedCores(cpu_count, max_cpus)]
-                return False
-            logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
 
         if valid:
             print_color(
