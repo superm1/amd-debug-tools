@@ -1506,7 +1506,7 @@ class S0i3Validator:
             if self.cpu_model in [0x08, 0x18]:
                 valid = False
 
-        if valid:
+        if not valid:
             self.failures += [UnsupportedModel()]
             print_color(
                 "This CPU model does not support hardware sleep over s2idle",
