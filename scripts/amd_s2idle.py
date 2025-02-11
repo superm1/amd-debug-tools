@@ -1549,29 +1549,45 @@ class S0i3Validator:
         print_color("SMT enabled", "✅")
         return True
 
-    def capture_system_vendor(self):
-        """Capture the system vendor information"""
+    def capture_smbios(self):
+        """Capture the SMBIOS (DMI) information"""
         p = os.path.join("/", "sys", "class", "dmi", "id")
         if not os.path.exists(p):
             print_color("DMI data was not setup", "🚦")
             self.failures += [DmiNotSetup()]
-        try:
-            ec = read_file(os.path.join(p, "ec_firmware_release"))
-        except FileNotFoundError:
-            ec = "unknown"
-        try:
-            vendor = read_file(os.path.join(p, "sys_vendor"))
-            product = read_file(os.path.join(p, "product_name"))
-            family = read_file(os.path.join(p, "product_family"))
-            release = read_file(os.path.join(p, "bios_release"))
-            ver = read_file(os.path.join(p, "bios_version"))
-            dt = read_file(os.path.join(p, "bios_date"))
+        else:
+            keys = {}
+            filtered = [
+                "product_serial",
+                "board_serial",
+                "board_asset_tag",
+                "chassis_asset_tag",
+                "chassis_serial",
+                "modalias",
+                "uevent",
+                "product_uuid",
+            ]
+            for root, _dirs, files in os.walk(p, topdown=False):
+                files.sort()
+                for fname in files:
+                    if "power" in root:
+                        continue
+                    if fname in filtered:
+                        continue
+                    contents = read_file(os.path.join(root, fname))
+                    keys[fname] = contents
             print_color(
-                f"{vendor} {product} ({family}) running BIOS {release} ({ver}) released {dt} and EC {ec}",
+                f"{keys['sys_vendor']} {keys['product_name']} ({keys['product_family']})",
                 "💻",
             )
-        except FileNotFoundError:
-            pass
+            for key, value in keys.items():
+                if (
+                    "product_name" in key
+                    or "sys_vendor" in key
+                    or "product_family" in key
+                ):
+                    continue
+                logging.debug("%s: %s", key, value)
 
     def check_sleep_mode(self):
         """Check if the system is configured for s2idle"""
@@ -2665,7 +2681,7 @@ class S0i3Validator:
         """Check the prerequisites for the system"""
         print_color(headers.Info, colors.HEADER)
         info = [
-            self.capture_system_vendor,
+            self.capture_smbios,
             self.capture_kernel_version,
             self.check_battery,
             self.check_thermal,
