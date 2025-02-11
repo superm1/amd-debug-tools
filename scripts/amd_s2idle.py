@@ -74,7 +74,7 @@ except ModuleNotFoundError:
     DISTRO = False
 
 
-class colors:
+class Colors:
     """Colors for terminal output"""
 
     DEBUG = "\033[90m"
@@ -86,7 +86,7 @@ class colors:
     UNDERLINE = "\033[4m"
 
 
-class defaults:
+class Defaults:
     """Default values for the script"""
 
     duration = 10
@@ -96,7 +96,9 @@ class defaults:
     log_suffix = "txt"
 
 
-class headers:
+class Headers:
+    """Headers for the script"""
+
     Info = "Debugging script for s2idle on AMD systems"
     Prerequisites = "Checking prerequisites for s2idle"
     BrokenPrerequisites = "Your system does not meet s2idle prerequisites!"
@@ -157,25 +159,25 @@ def get_property_pyudev(properties, key, fallback=""):
 def print_color(message, group):
     """Prints a message with a color"""
     prefix = f"{group} "
-    suffix = colors.ENDC
+    suffix = Colors.ENDC
     if group == "🚦":
-        color = colors.WARNING
+        color = Colors.WARNING
     elif group == "🦟":
-        color = colors.DEBUG
+        color = Colors.DEBUG
     elif any(mk in group for mk in ["❌", "👀", "🌡️"]):
-        color = colors.FAIL
+        color = Colors.FAIL
     elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱"]):
-        color = colors.OK
+        color = Colors.OK
     else:
         color = group
         prefix = ""
 
     log_txt = f"{prefix}{message}".strip()
-    if any(c in color for c in [colors.OK, colors.HEADER, colors.UNDERLINE]):
+    if any(c in color for c in [Colors.OK, Colors.HEADER, Colors.UNDERLINE]):
         logging.info(log_txt)
-    elif color == colors.WARNING:
+    elif color == Colors.WARNING:
         logging.warning(log_txt)
-    elif color == colors.FAIL:
+    elif color == Colors.FAIL:
         logging.error(log_txt)
     else:
         logging.debug(log_txt)
@@ -841,6 +843,8 @@ class DmesgLogger(KernelLogger):
 
 
 class SystemdLogger(KernelLogger):
+    """Class for logging using systemd journal"""
+
     def __init__(self):
         from systemd import journal
 
@@ -851,6 +855,7 @@ class SystemdLogger(KernelLogger):
         self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
 
     def seek(self, tim=None):
+        """Seek to the beginning of the log"""
         if tim:
             self.journal.seek_realtime(tim)
         else:
@@ -1063,7 +1068,8 @@ class WakeIRQ:
 
 class S0i3Validator:
     """
-    S0i3Validator class performs various checks and validations for S0i3/s2idle analysis on AMD systems.
+    S0i3Validator class performs various checks and validations for
+    S0i3/s2idle analysis on AMD systems.
     """
 
     def check_selinux(self):
@@ -1076,7 +1082,7 @@ class S0i3Validator:
 
     def show_install_message(self, message):
         """Show a message to install a package"""
-        action = headers.InstallAction if self.root_user else headers.RerunAction
+        action = Headers.InstallAction if self.root_user else Headers.RerunAction
         message = f"{message}. {action}."
         print_color(message, "👀")
 
@@ -1119,7 +1125,7 @@ class S0i3Validator:
                 except ImportError:
                     self.kernel_log = None
                 if not self.kernel_log:
-                    self.show_install_message(headers.MissingJournald)
+                    self.show_install_message(Headers.MissingJournald)
                     package = JournaldPackage(self.root_user)
                     package.install(self.distro)
                     self.kernel_log = SystemdLogger()
@@ -1158,7 +1164,7 @@ class S0i3Validator:
             self.pyudev = False
 
         if not self.pyudev:
-            self.show_install_message(headers.MissingPyudev)
+            self.show_install_message(Headers.MissingPyudev)
             package = PyUdevPackage(self.root_user)
             package.install(self.distro)
             try:
@@ -1171,7 +1177,7 @@ class S0i3Validator:
         try:
             self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
         except FileNotFoundError:
-            self.show_install_message(headers.MissingIasl)
+            self.show_install_message(Headers.MissingIasl)
             package = IaslPackage(self.root_user)
             self.iasl = package.install(self.distro)
 
@@ -1179,7 +1185,7 @@ class S0i3Validator:
 
         # for comparing SMU version
         if not VERSION:
-            self.show_install_message(headers.MissingPackaging)
+            self.show_install_message(Headers.MissingPackaging)
             package = PackagingPackage(self.root_user)
             package.install(self.distro)
             from packaging import version
@@ -1254,7 +1260,7 @@ class S0i3Validator:
                     r.seek(0x70)
                     found = struct.unpack("<I", r.read(4))[0] & BIT(21)
             except PermissionError:
-                print_color("FADT check unavailable", colors.WARNING)
+                print_color("FADT check unavailable", Colors.WARNING)
                 return True
         if found:
             message = "ACPI FADT supports Low-power S0 idle"
@@ -1634,7 +1640,7 @@ class S0i3Validator:
             model = get_property_pyudev(dev.properties, "ID_MODEL_FROM_DATABASE", "")
             message = f"{vendor} {model}"
             self.kernel_log.seek()
-            pattern = f"{pci_slot_name}.*{headers.NvmeSimpleSuspend}"
+            pattern = f"{pci_slot_name}.*{Headers.NvmeSimpleSuspend}"
             if self.kernel_log.match_pattern(pattern):
                 valid_nvme[pci_slot_name] = message
             if pci_slot_name not in valid_nvme:
@@ -1695,7 +1701,7 @@ class S0i3Validator:
             _ = subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
             return True
         except FileNotFoundError:
-            self.show_install_message(headers.MissingEthtool)
+            self.show_install_message(Headers.MissingEthtool)
             package = EthtoolPackage(self.root_user)
             return package.install(self.distro)
 
@@ -1729,7 +1735,7 @@ class S0i3Validator:
                     else:
                         print_color(
                             f"Platform may have low hardware sleep residency with Wake-on-lan disabled. Run `ethtool -s {interface} wol g` to enable it if necessary.",
-                            colors.WARNING,
+                            Colors.WARNING,
                         )
         return True
 
@@ -1766,7 +1772,7 @@ class S0i3Validator:
                 ) and version in device.get_version():
                     print_color(
                         f"Platform may have problems resuming.  Upgrade the firmware for '{device.get_name()}' if you have problems.",
-                        colors.WARNING,
+                        Colors.WARNING,
                     )
         return True
 
@@ -1857,7 +1863,7 @@ class S0i3Validator:
             return
         print_color(
             "Platform may hang resuming.  Upgrade your firmware or add pcie_port_pm=off to kernel command line if you have problems.",
-            colors.WARNING,
+            Colors.WARNING,
         )
 
     def check_wake_sources(self):
@@ -2168,10 +2174,10 @@ class S0i3Validator:
                 if self.lockdown:
                     print_color(
                         "Unable to gather IPS state data due to kernel lockdown.",
-                        colors.WARNING,
+                        Colors.WARNING,
                     )
                 else:
-                    print_color("Failed to read IPS state data", colors.WARNING)
+                    print_color("Failed to read IPS state data", Colors.WARNING)
 
     def capture_lid(self):
         """Capture lid status"""
@@ -2208,7 +2214,7 @@ class S0i3Validator:
             n = int(read_file(p))
             for irq in self.irqs:
                 if irq[0] == n:
-                    message = f"{headers.WokeFromIrq} {irq[0]}: {irq[1]}"
+                    message = f"{Headers.WokeFromIrq} {irq[0]}: {irq[1]}"
                     print_color(message, "🥱")
                     break
         except OSError:
@@ -2246,10 +2252,10 @@ class S0i3Validator:
                 if self.lockdown:
                     print_color(
                         "Unable to gather hardware sleep data.",
-                        colors.WARNING,
+                        Colors.WARNING,
                     )
                 else:
-                    print_color("Failed to read hardware sleep data", colors.WARNING)
+                    print_color("Failed to read hardware sleep data", Colors.WARNING)
                 return False
             except FileNotFoundError:
                 print_color("HW sleep statistics file missing", "❌")
@@ -2289,7 +2295,7 @@ class S0i3Validator:
             with open(p, "w") as w:
                 pass
         except PermissionError:
-            print_color(f"{headers.RootError}", "👀")
+            print_color(f"{Headers.RootError}", "👀")
             return False
         return True
 
@@ -2403,7 +2409,7 @@ class S0i3Validator:
     def capture_acpi(self):
         """Capture ACPI tables to debug"""
         if not self.iasl:
-            print_color(headers.MissingIasl, colors.WARNING)
+            print_color(Headers.MissingIasl, Colors.WARNING)
             return True
         if not self.root_user:
             logging.debug("Unable to capture ACPI tables without root")
@@ -2606,7 +2612,7 @@ class S0i3Validator:
         """Capture the full dmesg output"""
         if not self.kernel_log:
             message = "Unable to analyze kernel log"
-            print_color(message, colors.WARNING)
+            print_color(message, Colors.WARNING)
             return
         self.kernel_log.capture_full_dmesg()
 
@@ -2617,7 +2623,7 @@ class S0i3Validator:
         elif isinstance(self.kernel_log, DmesgLogger):
             print_color(
                 "🚦Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
-                colors.WARNING,
+                Colors.WARNING,
             )
             header = self.kernel_log.capture_header()
             if not header.startswith("Linux version"):
@@ -2662,7 +2668,7 @@ class S0i3Validator:
                 for line in output.split("\n"):
                     logging.debug(" %s", line)
             except subprocess.CalledProcessError as e:
-                logging.debug(f"Failed to run powerprofilesctl: {e.output}")
+                logging.debug("Failed to run powerprofilesctl: %s", e.output)
         return True
 
     def check_taint(self):
@@ -2679,7 +2685,7 @@ class S0i3Validator:
 
     def prerequisites(self):
         """Check the prerequisites for the system"""
-        print_color(headers.Info, colors.HEADER)
+        print_color(Headers.Info, Colors.HEADER)
         info = [
             self.capture_smbios,
             self.capture_kernel_version,
@@ -2689,7 +2695,7 @@ class S0i3Validator:
         for i in info:
             i()
 
-        print_color(headers.Prerequisites, colors.HEADER)
+        print_color(Headers.Prerequisites, Colors.HEADER)
         checks = [
             self.check_logger,
             self.check_cpu,
@@ -2734,7 +2740,7 @@ class S0i3Validator:
             if not check():
                 result = False
         if not result:
-            print_color(headers.BrokenPrerequisites, colors.UNDERLINE)
+            print_color(Headers.BrokenPrerequisites, Colors.UNDERLINE)
             self.capture_full_dmesg()
         return result
 
@@ -2820,7 +2826,7 @@ class S0i3Validator:
             self.active_gpios += re.findall(
                 r"\d+", re.search("GPIO.*is active", line).group()
             )
-        elif headers.Irq1Workaround in line:
+        elif Headers.Irq1Workaround in line:
             self.irq1_workaround = True
         logging.debug(line)
 
@@ -2839,7 +2845,7 @@ class S0i3Validator:
         if show_warning:
             print_color(
                 "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
-                colors.WARNING,
+                Colors.WARNING,
             )
         return True
 
@@ -2885,13 +2891,13 @@ class S0i3Validator:
                 for irq in self.irqs:
                     if irq[0] == int(n):
                         print_color(
-                            f"{headers.WakeTriggeredIrq} {irq[0]}: {irq[1]}", "🥱"
+                            f"{Headers.WakeTriggeredIrq} {irq[0]}: {irq[1]}", "🥱"
                         )
             if 1 in self.wakeup_irqs and self.cpu_needs_irq1_wa():
                 if self.irq1_workaround:
                     print_color("Kernel workaround for IRQ1 issue utilized", "✅")
                 else:
-                    print_color("IRQ1 found during wakeup", colors.WARNING)
+                    print_color("IRQ1 found during wakeup", Colors.WARNING)
                     self.failures += [Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
@@ -2933,7 +2939,7 @@ class S0i3Validator:
         min_suspend_duration = timedelta(seconds=self.requested_duration * 0.9)
         expected_wake_time = self.last_suspend + min_suspend_duration
         if now > expected_wake_time:
-            logging.debug(f"Userspace suspended for {self.userspace_duration}")
+            logging.debug("Userspace suspended for %s", self.userspace_duration)
         else:
             print_color(
                 f"Userspace suspended for {self.userspace_duration} (< minimum expected {min_suspend_duration})",
@@ -2956,7 +2962,7 @@ class S0i3Validator:
 
     def analyze_results(self):
         """Analyze the results of the last cycle"""
-        print_color(headers.LastCycleResults, colors.HEADER)
+        print_color(Headers.LastCycleResults, Colors.HEADER)
         checks = [
             self.analyze_kernel_log,
             self.check_wakeup_irq,
@@ -3032,12 +3038,12 @@ class S0i3Validator:
             length = timedelta(seconds=(duration + wait) * count)
             print_color(
                 f"Running {count} cycles (Test finish expected @ {datetime.now() + length})",
-                colors.HEADER,
+                Colors.HEADER,
             )
 
         self.requested_duration = duration
         logging.debug(
-            "%s %s", headers.SuspendDuration, timedelta(seconds=self.requested_duration)
+            "%s %s", Headers.SuspendDuration, timedelta(seconds=self.requested_duration)
         )
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
@@ -3053,7 +3059,7 @@ class S0i3Validator:
             self.kernel_duration = 0
             self.hw_sleep_duration = 0
             if count > 1:
-                header = f"{headers.CycleCount} {i}: "
+                header = f"{Headers.CycleCount} {i}: "
             else:
                 header = ""
             print_color(
@@ -3063,7 +3069,7 @@ class S0i3Validator:
                     finish=datetime.now()
                     + timedelta(seconds=self.requested_duration + wait),
                 ),
-                colors.HEADER,
+                Colors.HEADER,
             )
             if wakealarm:
                 try:
@@ -3090,7 +3096,7 @@ class S0i3Validator:
         """Print the failure report"""
         if len(self.failures) == 0:
             return True
-        print_color(headers.ExplanationReport, colors.HEADER)
+        print_color(Headers.ExplanationReport, Colors.HEADER)
         for item in self.failures:
             item.get_failure()
         return False
@@ -3105,15 +3111,15 @@ def parse_args():
     )
     parser.add_argument(
         "--log",
-        help=headers.LogDescription,
+        help=Headers.LogDescription,
     )
     parser.add_argument(
         "--duration",
-        help=headers.DurationDescription,
+        help=Headers.DurationDescription,
     )
     parser.add_argument(
         "--wait",
-        help=headers.WaitDescription,
+        help=Headers.WaitDescription,
     )
     parser.add_argument(
         "--kernel-log-provider",
@@ -3126,7 +3132,7 @@ def parse_args():
         action="store_true",
         help="Run suspend test even if prerequisites failed",
     )
-    parser.add_argument("--count", help=headers.CountDescription)
+    parser.add_argument("--count", help=Headers.CountDescription)
     parser.add_argument(
         "--acpidump",
         action="store_true",
@@ -3135,15 +3141,15 @@ def parse_args():
     parser.add_argument(
         "--logind", action="store_true", help="Use logind to suspend system"
     )
-    parser.add_argument("--debug-ec", action="store_true", help=headers.EcDebugging)
+    parser.add_argument("--debug-ec", action="store_true", help=Headers.EcDebugging)
     return parser.parse_args()
 
 
 def configure_log(logf):
     """Configure the log file"""
     if not logf:
-        fname = f"{defaults.log_prefix}-{date.today()}.{defaults.log_suffix}"
-        logf = input(f"{headers.LogDescription} (default {fname})? ")
+        fname = f"{Defaults.log_prefix}-{date.today()}.{Defaults.log_suffix}"
+        logf = input(f"{Headers.LogDescription} (default {fname})? ")
         if not logf:
             logf = fname
 
@@ -3160,18 +3166,18 @@ def configure_suspend(duration, wait, count):
     """Configure the suspend test arguments"""
     if not duration:
         duration = input(
-            f"{headers.DurationDescription} (default {defaults.duration})? "
+            f"{Headers.DurationDescription} (default {Defaults.duration})? "
         )
         if not duration:
-            duration = defaults.duration
+            duration = Defaults.duration
     if not wait:
-        wait = input(f"{headers.WaitDescription} (default {defaults.wait})? ")
+        wait = input(f"{Headers.WaitDescription} (default {Defaults.wait})? ")
         if not wait:
-            wait = defaults.wait
+            wait = Defaults.wait
     if not count:
-        count = input(f"{headers.CountDescription} (default {defaults.count})? ")
+        count = input(f"{Headers.CountDescription} (default {Defaults.count})? ")
         if not count:
-            count = defaults.count
+            count = Defaults.count
     return [int(duration), int(wait), int(count)]
 
 

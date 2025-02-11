@@ -141,25 +141,25 @@ def read_file(fn):
 
 def print_color(message, group):
     prefix = "%s " % group
-    suffix = colors.ENDC
+    suffix = Colors.ENDC
     if group == "🚦":
-        color = colors.WARNING
+        color = Colors.WARNING
     elif group == "🦟":
-        color = colors.DEBUG
+        color = Colors.DEBUG
     elif any(mk in group for mk in ["❌", "👀"]):
-        color = colors.FAIL
+        color = Colors.FAIL
     elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○"]):
-        color = colors.OK
+        color = Colors.OK
     else:
         color = group
         prefix = ""
 
     log_txt = f"{prefix}{message}".strip()
-    if any(c in color for c in [colors.OK, colors.HEADER, colors.UNDERLINE]):
+    if any(c in color for c in [Colors.OK, Colors.HEADER, Colors.UNDERLINE]):
         logging.info(log_txt)
-    elif color == colors.WARNING:
+    elif color == Colors.WARNING:
         logging.warning(log_txt)
-    elif color == colors.FAIL:
+    elif color == Colors.FAIL:
         logging.error(log_txt)
     else:
         logging.debug(log_txt)
@@ -179,7 +179,7 @@ def fatal_error(message):
 class AmdPstateTriage:
     def show_install_message(self, message):
         """Show a message indicating the installation action."""
-        action = headers.InstallAction if self.root_user else headers.RerunAction
+        action = Headers.InstallAction if self.root_user else Headers.RerunAction
         message = "{message}. {action}.".format(message=message, action=action)
         print_color(message, "👀")
 
@@ -210,7 +210,7 @@ class AmdPstateTriage:
             self.context = False
 
         if not self.context:
-            self.show_install_message(headers.MissingPyudev)
+            self.show_install_message(Headers.MissingPyudev)
             package = PyUdevPackage(self.root_user)
             package.install(self.distro)
             try:
@@ -229,7 +229,7 @@ class AmdPstateTriage:
             self.pandas = False
 
         if not self.pandas:
-            self.show_install_message(headers.MissingPandas)
+            self.show_install_message(Headers.MissingPandas)
             package = PandasPackage(self.root_user)
             package.install(self.distro)
             try:
@@ -247,7 +247,7 @@ class AmdPstateTriage:
             self.tabulate = False
 
         if not self.tabulate:
-            self.show_install_message(headers.MissingTabulate)
+            self.show_install_message(Headers.MissingTabulate)
             package = TabulatePackage(self.root_user)
             package.install(self.distro)
             try:
@@ -446,7 +446,7 @@ def parse_args():
     )
     parser.add_argument(
         "--log",
-        help=headers.LogDescription,
+        help=Headers.LogDescription,
     )
     return parser.parse_args()
 
@@ -454,8 +454,8 @@ def parse_args():
 def configure_log(arg):
     """Configure the log file name based on the provided argument or user input."""
     if not arg:
-        fname = f"{defaults.log_prefix}-{date.today()}.{defaults.log_suffix}"
-        arg = input(f"{headers.LogDescription} (default {fname})? ")
+        fname = f"{Defaultslog_prefix}-{date.today()}.{Defaultslog_suffix}"
+        arg = input(f"{Headers.LogDescription} (default {fname})? ")
         if not arg:
             arg = fname
     return arg
