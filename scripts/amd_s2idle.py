@@ -581,14 +581,14 @@ class I2CHidBug(S0i3Failure):
         super().__init__()
         self.description = f"The {name} device has been reported to cause high power consumption and spurious wakeups"
         self.explanation = (
-            f"\tI2C devices work in an initiator/receiver relationship where the device is the receiver. In order for the receiver to indicate\n"
+            "\tI2C devices work in an initiator/receiver relationship where the device is the receiver. In order for the receiver to indicate\n"
             "\tthe initiator needs to read data they will assert an attention GPIO pin.\n"
             "\tWhen a device misbehaves it may assert this pin spuriously which can cause the SoC to wakeup prematurely.\n"
             "\tThis typically manifests as high power consumption at runtime and spurious wakeups at suspend.\n"
             "\n"
             "\tThis issue can be worked around by unbinding the device from the kernel using this command:\n"
             "\n"
-            "\t{remediation}\n"
+            f"\t{remediation}\n"
             "\n"
             "\tTo fix this issue permanently the kernel will need to avoid binding to this device."
         )
@@ -732,7 +732,7 @@ class LimitedCores(S0i3Failure):
 
     def __init__(self, actual_cores, max_cores):
         super().__init__()
-        self.description = f"CPU cores have been limited"
+        self.description = "CPU cores have been limited"
         self.explanation = (
             f"\tThe CPU cores have been limited to {max_cores}, but the system\n"
             f"\tactually has {actual_cores}. Limiting the cores will prevent the\n"
