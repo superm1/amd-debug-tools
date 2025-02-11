@@ -3192,15 +3192,23 @@ def configure_suspend(duration, wait, count):
 
 if __name__ == "__main__":
     arg = parse_args()
-    configure_log(arg.log)
+    try:
+        configure_log(arg.log)
+    except KeyboardInterrupt:
+        print("")
+        sys.exit(0)
 
     if arg.logind and not DBUS:
         fatal_error("Unable to use logind without dbus, please install python3-dbus")
 
     app = S0i3Validator(arg.acpidump, arg.logind, arg.debug_ec, arg.kernel_log_provider)
     if app.prerequisites() or arg.force:
-        d, w, c = configure_suspend(
-            duration=arg.duration, wait=arg.wait, count=arg.count
-        )
+        try:
+            d, w, c = configure_suspend(
+                duration=arg.duration, wait=arg.wait, count=arg.count
+            )
+        except KeyboardInterrupt:
+            print("")
+            sys.exit(0)
         app.test_suspend(duration=d, wait=w, count=c)
     app.get_failure_report()
