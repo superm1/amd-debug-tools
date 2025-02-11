@@ -1461,9 +1461,12 @@ class S0i3Validator:
     def check_cpu(self):
         """Check if the CPU is supported"""
 
-        def read_cpuid(leaf, subleaf):
+        def read_cpuid(cpu, leaf, subleaf):
             """Read CPUID using kernel userspace interface"""
-            with open("/dev/cpu/0/cpuid", "rb") as f:
+            p = os.path.join("/", "dev", "cpu", "%d" % cpu, "cpuid")
+            if not os.path.exists(p):
+                os.system("modprobe cpuid")
+            with open(p, "rb") as f:
                 position = (subleaf << 32) | leaf
                 f.seek(position)
                 data = f.read(16)
@@ -1522,7 +1525,7 @@ class S0i3Validator:
             # Extended Topology Enumeration (NumLogCores)
             # CPUID 0x80000026 subleaf 1
             try:
-                _, cpu_count, _, _ = read_cpuid(0x80000026, 1)
+                _, cpu_count, _, _ = read_cpuid(0, 0x80000026, 1)
                 if cpu_count > max_cpus:
                     print_color(
                         f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
