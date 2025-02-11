@@ -1552,6 +1552,9 @@ class S0i3Validator:
     def capture_system_vendor(self):
         """Capture the system vendor information"""
         p = os.path.join("/", "sys", "class", "dmi", "id")
+        if not os.path.exists(p):
+            print_color("DMI data was not setup", "🚦")
+            self.failures += [DmiNotSetup()]
         try:
             ec = read_file(os.path.join(p, "ec_firmware_release"))
         except FileNotFoundError:
@@ -2046,14 +2049,6 @@ class S0i3Validator:
             return True
         print_color("GPIO driver `pinctrl_amd` not loaded", "❌")
         return False
-
-    def check_dmi_data(self):
-        """verify that rtc-cmos will be able to quirk properly"""
-        p = os.path.join("/", "sys", "class", "dmi", "id")
-        if not os.path.exists(p):
-            print_color("DMI data was not setup", "🚦")
-            self.failures += [DmiNotSetup()]
-        return True
 
     def check_rtc_cmos(self):
         """Check for the RTC CMOS driver configuration"""
@@ -2714,7 +2709,6 @@ class S0i3Validator:
             self.capture_acpi,
             self.check_logind,
             self.check_power_profile,
-            self.check_dmi_data,
             self.check_rtc_cmos,
             self.check_taint,
             self.check_permissions,
