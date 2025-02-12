@@ -1644,6 +1644,10 @@ class S0i3Validator:
             return True
 
         for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
+            # https://git.kernel.org/torvalds/c/e79a10652bbd3
+            if self.minimum_kernel(6, 10):
+                logging.debug("New enough kernel to avoid NVME check")
+                break
             pci_slot_name = dev.properties["PCI_SLOT_NAME"]
             vendor = get_property_pyudev(dev.properties, "ID_VENDOR_FROM_DATABASE", "")
             model = get_property_pyudev(dev.properties, "ID_MODEL_FROM_DATABASE", "")
