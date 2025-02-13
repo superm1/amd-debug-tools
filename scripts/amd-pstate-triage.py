@@ -433,7 +433,10 @@ class AmdPstateTriage:
     def run(self):
         self.gather_kernel_info()
         self.gather_scheduler_info()
-        self.gather_cpu_info()
+        try:
+            self.gather_cpu_info()
+        except FileNotFoundError:
+            print_color("Unable to gather CPU information", "❌")
         self.gather_msrs()
 
 
