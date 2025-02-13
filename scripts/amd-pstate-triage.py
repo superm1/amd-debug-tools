@@ -12,12 +12,12 @@ import struct
 from datetime import datetime, timedelta, date
 
 
-class defaults:
+class Defaults:
     log_prefix = "amd_pstate_report"
     log_suffix = "txt"
 
 
-class colors:
+class Colors:
     DEBUG = "\033[90m"
     HEADER = "\033[95m"
     OK = "\033[94m"
@@ -51,7 +51,7 @@ def AMD_CPPC_EPP_PERF(x):
     return (x >> 24) & 0xFF
 
 
-class headers:
+class Headers:
     LogDescription = "Location of log file"
     InstallAction = "Attempting to install"
     RerunAction = "Running this script as root will attempt to install it"
@@ -454,7 +454,7 @@ def parse_args():
 def configure_log(arg):
     """Configure the log file name based on the provided argument or user input."""
     if not arg:
-        fname = f"{Defaultslog_prefix}-{date.today()}.{Defaultslog_suffix}"
+        fname = f"{Defaults.log_prefix}-{date.today()}.{Defaults.log_suffix}"
         arg = input(f"{Headers.LogDescription} (default {fname})? ")
         if not arg:
             arg = fname
