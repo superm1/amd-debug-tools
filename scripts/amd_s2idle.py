@@ -2457,7 +2457,7 @@ class S0i3Validator:
 
     def capture_linux_firmware(self):
         """Capture the Linux firmware to debug"""
-        if self.distro == "ubuntu" or self.distro == "debian" and APT:
+        if self.distro in ("ubuntu", "debian"):
             cache = apt.Cache()
             packages = ["linux-firmware"]
             for obj in cache.get_providing_packages("amdgpu-firmware-nda"):
