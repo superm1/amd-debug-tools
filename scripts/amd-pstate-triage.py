@@ -9,15 +9,19 @@ import subprocess
 import logging
 import argparse
 import struct
-from datetime import datetime, timedelta, date
+from datetime import date
 
 
-class Defaults:
+class Defaults:  # pylint: disable=too-few-public-methods
+    """Default values for the script"""
+
     log_prefix = "amd_pstate_report"
     log_suffix = "txt"
 
 
-class Colors:
+class Colors:  # pylint: disable=too-few-public-methods
+    """ANSI color codes for terminal output"""
+
     DEBUG = "\033[90m"
     HEADER = "\033[95m"
     OK = "\033[94m"
@@ -27,7 +31,9 @@ class Colors:
     UNDERLINE = "\033[4m"
 
 
-class MSR:
+class MSR:  # pylint: disable=too-few-public-methods
+    """MSR addresses for CPPC"""
+
     MSR_AMD_CPPC_CAP1 = 0xC00102B0
     MSR_AMD_CPPC_ENABLE = 0xC00102B1
     MSR_AMD_CPPC_CAP2 = 0xC00102B2
@@ -36,38 +42,48 @@ class MSR:
 
 
 def AMD_CPPC_CAP_LOWEST_PERF(x):
+    """Return the lowest performance value from the given input."""
     return x & 0xFF
 
 
 def AMD_CPPC_CAP_LOWNONLIN_PERF(x):
+    """Return the lowest nonlinear performance value from the given input."""
     return (x >> 8) & 0xFF
 
 
 def AMD_CPPC_CAP_NOMINAL_PERF(x):
+    """Return the nominal performance value from the given input."""
     return (x >> 16) & 0xFF
 
 
 def AMD_CPPC_CAP_HIGHEST_PERF(x):
+    """Return the highest performance value from the given input."""
     return (x >> 24) & 0xFF
 
 
 def AMD_CPPC_MAX_PERF(x):
+    """Return the maximum performance value from the given input."""
     return x & 0xFF
 
 
 def AMD_CPPC_MIN_PERF(x):
+    """Return the minimum performance value from the given input."""
     return (x >> 8) & 0xFF
 
 
 def AMD_CPPC_DES_PERF(x):
+    """Return the desired performance value from the given input."""
     return (x >> 16) & 0xFF
 
 
 def AMD_CPPC_EPP_PERF(x):
+    """Return the energy performance preference value from the given input."""
     return (x >> 24) & 0xFF
 
 
-class Headers:
+class Headers:  # pylint: disable=too-few-public-methods
+    """Header strings for the script"""
+
     LogDescription = "Location of log file"
     InstallAction = "Attempting to install"
     RerunAction = "Running this script as root will attempt to install it"
@@ -77,6 +93,8 @@ class Headers:
 
 
 class DistroPackage:
+    """Class for handling distro-specific packages"""
+
     def __init__(self, deb, rpm, arch, pip, root):
         self.deb = deb
         self.rpm = rpm
@@ -85,9 +103,10 @@ class DistroPackage:
         self.root = root
 
     def install(self, distro):
+        """Install the package for the given distro."""
         if not self.root:
             sys.exit(1)
-        if distro == "ubuntu" or distro == "debian":
+        if distro in ("ubuntu", "debian"):
             if not self.deb:
                 return False
             installer = ["apt", "install", self.deb]
@@ -117,6 +136,8 @@ class DistroPackage:
 
 
 class PyUdevPackage(DistroPackage):
+    """Class for handling the pyudev package"""
+
     def __init__(self, root):
         super().__init__(
             deb="python3-pyudev",
@@ -128,6 +149,8 @@ class PyUdevPackage(DistroPackage):
 
 
 class PandasPackage(DistroPackage):
+    """Class for handling the pandas package"""
+
     def __init__(self, root):
         super().__init__(
             deb="python3-pandas",
@@ -139,6 +162,8 @@ class PandasPackage(DistroPackage):
 
 
 class TabulatePackage(DistroPackage):
+    """Class for handling the tabulate package"""
+
     def __init__(self, root):
         super().__init__(
             deb="python3-tabulate",
@@ -151,11 +176,12 @@ class TabulatePackage(DistroPackage):
 
 def read_file(fn):
     """Read the contents of a file and return it as a string."""
-    with open(fn, "r") as r:
+    with open(fn, "r", encoding="utf-8") as r:
         return r.read().strip()
 
 
 def print_color(message, group):
+    """Print a message with a color based on the group."""
     prefix = "%s " % group
     suffix = Colors.ENDC
     if group == "🚦":
@@ -193,10 +219,12 @@ def fatal_error(message):
 
 
 class AmdPstateTriage:
+    """Class for handling the triage process"""
+
     def show_install_message(self, message):
         """Show a message indicating the installation action."""
         action = Headers.InstallAction if self.root_user else Headers.RerunAction
-        message = "{message}. {action}.".format(message=message, action=action)
+        message = f"{message}. {action}."
         print_color(message, "👀")
 
     def __init__(self, arg):
@@ -476,6 +504,7 @@ class AmdPstateTriage:
         )
 
     def run(self):
+        """Run the triage process"""
         self.gather_kernel_info()
         self.gather_scheduler_info()
         try:
