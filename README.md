@@ -9,7 +9,7 @@ firmware, kernel configuration, and user configuration for known issues and flag
 
 It can also be used for collecting statistics about suspend cycles and for stress testing.
 
-## amd-pstate-triage.py
+## amd_pstate_triage.py
 
 `amd_pstate_triage.py` is a triaging script used for identification of issues with amd-pstate.
 It will capture some state from the system as well as from the machine specific registers that
