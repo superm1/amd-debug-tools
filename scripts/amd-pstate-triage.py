@@ -35,6 +35,22 @@ class MSR:
     MSR_AMD_CPPC_STATUS = 0xC00102B4
 
 
+def AMD_CPPC_CAP_LOWEST_PERF(x):
+    return x & 0xFF
+
+
+def AMD_CPPC_CAP_LOWNONLIN_PERF(x):
+    return (x >> 8) & 0xFF
+
+
+def AMD_CPPC_CAP_NOMINAL_PERF(x):
+    return (x >> 16) & 0xFF
+
+
+def AMD_CPPC_CAP_HIGHEST_PERF(x):
+    return (x >> 24) & 0xFF
+
+
 def AMD_CPPC_MAX_PERF(x):
     return x & 0xFF
 
@@ -371,6 +387,16 @@ class AmdPstateTriage:
             ]
         )
 
+        cap_df = pd.DataFrame(
+            columns=[
+                "CPU #",
+                "Lowest Perf",
+                "Nonlinear Perf",
+                "Nominal Perf",
+                "Highest Perf",
+            ]
+        )
+
         try:
             for cpu in cpus:
                 enable = read_msr(MSR.MSR_AMD_CPPC_ENABLE, cpu)
@@ -406,6 +432,18 @@ class AmdPstateTriage:
                     ignore_index=True,
                 )
 
+                row = [
+                    cpu,
+                    AMD_CPPC_CAP_LOWEST_PERF(cap1),
+                    AMD_CPPC_CAP_LOWNONLIN_PERF(cap1),
+                    AMD_CPPC_CAP_NOMINAL_PERF(cap1),
+                    AMD_CPPC_CAP_HIGHEST_PERF(cap1),
+                ]
+                cap_df = pd.concat(
+                    [pd.DataFrame([row], columns=cap_df.columns), cap_df],
+                    ignore_index=True,
+                )
+
         except FileNotFoundError:
             print_color("Unabled to check MSRs: MSR kernel module not loaded", "❌")
             return False
@@ -420,6 +458,13 @@ class AmdPstateTriage:
         print_color(
             "CPPC MSRs\n%s"
             % tabulate(msr_df, headers="keys", tablefmt="psql", showindex=False),
+            "🔋",
+        )
+
+        cap_df = cap_df.sort_values(by="CPU #")
+        print_color(
+            "MSR_AMD_CPPC_CAP1 (decoded)\n%s"
+            % tabulate(cap_df, headers="keys", tablefmt="psql", showindex=False),
             "🔋",
         )
 
