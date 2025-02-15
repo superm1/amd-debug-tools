@@ -190,7 +190,7 @@ def print_color(message, group):
         color = Colors.DEBUG
     elif any(mk in group for mk in ["❌", "👀"]):
         color = Colors.FAIL
-    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○"]):
+    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "🫆", "○"]):
         color = Colors.OK
     else:
         color = group
@@ -301,6 +301,12 @@ class AmdPstateTriage:
             except ModuleNotFoundError:
                 fatal_error("Missing python-tabulate package, unable to display data")
 
+    def gather_amd_pstate_info(self):
+        for f in ("status", "prefcore"):
+            p = os.path.join("/", "sys", "devices", "system", "cpu", "amd_pstate", f)
+            if os.path.exists(p):
+                print_color(f"'{f}':\t{read_file(p)}", "🫆")
+
     def gather_kernel_info(self):
         """Gather kernel information"""
         print_color(f"Kernel:\t{os.uname().release}", "🐧")
@@ -360,7 +366,7 @@ class AmdPstateTriage:
 
         df = df.sort_values(by="CPU #")
         print_color(
-            "Kernel sysfs files\n%s"
+            "Per-CPU sysfs files\n%s"
             % tabulate(df, headers="keys", tablefmt="psql", showindex=False),
             "🔋",
         )
@@ -506,6 +512,7 @@ class AmdPstateTriage:
     def run(self):
         """Run the triage process"""
         self.gather_kernel_info()
+        self.gather_amd_pstate_info()
         self.gather_scheduler_info()
         try:
             self.gather_cpu_info()
