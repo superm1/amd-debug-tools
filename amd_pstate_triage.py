@@ -380,13 +380,13 @@ class AmdPstateTriage:
                 os.system("modprobe msr")
             try:
                 f = os.open(p, os.O_RDONLY)
-            except OSError:
-                return None
+            except OSError as exc:
+                raise PermissionError from exc
             try:
                 os.lseek(f, msr, os.SEEK_SET)
                 val = struct.unpack("Q", os.read(f, 8))[0]
-            except OSError:
-                return None
+            except OSError as exc:
+                raise PermissionError from exc
             finally:
                 os.close(f)
             return val
@@ -434,9 +434,6 @@ class AmdPstateTriage:
         try:
             for cpu in cpus:
                 enable = read_msr(MSR.MSR_AMD_CPPC_ENABLE, cpu)
-                if not enable:
-                    logging.debug("MSR reads not supported")
-                    return False
                 status = read_msr(MSR.MSR_AMD_CPPC_STATUS, cpu)
                 cap1 = read_msr(MSR.MSR_AMD_CPPC_CAP1, cpu)
                 cap2 = read_msr(MSR.MSR_AMD_CPPC_CAP2, cpu)
