@@ -109,6 +109,7 @@ class Headers:
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
     WakeTriggeredIrq = "Wakeup triggered from IRQ"
+    MissingFwupd = "Firmware update library `fwupd` is missing"
     MissingPyudev = "Udev access library `pyudev` is missing"
     MissingPackaging = "Python library `packaging` is missing"
     MissingIasl = "ACPI extraction tool `iasl` is missing"
@@ -990,6 +991,19 @@ class EthtoolPackage(DistroPackage):
         )
 
 
+class FwupdPackage(DistroPackage):
+    """Fwupd package"""
+
+    def __init__(self, root):
+        super().__init__(
+            deb="gir1.2-fwupd-2.0",
+            rpm=None,
+            arch=None,
+            pip=None,
+            root=root,
+        )
+
+
 class WakeIRQ:
     """Class for wake IRQs"""
 
@@ -1188,7 +1202,13 @@ class S0i3Validator:
             self.show_install_message(Headers.MissingPackaging)
             package = PackagingPackage(self.root_user)
             package.install(self.distro)
-            from packaging import version
+            from packaging import version  # pylint: disable=import-outside-toplevel
+
+        # for reading firmware versions
+        if not FWUPD:
+            self.show_install_message(Headers.MissingFwupd)
+            package = FwupdPackage(self.root_user)
+            package.install(self.distro)
 
         self.cpu_family = ""
         self.cpu_model = ""
@@ -1754,7 +1774,17 @@ class S0i3Validator:
 
     def check_device_firmware(self):
         """Check for device firmware issues"""
-        if not FWUPD:
+        try:
+            import gi  # pylint: disable=redefined-outer-name,import-outside-toplevel
+            from gi.repository import (
+                GLib as _,
+            )  # pylint: disable=import-outside-toplevel
+
+            gi.require_version("Fwupd", "2.0")
+            from gi.repository import (
+                Fwupd,
+            )  # pylint: disable=redefined-outer-name,import-outside-toplevel,wrong-import-position
+        except ImportError:
             print_color(
                 "Device firmware checks unavailable without gobject introspection",
                 "🚦",
