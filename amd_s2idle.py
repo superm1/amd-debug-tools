@@ -40,7 +40,7 @@ try:
     from gi.repository import GLib as _
 
     gi.require_version("Fwupd", "2.0")
-    from gi.repository import Fwupd  # pylint: disable=wrong-import-position
+    from gi.repository import Fwupd  # pylint: disable=unused-import
 
     FWUPD = True
 except ImportError:
@@ -125,7 +125,7 @@ class Headers:
     EcDebugging = "Turn on dynamic debug messages for EC during suspend"
 
 
-def BIT(num):
+def BIT(num):  # pylint=disable=invalid-name
     """Returns a bit shifted by num"""
     return 1 << num
 
@@ -846,7 +846,7 @@ class SystemdLogger(KernelLogger):
     """Class for logging using systemd journal"""
 
     def __init__(self):
-        from systemd import journal
+        from systemd import journal  # pylint: disable=import-outside-toplevel
 
         self.journal = journal.Reader()
         self.journal.this_boot()
@@ -1157,7 +1157,7 @@ class S0i3Validator:
 
         # for analyzing devices
         try:
-            from pyudev import Context
+            from pyudev import Context  # pylint: disable=import-outside-toplevel
 
             self.pyudev = Context()
         except ModuleNotFoundError:
@@ -1168,7 +1168,7 @@ class S0i3Validator:
             package = PyUdevPackage(self.root_user)
             package.install(self.distro)
             try:
-                from pyudev import Context
+                from pyudev import Context  # pylint: disable=import-outside-toplevel
             except ModuleNotFoundError:
                 fatal_error("Missing python-pyudev package, unable to identify devices")
 
@@ -2937,7 +2937,9 @@ class S0i3Validator:
 
     def analyze_masks(self):
         try:
-            from common import add_model_checks
+            from common import (
+                add_model_checks,
+            )  # pylint: disable=import-outside-toplevel
 
             func = add_model_checks(self.cpu_model, self.cpu_family)
             for mask in self.idle_masks:
