@@ -1799,7 +1799,7 @@ class S0i3Validator:
             device_map = {
                 "8c36f7ee-cc11-4a36-b090-6363f54ecac2": "0.1.26",  # https://gitlab.freedesktop.org/drm/amd/-/issues/3443
             }
-            interesting_plugins = ["nvme", "tpm", "uefi_capsule"]
+            interesting_plugins = ["asus_hid", "nvme", "tpm", "uefi_capsule"]
             if device.get_plugin() in interesting_plugins:
                 logging.debug(
                     "%s %s firmware version: '%s'",
