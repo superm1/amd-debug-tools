@@ -124,6 +124,8 @@ class Headers:
     RerunAction = "Running this script as root will attempt to install it"
     ExplanationReport = "Explanations for your system"
     EcDebugging = "Turn on dynamic debug messages for EC during suspend"
+    RogAllyMcuOld = "ROG Ally MCU firmware too old"
+    RogAllyPowerSave = "Rog Ally doesn't have MCU powersave enabled"
 
 
 def BIT(num):  # pylint=disable=invalid-name
@@ -741,6 +743,30 @@ class LimitedCores(S0i3Failure):
             f"\tactually has {actual_cores}. Limiting the cores will prevent the\n"
             "\tthe system from going into a hardware sleep state.\n"
             "\tThis is typically solved by increasing the kernel config CONFIG_NR_CPUS.\n"
+        )
+
+
+class RogAllyOldMcu(S0i3Failure):
+    """MCU firwmare is too old"""
+
+    def __init__(self, vmin, actual):
+        super().__init__()
+        self.description = "Rog Ally MCU firmware is too old"
+        self.explanation = (
+            f"\tThe MCU is version {actual}, but needs to be at least {vmin}\n"
+            f"\tto avoid major issues with interactions with suspend\n"
+        )
+
+
+class RogAllyMcuPowerSave(S0i3Failure):
+    """MCU powersave is disabled"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "Rog Ally MCU power save is disabled"
+        self.explanation = (
+            f"\tThe MCU powersave feature is disabled which will cause problems\n"
+            f"\twith the controller after suspend/resume.\n"
         )
 
 
@@ -2771,6 +2797,7 @@ class S0i3Validator:
             self.capture_irq,
             self.check_i2c_hid,
             self.check_wake_sources,
+            self.check_asus_rog_ally,
             self.capture_acpi,
             self.check_logind,
             self.check_power_profile,
@@ -3072,6 +3099,40 @@ class S0i3Validator:
             except dbus.exceptions.DBusException as e:
                 print_color(f"Unable to communicate with logind: {e}", "❌")
                 return False
+        return True
+
+    def check_asus_rog_ally(self):
+        """Check for MCU version on ASUS ROG Ally devices"""
+        for dev in self.pyudev.list_devices(subsystem="hid", DRIVER="asus_rog_ally"):
+            p = os.path.join(dev.sys_path, "mcu_version")
+            if not os.path.exists(p):
+                continue
+            v = int(read_file(p))
+            hid_id = get_property_pyudev(dev.properties, "HID_ID", "")
+            if "1ABE" in hid_id:
+                minv = 319
+            elif "1B4C" in hid_id:
+                minv = 313
+            else:
+                minv = None
+            if minv and v < minv:
+                print_color(Headers.RogAllyMcuOld, "❌")
+                self.failures += [RogAllyOldMcu(minv, v)]
+                return False
+            else:
+                logging.debug("ASUS ROG MCU found with MCU version %d", v)
+        for dev in self.pyudev.list_devices(subsystem="firmware-attributes"):
+            p = os.path.join(
+                dev.sys_path, "attributes", "mcu_powersave", "current_value"
+            )
+            if not os.path.exists(p):
+                continue
+            v = int(read_file(p))
+            if v < 1:
+                print_color(Headers.RogAllyPowerSave, "❌")
+                self.failures += [RogAllyMcuPowerSave()]
+                return False
+
         return True
 
     def test_suspend(self, duration, count, wait):
