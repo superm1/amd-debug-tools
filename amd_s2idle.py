@@ -946,6 +946,8 @@ class DistroPackage:
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
         elif dist == "arch" or os.path.exists("/etc/arch-release"):
+            if not self.arch:
+                return False
             installer = ["pacman", "-Sy", self.arch]
         else:
             if not PIP or not self.pip:
