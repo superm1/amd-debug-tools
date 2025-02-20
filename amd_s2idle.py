@@ -1812,6 +1812,12 @@ class S0i3Validator:
             from gi.repository import (
                 Fwupd,
             )  # pylint: disable=redefined-outer-name,import-outside-toplevel,wrong-import-position
+        except ValueError:
+            print_color(
+                "Device firmware checks unavailable without gobject introspection",
+                "🚦",
+            )
+            return True
         except ImportError:
             print_color(
                 "Device firmware checks unavailable without gobject introspection",
