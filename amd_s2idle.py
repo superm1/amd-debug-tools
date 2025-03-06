@@ -201,13 +201,55 @@ def pm_debugging(func):
     """Turn on pm_debug_messages for the duration of the function"""
 
     def runner(*args, **kwargs):
-        fn = os.path.join("/", "sys", "power", "pm_debug_messages")
-        with open(fn, "w") as w:
+        # enable PM debugging
+        pm_debug_messages = os.path.join("/", "sys", "power", "pm_debug_messages")
+        with open(pm_debug_messages, "w", encoding="utf-8") as w:
             w.write("1")
+
+        # enable ACPI debugging
+        old_debug_level = None
+        old_debug_layer = None
+        acpi_base = os.path.join("/", "sys", "module", "acpi")
+        acpi_debug_layer = os.path.join(acpi_base, "parameters", "debug_layer")
+        acpi_debug_level = os.path.join(acpi_base, "parameters", "debug_level")
+        if os.path.exists(acpi_debug_level) and os.path.exists(acpi_debug_layer):
+            # backup old settings
+            with open(acpi_debug_level, "r", encoding="utf-8") as r:
+                for line in read_file(acpi_debug_level).split("\n"):
+                    if line.startswith("debug_level ="):
+                        old_debug_level = line.split()[2]
+                        break
+            with open(acpi_debug_layer, "r", encoding="utf-8") as r:
+                for line in read_file(acpi_debug_layer).split("\n"):
+                    if line.startswith("debug_layer ="):
+                        old_debug_layer = line.split()[2]
+                        break
+
+            # enable ACPI_LV_INFO
+            with open(acpi_debug_level, "w", encoding="utf-8") as w:
+                w.write("0x00000004")
+
+            # enable ACPI_EVENTS
+            with open(acpi_debug_layer, "w", encoding="utf-8") as w:
+                w.write("0x00000004")
+            logging.debug("Enabled ACPI debugging for ACPI_LV_INFO/ACPI_EVENTS")
+        else:
+            print_color("ACPI Notify() debugging not available", "👀")
+
         # getting the returned value
         ret = func(*args, **kwargs)
-        with open(fn, "w") as w:
+
+        # disable PM debugging
+        with open(pm_debug_messages, "w", encoding="utf-8") as w:
             w.write("0")
+
+        # disable ACPI debugging
+        if old_debug_level:
+            with open(acpi_debug_level, "w", encoding="utf-8") as w:
+                w.write(old_debug_level)
+        if old_debug_layer:
+            with open(acpi_debug_layer, "w", encoding="utf-8") as w:
+                w.write(old_debug_layer)
         return ret
 
     return runner
