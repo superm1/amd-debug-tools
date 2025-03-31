@@ -210,20 +210,17 @@ def pm_debugging(func):
         old_debug_level = None
         old_debug_layer = None
         acpi_base = os.path.join("/", "sys", "module", "acpi")
-        acpi_debug_layer = os.path.join(acpi_base, "parameters", "debug_layer")
-        acpi_debug_level = os.path.join(acpi_base, "parameters", "debug_level")
-        if os.path.exists(acpi_debug_level) and os.path.exists(acpi_debug_layer):
+        acpi_debug_layer = os.path.join(acpi_base, "parameters", "trace_debug_layer")
+        acpi_debug_level = os.path.join(acpi_base, "parameters", "trace_debug_level")
+        acpi_trace_state = os.path.join(acpi_base, "parameters", "trace_state")
+        if (
+            os.path.exists(acpi_debug_level)
+            and os.path.exists(acpi_debug_layer)
+            and os.path.exists(acpi_trace_state)
+        ):
             # backup old settings
-            with open(acpi_debug_level, "r", encoding="utf-8") as r:
-                for line in read_file(acpi_debug_level).split("\n"):
-                    if line.startswith("debug_level ="):
-                        old_debug_level = line.split()[2]
-                        break
-            with open(acpi_debug_layer, "r", encoding="utf-8") as r:
-                for line in read_file(acpi_debug_layer).split("\n"):
-                    if line.startswith("debug_layer ="):
-                        old_debug_layer = line.split()[2]
-                        break
+            old_debug_level = read_file(acpi_debug_level)
+            old_debug_layer = read_file(acpi_debug_layer)
 
             # enable ACPI_LV_INFO
             with open(acpi_debug_level, "w", encoding="utf-8") as w:
@@ -232,6 +229,8 @@ def pm_debugging(func):
             # enable ACPI_EVENTS
             with open(acpi_debug_layer, "w", encoding="utf-8") as w:
                 w.write("0x00000004")
+            with open(acpi_trace_state, "w", encoding="utf-8") as w:
+                w.write("enable")
             logging.debug("Enabled ACPI debugging for ACPI_LV_INFO/ACPI_EVENTS")
         else:
             print_color("ACPI Notify() debugging not available", "👀")
@@ -250,6 +249,8 @@ def pm_debugging(func):
         if old_debug_layer:
             with open(acpi_debug_layer, "w", encoding="utf-8") as w:
                 w.write(old_debug_layer)
+        with open(acpi_trace_state, "w", encoding="utf-8") as w:
+            w.write("disable")
         return ret
 
     return runner
