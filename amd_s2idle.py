@@ -2464,6 +2464,35 @@ class S0i3Validator:
                 return False
         return True
 
+    def map_acpi_path(self):
+        """Map of ACPI devices to ACPI paths"""
+        devices = []
+        for dev in self.pyudev.list_devices(subsystem="acpi"):
+            p = os.path.join(dev.sys_path, "path")
+            if not os.path.exists(p):
+                continue
+            p = os.path.join(dev.sys_path, "status")
+            if os.path.exists(p):
+                status = int(read_file(p))
+                if status == 0:
+                    continue
+            devices.append(dev)
+        logging.debug("ACPI name: ACPI path [driver]")
+        for dev in devices:
+            if dev == devices[-1]:
+                prefix = "└─"
+            else:
+                prefix = "│ "
+            p = os.path.join(dev.sys_path, "path")
+            pth = read_file(p)
+            p = os.path.join(dev.sys_path, "physical_node", "driver")
+            if os.path.exists(p):
+                driver = os.path.basename(os.readlink(p))
+            else:
+                driver = None
+            logging.debug("%s%s: %s [%s]", prefix, dev.sys_name, pth, driver)
+        return True
+
     def map_acpi_pci(self):
         """Map ACPI devices to PCI devices"""
         devices = []
@@ -2846,6 +2875,7 @@ class S0i3Validator:
             self.check_iommu,
             self.capture_linux_firmware,
             self.map_acpi_pci,
+            self.map_acpi_path,
             self.capture_irq,
             self.check_i2c_hid,
             self.check_wake_sources,
