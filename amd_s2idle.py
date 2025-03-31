@@ -1322,6 +1322,7 @@ class S0i3Validator:
         self.upep = False
         self.upep_microsoft = False
         self.wakeup_irqs = []
+        self.notify_devices = []
         self.idle_masks = []
         self.acpi_errors = []
         self.active_gpios = []
@@ -2949,6 +2950,15 @@ class S0i3Validator:
             )
         elif Headers.Irq1Workaround in line:
             self.irq1_workaround = True
+        # evmisc-0132 ev_queue_notify_reques: Dispatching Notify on [UBTC] (Device) Value 0x80 (Status Change) Node 0000000080144eee
+        elif "Dispatching Notify on" in line:
+            # add device without the [] to notify_devices if it's not already there
+            device = re.search(r"\[(.*?)\]", line)
+            if device:
+                device = device.group(1)
+                if device not in self.notify_devices:
+                    self.notify_devices += [device]
+
         logging.debug(line)
 
     def cpu_offers_hpet_wa(self):
@@ -2987,6 +2997,7 @@ class S0i3Validator:
         self.upep = False
         self.upep_microsoft = False
         self.wakeup_irqs = []
+        self.notify_devices = []
         self.idle_masks = []
         self.acpi_errors = []
         self.active_gpios = []
@@ -3042,6 +3053,10 @@ class S0i3Validator:
         if self.acpi_errors:
             print_color("ACPI BIOS errors found", "❌")
             self.failures += [AcpiBiosError(self.acpi_errors)]
+        if self.notify_devices:
+            print_color(
+                f"Notify devices {self.notify_devices} found during suspend", "💤"
+            )
 
     def analyze_masks(self):
         try:
