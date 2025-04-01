@@ -1177,9 +1177,13 @@ class S0i3Validator:
         self.pretty_distro = None
 
         if DISTRO:
-            self.distro = distro.id()
-            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
-        else:
+            try:
+                self.distro = distro.id()
+                self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
+            except AttributeError:
+                print_color("Failed to discover distro using python-distro", "🚦")
+
+        if not self.distro or not self.pretty_distro:
             p = os.path.join("/", "etc", "os-release")
             if os.path.exists(p):
                 v = read_file(p)
@@ -1197,7 +1201,7 @@ class S0i3Validator:
                 self.distro = "debian"
 
         if not self.distro:
-            fatal_error("Missing python-distro package, unable to identify distro")
+            fatal_error("Unable to identify distro")
 
     def setup_kernel_log(self, kernel_log):
         """Setup the kernel log provider"""

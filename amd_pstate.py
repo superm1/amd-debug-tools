@@ -11,6 +11,14 @@ import argparse
 import struct
 from datetime import date
 
+# used to identify the distro
+try:
+    import distro
+
+    DISTRO = True
+except ModuleNotFoundError:
+    DISTRO = False
+
 
 class Defaults:  # pylint: disable=too-few-public-methods
     """Default values for the script"""
@@ -218,6 +226,39 @@ def fatal_error(message):
     sys.exit(1)
 
 
+def guess_distro():
+    """Guess the distro based on heuristics"""
+    dist = None
+    pretty = None
+
+    if DISTRO:
+        try:
+            dist = distro.id()
+            pretty = distro.os_release_info()["pretty_name"]
+        except AttributeError:
+            print_color("Failed to discover distro", "🚦")
+    if not dist or not pretty:
+        p = os.path.join("/", "etc", "os-release")
+        if os.path.exists(p):
+            v = read_file(p)
+            for line in v.split("\n"):
+                if "ID=" in line:
+                    dist = line.split("=")[-1].strip().strip('"')
+                if "PRETTY_NAME=" in line:
+                    pretty = line.split("=")[-1].strip().strip('"')
+    if not dist:
+        if os.path.exists("/etc/arch-release"):
+            dist = "arch"
+        elif os.path.exists("/etc/fedora-release"):
+            dist = "fedora"
+        elif os.path.exists("/etc/debian_version"):
+            dist = "debian"
+
+    if not dist:
+        fatal_error("Unable to identify distro")
+    return (dist, pretty)
+
+
 class AmdPstateTriage:
     """Class for handling the triage process"""
 
@@ -238,13 +279,8 @@ class AmdPstateTriage:
 
         self.root_user = os.geteuid() == 0
 
-        try:
-            import distro
-
-            self.distro = distro.id()
-            self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
-        except ModuleNotFoundError:
-            fatal_error("Missing python-distro package, unable to identify distro")
+        dist, pretty = guess_distro()
+        print_color(f"{pretty}", "🐧")
 
         try:
             import pyudev
@@ -256,7 +292,7 @@ class AmdPstateTriage:
         if not self.context:
             self.show_install_message(Headers.MissingPyudev)
             package = PyUdevPackage(self.root_user)
-            package.install(self.distro)
+            package.install(dist)
             try:
                 from pyudev import Context
             except ModuleNotFoundError:
@@ -275,7 +311,7 @@ class AmdPstateTriage:
         if not self.pandas:
             self.show_install_message(Headers.MissingPandas)
             package = PandasPackage(self.root_user)
-            package.install(self.distro)
+            package.install(dist)
             try:
                 from pandas import DataFrame
 
@@ -293,7 +329,7 @@ class AmdPstateTriage:
         if not self.tabulate:
             self.show_install_message(Headers.MissingTabulate)
             package = TabulatePackage(self.root_user)
-            package.install(self.distro)
+            package.install(dist)
             try:
                 from tabulate import tabulate
 
