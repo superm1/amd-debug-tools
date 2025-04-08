@@ -209,6 +209,7 @@ def pm_debugging(func):
         # enable ACPI debugging
         old_debug_level = None
         old_debug_layer = None
+        old_trace_state = None
         acpi_base = os.path.join("/", "sys", "module", "acpi")
         acpi_debug_layer = os.path.join(acpi_base, "parameters", "trace_debug_layer")
         acpi_debug_level = os.path.join(acpi_base, "parameters", "trace_debug_level")
@@ -221,6 +222,7 @@ def pm_debugging(func):
             # backup old settings
             old_debug_level = read_file(acpi_debug_level)
             old_debug_layer = read_file(acpi_debug_layer)
+            old_trace_state = read_file(acpi_trace_state)
 
             # enable ACPI_LV_INFO
             with open(acpi_debug_level, "w", encoding="utf-8") as w:
@@ -249,8 +251,9 @@ def pm_debugging(func):
         if old_debug_layer:
             with open(acpi_debug_layer, "w", encoding="utf-8") as w:
                 w.write(old_debug_layer)
-        with open(acpi_trace_state, "w", encoding="utf-8") as w:
-            w.write("disable")
+        if old_trace_state:
+            with open(acpi_trace_state, "w", encoding="utf-8") as w:
+                w.write("disable")
         return ret
 
     return runner
