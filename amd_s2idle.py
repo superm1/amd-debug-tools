@@ -726,6 +726,19 @@ class MissingIommuACPI(S0i3Failure):
         self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3738#note_2667140"
 
 
+class IommuPageFault(S0i3Failure):
+    """IOMMU Page fault"""
+
+    def __init__(self, device):
+        super().__init__()
+        self.description = f"Page fault reported for {device}"
+        self.explanation = (
+            f"\tThe IOMMU reports a page fault caused by {device}. This can prevent suspend/resume from functioning properly\n"
+            "\tThe page fault can be the device itself, a problem in the firmware or a problem in the kernel.\n"
+            "\tReport a bug for further triage and investigation.\n"
+        )
+
+
 class SMTNotEnabled(S0i3Failure):
     """SMT is not enabled"""
 
@@ -1334,6 +1347,7 @@ class S0i3Validator:
         self.acpi_errors = []
         self.active_gpios = []
         self.irq1_workaround = False
+        self.page_faults = []
 
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
@@ -2995,6 +3009,14 @@ class S0i3Validator:
                 device = device.group(1)
                 if device not in self.notify_devices:
                     self.notify_devices += [device]
+        # AMD-Vi: Event logged [IO_PAGE_FAULT device=0000:00:0c.0 domain=0x0000 address=0x7e800000 flags=0x0050]
+        elif "Event logged [IO_PAGE_FAULT" in line:
+            # get the device from string
+            device = re.search(r"device=(.*?) domain", line)
+            if device:
+                device = device.group(1)
+                if device not in self.page_faults:
+                    self.page_faults += [device]
 
         logging.debug(line)
 
@@ -3038,6 +3060,7 @@ class S0i3Validator:
         self.idle_masks = []
         self.acpi_errors = []
         self.active_gpios = []
+        self.page_faults = []
         self.irq1_workaround = False
         self.kernel_log.seek(self.last_suspend)
         self.kernel_log.process_callback(self._analyze_kernel_log_line)
@@ -3090,6 +3113,9 @@ class S0i3Validator:
         if self.acpi_errors:
             print_color("ACPI BIOS errors found", "❌")
             self.failures += [AcpiBiosError(self.acpi_errors)]
+        if self.page_faults:
+            print_color("Page faults found", "❌")
+            self.failures += [IommuPageFault(self.page_faults)]
         if self.notify_devices:
             print_color(
                 f"Notify devices {self.notify_devices} found during suspend", "💤"
