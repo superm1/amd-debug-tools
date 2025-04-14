@@ -726,6 +726,18 @@ class MissingIommuACPI(S0i3Failure):
         self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3738#note_2667140"
 
 
+class MissingIommuPolicy(S0i3Failure):
+    """ACPI table errors"""
+
+    def __init__(self, device):
+        super().__init__()
+        self.description = f"Device {device} does not have IOMMU policy applied"
+        self.explanation = (
+            f"\tThe ACPI device {device} is present but no IOMMU policy was set for it.\n"
+            "\tThis generally happens if the HID or UID don't match the ACPI IVRS table.\n"
+        )
+
+
 class IommuPageFault(S0i3Failure):
     """IOMMU Page fault"""
 
@@ -1980,6 +1992,7 @@ class S0i3Validator:
                 )
                 self.failures += [DMArNotEnabled()]
                 return False
+            # check that MSFT0201 is present
             for dev in self.pyudev.list_devices(subsystem="acpi"):
                 if "MSFT0201" in dev.sys_path:
                     found_acpi = True
@@ -1987,6 +2000,13 @@ class S0i3Validator:
                 print_color("IOMMU is misconfigured: missing MSFT0201 ACPI device", "❌")
                 self.failures += [MissingIommuACPI("MSFT0201")]
                 return False
+            # check that policy is bound to it
+            for dev in self.pyudev.list_devices(subsystem="platform"):
+                if "MSFT0201" in dev.sys_path:
+                    p = os.path.join(dev.sys_path, "iommu")
+                    if not os.path.exists(p):
+                        self.failures += [MissingIommuPolicy("MSFT0201")]
+                        return False
             print_color("IOMMU properly configured", "✅")
         return True
 
