@@ -720,7 +720,7 @@ class MissingIommuACPI(S0i3Failure):
         super().__init__()
         self.description = f"Device {device} missing from ACPI tables"
         self.explanation = (
-            "\tThe ACPI device {device} is required for suspend to work when the IOMMU is enabled.\n"
+            f"\tThe ACPI device {device} is required for suspend to work when the IOMMU is enabled.\n"
             "\tPlease check your BIOS settings and if configured correctly, report a bug to your system vendor.\n"
         )
         self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3738#note_2667140"
