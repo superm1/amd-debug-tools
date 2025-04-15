@@ -1360,6 +1360,7 @@ class S0i3Validator:
         self.active_gpios = []
         self.irq1_workaround = False
         self.page_faults = []
+        self.wakeup_count = {}
 
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
@@ -2314,6 +2315,47 @@ class S0i3Validator:
 
         return True
 
+    def capture_input_wakeup_count(self):
+        """Capture wakeup count for input related devices"""
+
+        def get_wakeup_count(device):
+            """Get the wakeup count for a device"""
+            p = os.path.join(device.sys_path, "power", "wakeup")
+            if not os.path.exists(p):
+                return None
+            p = os.path.join(device.sys_path, "power", "wakeup_count")
+            if not os.path.exists(p):
+                return None
+            return read_file(p)
+
+        wakeup_count = {}
+        for device in self.pyudev.list_devices(subsystem="input"):
+            count = get_wakeup_count(device)
+            if count is not None:
+                wakeup_count[device.sys_path] = count
+                continue
+            # iterate parents until finding one with a wakeup count
+            # or no more parents
+            parent = device.parent
+            while parent is not None:
+                count = get_wakeup_count(parent)
+                if count is not None:
+                    wakeup_count[parent.sys_path] = count
+                    break
+                parent = parent.parent
+
+        # diff the count
+        for device, count in wakeup_count.items():
+            if device not in self.wakeup_count:
+                continue
+            if self.wakeup_count[device] == count:
+                continue
+            print_color(
+                f"Woke up from input source {device} ({self.wakeup_count[device]}->{count})",
+                "💤",
+            )
+        self.wakeup_count = wakeup_count
+
     def capture_amdgpu_ips_status(self):
         """Capture the AMDGPU IPS status"""
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="38000"):
@@ -3192,6 +3234,7 @@ class S0i3Validator:
             self.check_hw_sleep,
             self.check_battery,
             self.check_thermal,
+            self.capture_input_wakeup_count,
         ]
         for check in checks:
             check()
@@ -3317,6 +3360,7 @@ class S0i3Validator:
         for i in range(1, count + 1):
             self.capture_gpes()
             self.capture_lid()
+            self.capture_input_wakeup_count()
             self.capture_amdgpu_ips_status()
             self.run_countdown("Suspending system", wait / 2)
             self.last_suspend = datetime.now()
