@@ -3225,6 +3225,15 @@ class S0i3Validator:
                 print_color(f"Unable to communicate with logind: {e}", "❌")
                 return False
         else:
+            p = os.path.join("/", "sys", "power", "wakeup_count")
+            f = read_file(p)
+            try:
+                with open(p, "w", encoding="utf-8") as w:
+                    w.write(str(int(f)))
+            except OSError as e:
+                print_color("Failed to set wakeup count", "❌")
+                logging.debug(e)
+                return False
             p = os.path.join("/", "sys", "power", "state")
             try:
                 with open(p, "w") as fd:
