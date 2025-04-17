@@ -6,15 +6,22 @@ import os
 import re
 import argparse
 import struct
-from amd_debug.common import (
-    print_color,
-    read_file,
-    configure_log,
-    is_root,
-    get_pretty_distro,
-    fatal_error,
-)
-from amd_debug.installer import Installer
+import sys
+
+try:
+    from amd_debug.common import (
+        print_color,
+        read_file,
+        configure_log,
+        is_root,
+        get_pretty_distro,
+        fatal_error,
+    )
+    from amd_debug.installer import Installer
+except ModuleNotFoundError:
+    sys.exit(
+        f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
+    )
 
 
 class MSR:  # pylint: disable=too-few-public-methods
