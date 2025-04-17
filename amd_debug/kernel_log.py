@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""Kernel log analysis"""
+
+import logging
+import re
+import subprocess
+from datetime import timedelta
+
+from amd_debug.common import systemd_in_use, read_file
+
+
+class KernelLogger:
+    """Base class for kernel loggers"""
+
+    def __init__(self):
+        pass
+
+    def seek(self):
+        """Seek to the beginning of the log"""
+
+    def process_callback(self, callback):
+        """Process the log"""
+
+    def match_line(self, matches):
+        """Find lines that match all matches"""
+
+    def match_pattern(self, pattern):
+        """Find lines that match a pattern"""
+
+
+class InputFile(KernelLogger):
+    """Class for input file parsing"""
+
+    def __init__(self, fname):
+        self.since_support = False
+        self.buffer = None
+        self.seeked = False
+        self.buffer = read_file(fname)
+
+    def process_callback(self, callback):
+        """Process the log"""
+        for entry in self.buffer.split("\n"):
+            callback(entry)
+
+
+class DmesgLogger(KernelLogger):
+    """Class for dmesg logging"""
+
+    def __init__(self):
+        self.since_support = False
+        self.buffer = None
+        self.seeked = False
+
+        cmd = ["dmesg", "-h"]
+        result = subprocess.run(cmd, check=True, capture_output=True)
+        for line in result.stdout.decode("utf-8").split("\n"):
+            if "--since" in line:
+                self.since_support = True
+        logging.debug("Since support: %d", self.since_support)
+
+        self.command = ["dmesg", "-t", "-k"]
+        self._refresh_head()
+
+    def _refresh_head(self):
+        self.buffer = []
+        self.seeked = False
+        result = subprocess.run(self.command, check=True, capture_output=True)
+        if result.returncode == 0:
+            self.buffer = result.stdout.decode("utf-8")
+
+    def seek(self, tim=None):
+        """Seek to the beginning of the log"""
+        if tim:
+            if self.since_support:
+                # look 10 seconds back because dmesg time isn't always accurate
+                fuzz = tim - timedelta(seconds=10)
+                cmd = self.command + [
+                    "--time-format=iso",
+                    f"--since={fuzz.strftime('%Y-%m-%dT%H:%M:%S')}",
+                ]
+            else:
+                cmd = self.command
+            result = subprocess.run(cmd, check=True, capture_output=True)
+            if result.returncode == 0:
+                self.buffer = result.stdout.decode("utf-8")
+                if self.since_support:
+                    self.seeked = True
+        elif self.seeked:
+            self._refresh_head()
+
+    def process_callback(self, callback, _priority=None):
+        """Process the log"""
+        for entry in self.buffer.split("\n"):
+            callback(entry, _priority)
+
+    def match_line(self, matches):
+        """Find lines that match all matches"""
+        for entry in self.buffer.split("\n"):
+            for match in matches:
+                if match not in entry:
+                    break
+                return entry
+        return None
+
+    def match_pattern(self, pattern):
+        for entry in self.buffer.split("\n"):
+            if re.search(pattern, entry):
+                return entry
+        return None
+
+    def capture_header(self):
+        """Capture the header of the log"""
+        return self.buffer.split("\n")[0]
+
+
+class SystemdLogger(KernelLogger):
+    """Class for logging using systemd journal"""
+
+    def __init__(self):
+        from systemd import journal  # pylint: disable=import-outside-toplevel
+
+        self.journal = journal.Reader()
+        self.journal.this_boot()
+        self.journal.log_level(journal.LOG_INFO)
+        self.journal.add_match(_TRANSPORT="kernel")
+        self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
+
+    def seek(self, tim=None):
+        """Seek to the beginning of the log"""
+        if tim:
+            self.journal.seek_realtime(tim)
+        else:
+            self.journal.seek_head()
+
+    def process_callback(self, callback, _priority=None):
+        """Process the log"""
+        for entry in self.journal:
+            callback(entry["MESSAGE"], entry["PRIORITY"])
+
+    def match_line(self, matches):
+        """Find lines that match all matches"""
+        for entry in self.journal:
+            for match in matches:
+                if match not in entry["MESSAGE"]:
+                    break
+                return entry["MESSAGE"]
+        return None
+
+    def match_pattern(self, pattern):
+        """Find lines that match a pattern"""
+        for entry in self.journal:
+            if re.search(pattern, entry["MESSAGE"]):
+                return entry["MESSAGE"]
+        return None
+
+
+def get_kernel_log(input_file=None) -> KernelLogger:
+    """Get the kernel log provider"""
+    kernel_log = None
+    if input_file:
+        kernel_log = InputFile(input_file)
+    elif systemd_in_use():
+        try:
+            kernel_log = SystemdLogger()
+        except ModuleNotFoundError:
+            pass
+    if not kernel_log:
+        try:
+            kernel_log = DmesgLogger()
+        except subprocess.CalledProcessError:
+            kernel_log = None
+    return kernel_log
