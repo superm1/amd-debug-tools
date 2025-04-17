@@ -9,6 +9,7 @@ import logging
 import os
 import platform
 import time
+import struct
 import subprocess
 import sys
 from datetime import date, timedelta
@@ -244,6 +245,24 @@ def _git_describe() -> str:
     except subprocess.CalledProcessError as e:
         logging.error("Git command failed: %s", e)
         return None
+
+
+def read_msr(msr, cpu):
+    p = f"/dev/cpu/{cpu}/msr"
+    if not os.path.exists(p) and is_root():
+        os.system("modprobe msr")
+    try:
+        f = os.open(p, os.O_RDONLY)
+    except OSError as exc:
+        raise PermissionError from exc
+    try:
+        os.lseek(f, msr, os.SEEK_SET)
+        val = struct.unpack("Q", os.read(f, 8))[0]
+    except OSError as exc:
+        raise PermissionError from exc
+    finally:
+        os.close(f)
+    return val
 
 
 class AmdTool:

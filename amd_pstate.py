@@ -5,7 +5,6 @@
 import os
 import re
 import argparse
-import struct
 import sys
 
 try:
@@ -15,6 +14,7 @@ try:
         is_root,
         get_pretty_distro,
         fatal_error,
+        read_msr,
         AmdTool,
     )
     from amd_debug.installer import Installer
@@ -166,24 +166,6 @@ class AmdPstateTriage(AmdTool):
 
     def gather_msrs(self):
         """Gather MSR information"""
-
-        def read_msr(msr, cpu):
-            p = f"/dev/cpu/{cpu}/msr"
-            if not os.path.exists(p) and self.root_user:
-                os.system("modprobe msr")
-            try:
-                f = os.open(p, os.O_RDONLY)
-            except OSError as exc:
-                raise PermissionError from exc
-            try:
-                os.lseek(f, msr, os.SEEK_SET)
-                val = struct.unpack("Q", os.read(f, 8))[0]
-            except OSError as exc:
-                raise PermissionError from exc
-            finally:
-                os.close(f)
-            return val
-
         import pandas as pd
         from tabulate import tabulate
 

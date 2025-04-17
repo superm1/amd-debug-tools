@@ -29,6 +29,7 @@ try:
         AmdTool,
         get_distro,
         get_pretty_distro,
+        read_msr,
     )
 except ModuleNotFoundError:
     sys.exit(
@@ -300,16 +301,6 @@ class S0i3Validator(AmdTool):
 
     def check_msr(self):
         """Check if PC6 or CC6 has been disabled"""
-
-        def read_msr(msr, cpu):
-            p = os.path.join("/", "dev", "cpu", f"{cpu}", "msr")
-            if not os.path.exists(p) and self.root_user:
-                os.system("modprobe msr")
-            f = os.open(p, os.O_RDONLY)
-            os.lseek(f, msr, os.SEEK_SET)
-            val = struct.unpack("Q", os.read(f, 8))[0]
-            os.close(f)
-            return val
 
         def check_bits(value, mask):
             return value & mask
