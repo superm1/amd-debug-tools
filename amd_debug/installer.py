@@ -3,7 +3,13 @@
 
 import os
 import subprocess
-from amd_debug.common import print_color, get_distro, read_file, systemd_in_use
+from amd_debug.common import (
+    print_color,
+    get_distro,
+    read_file,
+    systemd_in_use,
+    fatal_error,
+)
 
 # test if pip can be used to install anything
 try:
@@ -72,7 +78,10 @@ class DistroPackage:
                 return False
             installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
 
-        subprocess.check_call(installer)
+        try:
+            subprocess.check_call(installer)
+        except subprocess.CalledProcessError as e:
+            fatal_error(e)
         return True
 
 
