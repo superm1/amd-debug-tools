@@ -22,13 +22,15 @@ except ModuleNotFoundError:
     VERSION = False
 
 
-class Headers:
+class Headers:  # pylint: disable=too-few-public-methods
     """Headers for the script"""
 
     MissingPyudev = "Udev access library `pyudev` is missing"
     MissingPackaging = "Python library `packaging` is missing"
     MissingIasl = "ACPI extraction tool `iasl` is missing"
     MissingJournald = "Python systemd/journald module is missing"
+    MissingPandas = "Data library `pandas` is missing"
+    MissingTabulate = "Data library `tabulate` is missing"
     MissingEthtool = "Ethtool is missing"
     InstallAction = "Attempting to install"
 
@@ -132,6 +134,30 @@ class EthtoolPackage(DistroPackage):
         )
 
 
+class PandasPackage(DistroPackage):
+    """Class for handling the pandas package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-pandas",
+            rpm="python3-pandas",
+            arch="python-pandas",
+            pip="pandas",
+        )
+
+
+class TabulatePackage(DistroPackage):
+    """Class for handling the tabulate package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-tabulate",
+            rpm="python3-tabulate",
+            arch="python-tabulate",
+            pip="tabulate",
+        )
+
+
 class Installer:
     """Installer class"""
 
@@ -180,6 +206,26 @@ class Installer:
             self.journald = False
         self.requirements = []
 
+        # for checking for pandas
+        try:
+            from pandas import DataFrame as _  # pylint: disable=import-outside-toplevel
+
+            self.pandas = True
+        except ModuleNotFoundError:
+            self.pandas = False
+        except ImportError:
+            self.pandas = False
+
+        # for checking for tabulate
+        try:
+            from tabulate import (
+                tabulate as _,
+            )  # pylint: disable=import-outside-toplevel
+
+            self.tabulate = True
+        except ModuleNotFoundError:
+            self.tabulate = False
+
     def set_requirements(self, *args):
         """Set the requirements for the installer"""
         self.requirements = args
@@ -209,6 +255,16 @@ class Installer:
         if "journald" in self.requirements and not self.journald:
             self.show_install_message(Headers.MissingJournald)
             package = JournaldPackage()
+            if not package.install():
+                return False
+        if "pandas" in self.requirements and not self.pandas:
+            self.show_install_message(Headers.MissingPandas)
+            package = PandasPackage()
+            if not package.install():
+                return False
+        if "tabulate" in self.requirements and not self.tabulate:
+            self.show_install_message(Headers.MissingTabulate)
+            package = TabulatePackage()
             if not package.install():
                 return False
 

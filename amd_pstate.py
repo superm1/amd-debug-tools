@@ -2,41 +2,19 @@
 # SPDX-License-Identifier: MIT
 """CPPC triage script for AMD systems"""
 
-import sys
 import os
 import re
-import subprocess
-import logging
 import argparse
 import struct
-from datetime import date
-
-# used to identify the distro
-try:
-    import distro
-
-    DISTRO = True
-except ModuleNotFoundError:
-    DISTRO = False
-
-
-class Defaults:  # pylint: disable=too-few-public-methods
-    """Default values for the script"""
-
-    log_prefix = "amd_pstate_report"
-    log_suffix = "txt"
-
-
-class Colors:  # pylint: disable=too-few-public-methods
-    """ANSI color codes for terminal output"""
-
-    DEBUG = "\033[90m"
-    HEADER = "\033[95m"
-    OK = "\033[94m"
-    WARNING = "\033[32m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    UNDERLINE = "\033[4m"
+from amd_debug.common import (
+    print_color,
+    read_file,
+    configure_log,
+    is_root,
+    get_pretty_distro,
+    fatal_error,
+)
+from amd_debug.installer import Installer
 
 
 class MSR:  # pylint: disable=too-few-public-methods
@@ -89,255 +67,26 @@ def AMD_CPPC_EPP_PERF(x):
     return (x >> 24) & 0xFF
 
 
-class Headers:  # pylint: disable=too-few-public-methods
-    """Header strings for the script"""
-
-    LogDescription = "Location of log file"
-    InstallAction = "Attempting to install"
-    RerunAction = "Running this script as root will attempt to install it"
-    MissingPyudev = "Udev access library `pyudev` is missing"
-    MissingPandas = "Data library `pandas` is missing"
-    MissingTabulate = "Data library `tabulate` is missing"
-
-
-class DistroPackage:
-    """Class for handling distro-specific packages"""
-
-    def __init__(self, deb, rpm, arch, pip, root):
-        self.deb = deb
-        self.rpm = rpm
-        self.arch = arch
-        self.pip = pip
-        self.root = root
-
-    def install(self, distro):
-        """Install the package for the given distro."""
-        if not self.root:
-            sys.exit(1)
-        if distro in ("ubuntu", "debian"):
-            if not self.deb:
-                return False
-            installer = ["apt", "install", self.deb]
-        elif distro == "fedora":
-            if not self.rpm:
-                return False
-            release = read_file("/usr/lib/os-release")
-            variant = None
-            for line in release.split("\n"):
-                if line.startswith("VARIANT_ID"):
-                    variant = line.split("=")[-1]
-            if variant != "workstation":
-                return False
-            installer = ["dnf", "install", "-y", self.rpm]
-        elif distro == "arch" or os.path.exists("/etc/arch-release"):
-            installer = ["pacman", "-Sy", self.arch]
-        else:
-            try:
-                import pip
-            except ModuleNotFoundError:
-                self.pip = False
-            if not self.pip:
-                return False
-            installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
-        subprocess.check_call(installer)
-        return True
-
-
-class PyUdevPackage(DistroPackage):
-    """Class for handling the pyudev package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="python3-pyudev",
-            rpm="python3-pyudev",
-            arch="python-pyudev",
-            pip="pyudev",
-            root=root,
-        )
-
-
-class PandasPackage(DistroPackage):
-    """Class for handling the pandas package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="python3-pandas",
-            rpm="python3-pandas",
-            arch="python-pandas",
-            pip="pandas",
-            root=root,
-        )
-
-
-class TabulatePackage(DistroPackage):
-    """Class for handling the tabulate package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="python3-tabulate",
-            rpm="python3-tabulate",
-            arch="python-tabulate",
-            pip="tabulate",
-            root=root,
-        )
-
-
-def read_file(fn):
-    """Read the contents of a file and return it as a string."""
-    with open(fn, "r", encoding="utf-8") as r:
-        return r.read().strip()
-
-
-def print_color(message, group):
-    """Print a message with a color based on the group."""
-    prefix = "%s " % group
-    suffix = Colors.ENDC
-    if group == "🚦":
-        color = Colors.WARNING
-    elif group == "🦟":
-        color = Colors.DEBUG
-    elif any(mk in group for mk in ["❌", "👀"]):
-        color = Colors.FAIL
-    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "🫆", "○"]):
-        color = Colors.OK
-    else:
-        color = group
-        prefix = ""
-
-    log_txt = f"{prefix}{message}".strip()
-    if any(c in color for c in [Colors.OK, Colors.HEADER, Colors.UNDERLINE]):
-        logging.info(log_txt)
-    elif color == Colors.WARNING:
-        logging.warning(log_txt)
-    elif color == Colors.FAIL:
-        logging.error(log_txt)
-    else:
-        logging.debug(log_txt)
-
-    if "TERM" in os.environ and os.environ["TERM"] == "dumb":
-        suffix = ""
-        color = ""
-    print(f"{prefix}{color}{message}{suffix}")
-
-
-def fatal_error(message):
-    """Print an error message and exit the program."""
-    print_color(message, "👀")
-    sys.exit(1)
-
-
-def guess_distro():
-    """Guess the distro based on heuristics"""
-    dist = None
-    pretty = None
-
-    if DISTRO:
-        try:
-            dist = distro.id()
-            pretty = distro.os_release_info()["pretty_name"]
-        except AttributeError:
-            print_color("Failed to discover distro", "🚦")
-    if not dist or not pretty:
-        p = os.path.join("/", "etc", "os-release")
-        if os.path.exists(p):
-            v = read_file(p)
-            for line in v.split("\n"):
-                if "ID=" in line:
-                    dist = line.split("=")[-1].strip().strip('"')
-                if "PRETTY_NAME=" in line:
-                    pretty = line.split("=")[-1].strip().strip('"')
-    if not dist:
-        if os.path.exists("/etc/arch-release"):
-            dist = "arch"
-        elif os.path.exists("/etc/fedora-release"):
-            dist = "fedora"
-        elif os.path.exists("/etc/debian_version"):
-            dist = "debian"
-
-    if not dist:
-        fatal_error("Unable to identify distro")
-    return (dist, pretty)
-
-
 class AmdPstateTriage:
     """Class for handling the triage process"""
 
-    def show_install_message(self, message):
-        """Show a message indicating the installation action."""
-        action = Headers.InstallAction if self.root_user else Headers.RerunAction
-        message = f"{message}. {action}."
-        print_color(message, "👀")
+    def __init__(self):
+        self.root_user = is_root()
 
-    def __init__(self, arg):
-        # for saving a log file for analysis
-        logging.basicConfig(
-            format="%(asctime)s %(levelname)s:\t%(message)s",
-            filename=arg,
-            filemode="w",
-            level=logging.DEBUG,
-        )
-
-        self.root_user = os.geteuid() == 0
-
-        dist, pretty = guess_distro()
+        pretty = get_pretty_distro()
         print_color(f"{pretty}", "🐧")
 
-        try:
-            import pyudev
+        installer = Installer()
+        installer.set_requirements("pyudev", "pandas", "tabulate")
+        if not installer.install_dependencies():
+            fatal_error("Failed to install dependencies")
 
-            self.context = pyudev.Context()
-        except ModuleNotFoundError:
-            self.context = False
+        from pyudev import Context  # pylint: disable=import-outside-toplevel
 
-        if not self.context:
-            self.show_install_message(Headers.MissingPyudev)
-            package = PyUdevPackage(self.root_user)
-            package.install(dist)
-            try:
-                from pyudev import Context
-            except ModuleNotFoundError:
-                fatal_error("Missing python-pyudev package, unable to identify devices")
-            self.context = Context()
-
-        try:
-            from pandas import DataFrame
-
-            self.pandas = True
-        except ModuleNotFoundError:
-            self.pandas = False
-        except ImportError:
-            self.pandas = False
-
-        if not self.pandas:
-            self.show_install_message(Headers.MissingPandas)
-            package = PandasPackage(self.root_user)
-            package.install(dist)
-            try:
-                from pandas import DataFrame
-
-                self.pandas = True
-            except ModuleNotFoundError:
-                fatal_error("Missing pandas package, unable to gather data")
-
-        try:
-            from tabulate import tabulate
-
-            self.tabulate = True
-        except ModuleNotFoundError:
-            self.tabulate = False
-
-        if not self.tabulate:
-            self.show_install_message(Headers.MissingTabulate)
-            package = TabulatePackage(self.root_user)
-            package.install(dist)
-            try:
-                from tabulate import tabulate
-
-                self.tabulate = True
-            except ModuleNotFoundError:
-                fatal_error("Missing python-tabulate package, unable to display data")
+        self.context = Context()
 
     def gather_amd_pstate_info(self):
+        """Gather AMD Pstate global information"""
         for f in ("status", "prefcore"):
             p = os.path.join("/", "sys", "devices", "system", "cpu", "amd_pstate", f)
             if os.path.exists(p):
@@ -360,8 +109,8 @@ class AmdPstateTriage:
 
     def gather_cpu_info(self):
         """Gather a dataframe of CPU information"""
-        import pandas as pd
-        from tabulate import tabulate
+        import pandas as pd  # pylint: disable=import-outside-toplevel
+        from tabulate import tabulate  # pylint: disable=import-outside-toplevel
 
         df = pd.DataFrame(
             columns=[
@@ -512,7 +261,7 @@ class AmdPstateTriage:
                 )
 
         except FileNotFoundError:
-            print_color("Unabled to check MSRs: MSR kernel module not loaded", "❌")
+            print_color("Unable to check MSRs: MSR kernel module not loaded", "❌")
             return False
         except PermissionError:
             if not self.root_user:
@@ -558,28 +307,18 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Collect useful information for debugging amd-pstate issues.",
-        epilog="Arguments are optional, and if they are not provided will prompted.\n"
-        "To use non-interactively, please populate all optional arguments.",
+        epilog="Arguments are optional",
     )
     parser.add_argument(
         "--log",
-        help=Headers.LogDescription,
+        help="Location of log file",
     )
     return parser.parse_args()
 
 
-def configure_log(arg):
-    """Configure the log file name based on the provided argument or user input."""
-    if not arg:
-        fname = f"{Defaults.log_prefix}-{date.today()}.{Defaults.log_suffix}"
-        arg = input(f"{Headers.LogDescription} (default {fname})? ")
-        if not arg:
-            arg = fname
-    return arg
-
-
 if __name__ == "__main__":
     args = parse_args()
-    log = configure_log(args.log)
-    triage = AmdPstateTriage(log)
+    log = configure_log("amd-pstate", args.log)
+    triage = AmdPstateTriage()
     triage.run()
+    print(f"Logs are saved to {log}")
