@@ -30,6 +30,7 @@ try:
         get_distro,
         get_pretty_distro,
         read_msr,
+        minimum_kernel,
     )
 except ModuleNotFoundError:
     sys.exit(
@@ -201,9 +202,6 @@ class S0i3Validator(AmdTool):
         # turn on EC debug messages
         self.debug_ec = debug_ec
 
-        self.distro = get_distro()
-        self.pretty_distro = get_pretty_distro()
-
         self.installer = Installer()
         self.installer.set_requirements("pyudev", "iasl", "packaging", "fwupd")
         if not self.installer.install_dependencies():
@@ -244,11 +242,6 @@ class S0i3Validator(AmdTool):
 
         # If we're locked down, a lot less errors make sense
         self.lockdown = False
-
-        # kernel versioning reporting and checking
-        self.kernel = platform.uname().release
-        self.kernel_major = int(self.kernel.split(".")[0])
-        self.kernel_minor = int(self.kernel.split(".")[1])
 
         # used to analyze the suspend cycle
         self.suspend_count = 0
@@ -327,9 +320,10 @@ class S0i3Validator(AmdTool):
 
     def capture_kernel_version(self):
         """Log the kernel version used"""
-        if self.pretty_distro:
-            print_color(f"{self.pretty_distro}", "🐧")
-        print_color(f"Kernel {self.kernel}", "🐧")
+        pretty_distro = get_pretty_distro()
+        if pretty_distro:
+            print_color(f"{pretty_distro}", "🐧")
+        print_color(f"Kernel {platform.uname().release}", "🐧")
 
     def check_thermal(self):
         """Capture thermal zone information"""
@@ -654,7 +648,7 @@ class S0i3Validator(AmdTool):
 
         for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
             # https://git.kernel.org/torvalds/c/e79a10652bbd3
-            if self.minimum_kernel(6, 10):
+            if minimum_kernel(6, 10):
                 logging.debug("New enough kernel to avoid NVME check")
                 break
             pci_slot_name = dev.properties["PCI_SLOT_NAME"]
@@ -819,7 +813,7 @@ class S0i3Validator(AmdTool):
         """Check for AMD HSMP driver"""
         # not needed to check in newer kernels
         # see https://github.com/torvalds/linux/commit/77f1972bdcf7513293e8bbe376b9fe837310ee9c
-        if self.minimum_kernel(6, 10):
+        if minimum_kernel(6, 10):
             logging.debug("New enough kernel to avoid HSMP check")
             return True
         f = os.path.join("/", "boot", f"config-{platform.uname().release}")
@@ -1562,7 +1556,7 @@ class S0i3Validator(AmdTool):
 
     def capture_linux_firmware(self):
         """Capture the Linux firmware to debug"""
-        if self.distro in ("ubuntu", "debian"):
+        if get_distro() in ("ubuntu", "debian"):
             cache = apt.Cache()
             packages = ["linux-firmware"]
             for obj in cache.get_providing_packages("amdgpu-firmware-nda"):
@@ -1868,23 +1862,15 @@ class S0i3Validator(AmdTool):
             self.lockdown = True
         return True
 
-    def minimum_kernel(self, major, minor):
-        """Checks if the kernel version is at least major.minor"""
-        if self.kernel_major > major:
-            return True
-        if self.kernel_major < major:
-            return False
-        return self.kernel_minor >= minor
-
     def toggle_dynamic_debugging(self, enable):
         """Enable or disable dynamic debugging"""
         try:
             fn = os.path.join("/", "sys", "kernel", "debug", "dynamic_debug", "control")
             setting = "+" if enable else "-"
-            if not self.minimum_kernel(6, 2):
+            if not minimum_kernel(6, 2):
                 with open(fn, "w") as w:
                     w.write(f"file drivers/acpi/x86/s2idle.c {setting}p")
-            if not self.minimum_kernel(6, 5):
+            if not minimum_kernel(6, 5):
                 # only needed if missing https://github.com/torvalds/linux/commit/c9a236419ff936755eb5db8a894c3047440e65a8
                 with open(fn, "w") as w:
                     w.write(f"file drivers/pinctrl/pinctrl-amd.c {setting}p")
