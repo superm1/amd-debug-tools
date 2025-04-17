@@ -23,6 +23,8 @@ except ModuleNotFoundError:
         f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
     )
 
+ACPI_METHOD = "M460"
+
 
 class AmdBios(AmdTool):
     """
@@ -39,6 +41,20 @@ class AmdBios(AmdTool):
     def set_tracing(self, enable, disable):
         """Run the action"""
 
+        def search_acpi_tables(pattern):
+            """Search for a pattern in ACPI tables"""
+            p = os.path.join("/", "sys", "firmware", "acpi", "tables")
+
+            for fn in os.listdir(p):
+                if not fn.startswith("SSDT") and not fn.startswith("DSDT"):
+                    continue
+                fp = os.path.join(p, fn)
+                with open(fp, "rb") as file:
+                    content = file.read()
+                    if pattern.encode() in content:
+                        return True
+            return False
+
         if enable or disable:
             if not self.root_user:
                 fatal_error("Please run this script as root")
@@ -46,7 +62,7 @@ class AmdBios(AmdTool):
         expected = {
             "trace_debug_layer": 0x80,
             "trace_debug_level": 0x10,
-            "trace_method_name": "\\M460",
+            "trace_method_name": f"\\{ACPI_METHOD}",
             "trace_state": "method",
         }
         actual = {}
@@ -61,6 +77,11 @@ class AmdBios(AmdTool):
         logging.debug(actual)
 
         if enable:
+            # check that ACPI tables have \_SB.\M460
+            if not search_acpi_tables(ACPI_METHOD):
+                fatal_error(
+                    f"{sys.argv[0]} will not work on this system: ACPI tables do not contain {ACPI_METHOD}"
+                )
             for key, value in expected.items():
                 p = os.path.join(acpi_base, key)
                 t = actual[key]
@@ -71,6 +92,7 @@ class AmdBios(AmdTool):
                 else:
                     if actual[key].strip() == str(value):
                         continue
+                    t = value
                 with open(p, "w", encoding="utf-8") as w:
                     w.write(t)
             print_color("Enabled BIOS tracing", "✅")
