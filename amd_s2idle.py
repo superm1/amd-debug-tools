@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, date
 
 try:
     import amd_debug.failures
+    from amd_debug.common import read_file, print_color, fatal_error, BIT
 except ModuleNotFoundError:
     sys.exit(
         f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
@@ -81,18 +82,6 @@ except ModuleNotFoundError:
     DISTRO = False
 
 
-class Colors:
-    """Colors for terminal output"""
-
-    DEBUG = "\033[90m"
-    HEADER = "\033[95m"
-    OK = "\033[94m"
-    WARNING = "\033[32m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    UNDERLINE = "\033[4m"
-
-
 class Defaults:
     """Default values for the script"""
 
@@ -135,17 +124,6 @@ class Headers:
     RogAllyPowerSave = "Rog Ally doesn't have MCU powersave enabled"
 
 
-def BIT(num):  # pylint=disable=invalid-name
-    """Returns a bit shifted by num"""
-    return 1 << num
-
-
-def read_file(fn):
-    """Reads and returns the contents of fn"""
-    with open(fn, "r") as r:
-        return r.read().strip()
-
-
 def capture_file_to_debug(fn):
     """Reads and captures all contents of fn"""
     try:
@@ -164,44 +142,6 @@ def get_property_pyudev(properties, key, fallback=""):
         return properties.get(key, fallback)
     except UnicodeDecodeError:
         return ""
-
-
-def print_color(message, group):
-    """Prints a message with a color"""
-    prefix = f"{group} "
-    suffix = Colors.ENDC
-    if group == "🚦":
-        color = Colors.WARNING
-    elif group == "🦟":
-        color = Colors.DEBUG
-    elif any(mk in group for mk in ["❌", "👀", "🌡️"]):
-        color = Colors.FAIL
-    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱"]):
-        color = Colors.OK
-    else:
-        color = group
-        prefix = ""
-
-    log_txt = f"{prefix}{message}".strip()
-    if any(c in color for c in [Colors.OK, Colors.HEADER, Colors.UNDERLINE]):
-        logging.info(log_txt)
-    elif color == Colors.WARNING:
-        logging.warning(log_txt)
-    elif color == Colors.FAIL:
-        logging.error(log_txt)
-    else:
-        logging.debug(log_txt)
-
-    if "TERM" in os.environ and os.environ["TERM"] == "dumb":
-        suffix = ""
-        color = ""
-    print(f"{prefix}{color}{message}{suffix}")
-
-
-def fatal_error(message):
-    """Prints a fatal error message and exits"""
-    print_color(message, "👀")
-    sys.exit(1)
 
 
 def pm_debugging(func):
@@ -811,7 +751,7 @@ class S0i3Validator:
                     r.seek(0x70)
                     found = struct.unpack("<I", r.read(4))[0] & BIT(21)
             except PermissionError:
-                print_color("FADT check unavailable", Colors.WARNING)
+                print_color("FADT check unavailable", "🚦")
                 return True
         if found:
             message = "ACPI FADT supports Low-power S0 idle"
@@ -1292,7 +1232,7 @@ class S0i3Validator:
                     else:
                         print_color(
                             f"Platform may have low hardware sleep residency with Wake-on-lan disabled. Run `ethtool -s {interface} wol g` to enable it if necessary.",
-                            Colors.WARNING,
+                            "🚦",
                         )
         return True
 
@@ -1345,7 +1285,7 @@ class S0i3Validator:
                 ) and version in device.get_version():
                     print_color(
                         f"Platform may have problems resuming.  Upgrade the firmware for '{device.get_name()}' if you have problems.",
-                        Colors.WARNING,
+                        "🚦",
                     )
         return True
 
@@ -1446,7 +1386,7 @@ class S0i3Validator:
             return
         print_color(
             "Platform may hang resuming.  Upgrade your firmware or add pcie_port_pm=off to kernel command line if you have problems.",
-            Colors.WARNING,
+            "🚦",
         )
 
     def check_wake_sources(self):
@@ -1798,10 +1738,10 @@ class S0i3Validator:
                 if self.lockdown:
                     print_color(
                         "Unable to gather IPS state data due to kernel lockdown.",
-                        Colors.WARNING,
+                        "🚦",
                     )
                 else:
-                    print_color("Failed to read IPS state data", Colors.WARNING)
+                    print_color("Failed to read IPS state data", "🚦")
 
     def capture_lid(self):
         """Capture lid status"""
@@ -1876,10 +1816,10 @@ class S0i3Validator:
                 if self.lockdown:
                     print_color(
                         "Unable to gather hardware sleep data.",
-                        Colors.WARNING,
+                        "🚦",
                     )
                 else:
-                    print_color("Failed to read hardware sleep data", Colors.WARNING)
+                    print_color("Failed to read hardware sleep data", "🚦")
                 return False
             except FileNotFoundError:
                 print_color("HW sleep statistics file missing", "❌")
@@ -2062,7 +2002,7 @@ class S0i3Validator:
     def capture_acpi(self):
         """Capture ACPI tables to debug"""
         if not self.iasl:
-            print_color(Headers.MissingIasl, Colors.WARNING)
+            print_color(Headers.MissingIasl, "🚦")
             return True
         if not self.root_user:
             logging.debug("Unable to capture ACPI tables without root")
@@ -2265,7 +2205,7 @@ class S0i3Validator:
         """Capture the full dmesg output"""
         if not self.kernel_log:
             message = "Unable to analyze kernel log"
-            print_color(message, Colors.WARNING)
+            print_color(message, "🚦")
             return
         self.kernel_log.capture_full_dmesg()
 
@@ -2276,7 +2216,7 @@ class S0i3Validator:
         elif isinstance(self.kernel_log, DmesgLogger):
             print_color(
                 "🚦Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
-                Colors.WARNING,
+                "🚦",
             )
             header = self.kernel_log.capture_header()
             if not header.startswith("Linux version"):
@@ -2338,7 +2278,7 @@ class S0i3Validator:
 
     def prerequisites(self):
         """Check the prerequisites for the system"""
-        print_color(Headers.Info, Colors.HEADER)
+        print_color(Headers.Info, "🗣️")
         info = [
             self.capture_smbios,
             self.capture_kernel_version,
@@ -2348,7 +2288,7 @@ class S0i3Validator:
         for i in info:
             i()
 
-        print_color(Headers.Prerequisites, Colors.HEADER)
+        print_color(Headers.Prerequisites, "🗣️")
         checks = [
             self.check_logger,
             self.check_cpu,
@@ -2395,7 +2335,7 @@ class S0i3Validator:
             if not check():
                 result = False
         if not result:
-            print_color(Headers.BrokenPrerequisites, Colors.UNDERLINE)
+            print_color(Headers.BrokenPrerequisites, "💯")
             self.capture_full_dmesg()
         return result
 
@@ -2517,7 +2457,7 @@ class S0i3Validator:
         if show_warning:
             print_color(
                 "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
-                Colors.WARNING,
+                "🚦",
             )
         return True
 
@@ -2571,7 +2511,7 @@ class S0i3Validator:
                 if self.irq1_workaround:
                     print_color("Kernel workaround for IRQ1 issue utilized", "✅")
                 else:
-                    print_color("IRQ1 found during wakeup", Colors.WARNING)
+                    print_color("IRQ1 found during wakeup", "🚦")
                     self.failures += [amd_debug.failures.Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
@@ -2647,7 +2587,7 @@ class S0i3Validator:
 
     def analyze_results(self):
         """Analyze the results of the last cycle"""
-        print_color(Headers.LastCycleResults, Colors.HEADER)
+        print_color(Headers.LastCycleResults, "🗣️")
         checks = [
             self.analyze_kernel_log,
             self.check_wakeup_irq,
@@ -2767,7 +2707,7 @@ class S0i3Validator:
             length = timedelta(seconds=(duration + wait) * count)
             print_color(
                 f"Running {count} cycles (Test finish expected @ {datetime.now() + length})",
-                Colors.HEADER,
+                "🗣️",
             )
 
         self.requested_duration = duration
@@ -2799,7 +2739,7 @@ class S0i3Validator:
                     finish=datetime.now()
                     + timedelta(seconds=self.requested_duration + wait),
                 ),
-                Colors.HEADER,
+                "🗣️",
             )
             if wakealarm:
                 try:
@@ -2826,7 +2766,7 @@ class S0i3Validator:
         """Print the failure report"""
         if len(self.failures) == 0:
             return True
-        print_color(Headers.ExplanationReport, Colors.HEADER)
+        print_color(Headers.ExplanationReport, "🗣️")
         for item in self.failures:
             item.get_failure()
         return False
