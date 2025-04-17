@@ -6,9 +6,22 @@ import argparse
 import logging
 import os
 import re
-from amd_debug.common import read_file, print_color, is_root, configure_log, fatal_error
-from amd_debug.kernel_log import get_kernel_log
-from amd_debug.installer import Installer
+import sys
+
+try:
+    from amd_debug.common import (
+        read_file,
+        print_color,
+        is_root,
+        configure_log,
+        fatal_error,
+    )
+    from amd_debug.kernel_log import get_kernel_log
+    from amd_debug.installer import Installer
+except ModuleNotFoundError:
+    sys.exit(
+        f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
+    )
 
 
 class AmdBios:
