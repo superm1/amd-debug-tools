@@ -13,8 +13,8 @@ try:
         read_file,
         print_color,
         is_root,
-        configure_log,
         fatal_error,
+        AmdTool,
     )
     from amd_debug.kernel_log import get_kernel_log
     from amd_debug.installer import Installer
@@ -24,12 +24,13 @@ except ModuleNotFoundError:
     )
 
 
-class AmdBios:
+class AmdBios(AmdTool):
     """
     AmdBios is a class which fetches the BIOS events from kernel logs.
     """
 
-    def __init__(self, inf):
+    def __init__(self, inf, log_file):
+        super().__init__("bios", log_file)
         self.distro = None
         self.pretty_distro = None
         self.root_user = is_root()
@@ -171,10 +172,8 @@ if __name__ == "__main__":
     if args.enable and args.disable:
         raise ValueError("can't set both enable and disable")
 
-    log = configure_log("bios", args.log)
-    app = AmdBios(args.input)
+    app = AmdBios(args.input, args.log)
     if not args.input:
         app.set_tracing(args.enable, args.disable)
     if not args.enable and not args.disable:
         app.run()
-    print(f"Logs are saved to {log}")

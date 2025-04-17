@@ -12,10 +12,10 @@ try:
     from amd_debug.common import (
         print_color,
         read_file,
-        configure_log,
         is_root,
         get_pretty_distro,
         fatal_error,
+        AmdTool,
     )
     from amd_debug.installer import Installer
 except ModuleNotFoundError:
@@ -74,10 +74,11 @@ def AMD_CPPC_EPP_PERF(x):
     return (x >> 24) & 0xFF
 
 
-class AmdPstateTriage:
+class AmdPstateTriage(AmdTool):
     """Class for handling the triage process"""
 
-    def __init__(self):
+    def __init__(self, log_file):
+        super().__init__("amd-pstate", log_file)
         self.root_user = is_root()
 
         pretty = get_pretty_distro()
@@ -325,7 +326,5 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    log = configure_log("amd-pstate", args.log)
-    triage = AmdPstateTriage()
+    triage = AmdPstateTriage(args.log)
     triage.run()
-    print(f"Logs are saved to {log}")

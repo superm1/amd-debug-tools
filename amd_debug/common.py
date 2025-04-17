@@ -9,6 +9,7 @@ import logging
 import os
 import platform
 import time
+import subprocess
 import sys
 from datetime import date, timedelta
 
@@ -229,3 +230,29 @@ def get_property_pyudev(properties, key, fallback=""):
         return properties.get(key, fallback)
     except UnicodeDecodeError:
         return ""
+
+
+def _git_describe() -> str:
+    """Get the git description of the current commit"""
+    try:
+        result = subprocess.check_output(
+            ["git", "log", "-1", '--format=commit %h ("%s")'],
+            cwd=os.path.dirname(__file__),
+            text=True,
+        )
+        return result.strip()
+    except subprocess.CalledProcessError as e:
+        logging.error("Git command failed: %s", e)
+        return None
+
+
+class AmdTool:
+    """Base class for AMD tools"""
+
+    def __init__(self, log_prefix, log_file):
+        self.log = configure_log(log_prefix, log_file)
+        logging.debug("command: %s", sys.argv)
+        logging.debug(_git_describe())
+
+    def __del__(self):
+        print(f"Logs are saved to {self.log}")
