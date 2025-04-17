@@ -15,6 +15,10 @@ It can also be used for collecting statistics about suspend cycles and for stres
 It will capture some state from the system as well as from the machine specific registers that
 amd-pstate uses.
 
+## amd_bios.py
+
+`amd_bios.py` is a a script that can be used to enable or disable BIOS AML debug logging
+and to parse a kernel log that contains BIOS logs.
 
 ## psr.py
 
