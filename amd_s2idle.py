@@ -18,7 +18,8 @@ from datetime import datetime, timedelta, date
 
 try:
     import amd_debug.failures
-    from amd_debug.common import read_file, print_color, fatal_error, BIT
+    from amd_debug.kernel_log import get_kernel_log, SystemdLogger, DmesgLogger
+    from amd_debug.common import read_file, print_color, fatal_error, BIT, AmdTool
 except ModuleNotFoundError:
     sys.exit(
         f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
@@ -204,152 +205,6 @@ def pm_debugging(func):
         return ret
 
     return runner
-
-
-class KernelLogger:
-    """Base class for kernel loggers"""
-
-    def __init__(self):
-        pass
-
-    def seek(self):
-        """Seek to the beginning of the log"""
-
-    def process_callback(self, callback):
-        """Process the log"""
-
-    def match_line(self, matches):
-        """Find lines that match all matches"""
-
-    def match_pattern(self, pattern):
-        """Find lines that match a pattern"""
-
-    def capture_full_dmesg(self, line):
-        """Capture the full dmesg"""
-        logging.debug(line)
-
-
-class DmesgLogger(KernelLogger):
-    """Class for dmesg logging"""
-
-    def __init__(self):
-        self.since_support = False
-        self.buffer = None
-        self.seeked = False
-
-        cmd = ["dmesg", "-h"]
-        result = subprocess.run(cmd, check=True, capture_output=True)
-        for line in result.stdout.decode("utf-8").split("\n"):
-            if "--since" in line:
-                self.since_support = True
-        logging.debug("Since support: %d", self.since_support)
-
-        self.command = ["dmesg", "-t", "-k"]
-        self._refresh_head()
-
-    def _refresh_head(self):
-        self.buffer = []
-        self.seeked = False
-        result = subprocess.run(self.command, check=True, capture_output=True)
-        if result.returncode == 0:
-            self.buffer = result.stdout.decode("utf-8")
-
-    def seek(self, tim=None):
-        """Seek to the beginning of the log"""
-        if tim:
-            if self.since_support:
-                # look 10 seconds back because dmesg time isn't always accurate
-                fuzz = tim - timedelta(seconds=10)
-                cmd = self.command + [
-                    "--time-format=iso",
-                    f"--since={fuzz.strftime('%Y-%m-%dT%H:%M:%S')}",
-                ]
-            else:
-                cmd = self.command
-            result = subprocess.run(cmd, check=True, capture_output=True)
-            if result.returncode == 0:
-                self.buffer = result.stdout.decode("utf-8")
-                if self.since_support:
-                    self.seeked = True
-        elif self.seeked:
-            self._refresh_head()
-
-    def process_callback(self, callback):
-        """Process the log"""
-        for entry in self.buffer.split("\n"):
-            callback(entry)
-
-    def match_line(self, matches):
-        """Find lines that match all matches"""
-        for entry in self.buffer.split("\n"):
-            for match in matches:
-                if match not in entry:
-                    break
-                return entry
-        return None
-
-    def match_pattern(self, pattern):
-        for entry in self.buffer.split("\n"):
-            if re.search(pattern, entry):
-                return entry
-        return None
-
-    def capture_full_dmesg(self, line=None):
-        """Capture the full dmesg"""
-        self.seek()
-        for entry in self.buffer.split("\n"):
-            super().capture_full_dmesg(entry)
-
-    def capture_header(self):
-        """Capture the header of the log"""
-        return self.buffer.split("\n")[0]
-
-
-class SystemdLogger(KernelLogger):
-    """Class for logging using systemd journal"""
-
-    def __init__(self):
-        from systemd import journal  # pylint: disable=import-outside-toplevel
-
-        self.journal = journal.Reader()
-        self.journal.this_boot()
-        self.journal.log_level(journal.LOG_INFO)
-        self.journal.add_match(_TRANSPORT="kernel")
-        self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
-
-    def seek(self, tim=None):
-        """Seek to the beginning of the log"""
-        if tim:
-            self.journal.seek_realtime(tim)
-        else:
-            self.journal.seek_head()
-
-    def process_callback(self, callback):
-        """Process the log"""
-        for entry in self.journal:
-            callback(entry["MESSAGE"])
-
-    def match_line(self, matches):
-        """Find lines that match all matches"""
-        for entry in self.journal:
-            for match in matches:
-                if match not in entry["MESSAGE"]:
-                    break
-                return entry["MESSAGE"]
-        return None
-
-    def match_pattern(self, pattern):
-        """Find lines that match a pattern"""
-        for entry in self.journal:
-            if re.search(pattern, entry["MESSAGE"]):
-                return entry["MESSAGE"]
-        return None
-
-    def capture_full_dmesg(self, line=None):
-        """Capture the full dmesg"""
-        self.seek()
-        for entry in self.journal:
-            super().capture_full_dmesg(entry["MESSAGE"])
 
 
 class DistroPackage:
@@ -544,7 +399,7 @@ class WakeIRQ:
         return f"{self.name}{actions}"
 
 
-class S0i3Validator:
+class S0i3Validator(AmdTool):
     """
     S0i3Validator class performs various checks and validations for
     S0i3/s2idle analysis on AMD systems.
@@ -596,32 +451,8 @@ class S0i3Validator:
         if not self.distro:
             fatal_error("Unable to identify distro")
 
-    def setup_kernel_log(self, kernel_log):
-        """Setup the kernel log provider"""
-        self.kernel_log = None
-        if kernel_log == "auto":
-            init_daemon = read_file("/proc/1/comm")
-            if "systemd" in init_daemon:
-                try:
-                    self.kernel_log = SystemdLogger()
-                except ImportError:
-                    self.kernel_log = None
-                if not self.kernel_log:
-                    self.show_install_message(Headers.MissingJournald)
-                    package = JournaldPackage(self.root_user)
-                    package.install(self.distro)
-                    self.kernel_log = SystemdLogger()
-            else:
-                try:
-                    self.kernel_log = DmesgLogger()
-                except subprocess.CalledProcessError:
-                    self.kernel_log = None
-        elif kernel_log == "systemd":
-            self.kernel_log = SystemdLogger()
-        elif kernel_log == "dmesg":
-            self.kernel_log = DmesgLogger()
-
-    def __init__(self, acpidump, logind, debug_ec, kernel_log):
+    def __init__(self, acpidump, logind, debug_ec, log_file):
+        super().__init__("amd_s2idle", log_file)
         # for installing and running suspend
         self.root_user = os.geteuid() == 0
         self.check_selinux()
@@ -663,7 +494,7 @@ class S0i3Validator:
             package = IaslPackage(self.root_user)
             self.iasl = package.install(self.distro)
 
-        self.setup_kernel_log(kernel_log)
+        self.kernel_log = get_kernel_log(None)
 
         # for comparing SMU version
         if not VERSION:
@@ -2201,14 +2032,6 @@ class S0i3Validator:
                     logging.debug("%s is configured to %s", f, d)
         return True
 
-    def capture_full_dmesg(self):
-        """Capture the full dmesg output"""
-        if not self.kernel_log:
-            message = "Unable to analyze kernel log"
-            print_color(message, "🚦")
-            return
-        self.kernel_log.capture_full_dmesg()
-
     def check_logger(self):
         """Check if the kernel log is available"""
         if isinstance(self.kernel_log, SystemdLogger):
@@ -2336,7 +2159,6 @@ class S0i3Validator:
                 result = False
         if not result:
             print_color(Headers.BrokenPrerequisites, "💯")
-            self.capture_full_dmesg()
         return result
 
     def check_lockdown(self):
@@ -2382,7 +2204,7 @@ class S0i3Validator:
             # caught by lockdown test
             pass
 
-    def _analyze_kernel_log_line(self, line):
+    def _analyze_kernel_log_line(self, line, _priority):
         """Analyze a line from the kernel log"""
         if "Timekeeping suspended for" in line:
             self.cycle_count += 1
@@ -2792,12 +2614,6 @@ def parse_args():
         help=Headers.WaitDescription,
     )
     parser.add_argument(
-        "--kernel-log-provider",
-        default="auto",
-        choices=["auto", "systemd", "dmesg"],
-        help="Kernel log provider",
-    )
-    parser.add_argument(
         "--force",
         action="store_true",
         help="Run suspend test even if prerequisites failed",
@@ -2813,23 +2629,6 @@ def parse_args():
     )
     parser.add_argument("--debug-ec", action="store_true", help=Headers.EcDebugging)
     return parser.parse_args()
-
-
-def configure_log(logf):
-    """Configure the log file"""
-    if not logf:
-        fname = f"{Defaults.log_prefix}-{date.today()}.{Defaults.log_suffix}"
-        logf = input(f"{Headers.LogDescription} (default {fname})? ")
-        if not logf:
-            logf = fname
-
-    # for saving a log file for analysis
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s:\t%(message)s",
-        filename=logf,
-        filemode="w",
-        level=logging.DEBUG,
-    )
 
 
 def configure_suspend(duration, wait, count):
@@ -2853,16 +2652,11 @@ def configure_suspend(duration, wait, count):
 
 if __name__ == "__main__":
     arg = parse_args()
-    try:
-        configure_log(arg.log)
-    except KeyboardInterrupt:
-        print("")
-        sys.exit(0)
 
     if arg.logind and not DBUS:
         fatal_error("Unable to use logind without dbus, please install python3-dbus")
 
-    app = S0i3Validator(arg.acpidump, arg.logind, arg.debug_ec, arg.kernel_log_provider)
+    app = S0i3Validator(arg.acpidump, arg.logind, arg.debug_ec, arg.log)
     if app.prerequisites() or arg.force:
         try:
             d, w, c = configure_suspend(
