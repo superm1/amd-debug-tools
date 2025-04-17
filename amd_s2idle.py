@@ -16,6 +16,13 @@ import time
 import struct
 from datetime import datetime, timedelta, date
 
+try:
+    import amd_debug.failures
+except ModuleNotFoundError:
+    sys.exit(
+        f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
+    )
+
 # test if dbus is available for logind use
 try:
     import dbus
@@ -257,588 +264,6 @@ def pm_debugging(func):
         return ret
 
     return runner
-
-
-class S0i3Failure:
-    """Base class for all S0i3 failures"""
-
-    def __init__(self):
-        self.explanation = ""
-        self.url = ""
-        self.description = ""
-
-    def get_failure(self):
-        """Prints the failure message"""
-        if self.description:
-            print_color(self.description, "🚦")
-        if self.explanation:
-            print(self.explanation)
-        if self.url:
-            print(f"For more information on this failure see:\n\t{self.url}")
-
-
-class RtcAlarmWrong(S0i3Failure):
-    """RTC alarm is not configured to use ACPI"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "rtc_cmos is not configured to use ACPI alarm"
-        self.explanation = (
-            "\tSome problems can occur during wakeup cycles if the HPET RTC emulation is used to\n"
-            "\twake systems. This can manifest in unexpected wakeups or high power consumption.\n"
-        )
-        self.url = "https://github.com/systemd/systemd/issues/24279"
-
-
-class MissingAmdgpu(S0i3Failure):
-    """AMDGPU driver is missing"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "AMDGPU driver is missing"
-        self.explanation = (
-            "\tThe amdgpu driver is used for hardware acceleration as well\n"
-            "\tas coordination of the power states for certain IP blocks on the SOC.\n"
-            "\tBe sure that you have enabled CONFIG_AMDGPU in your kernel.\n"
-        )
-
-
-class MissingAmdgpuFirmware(S0i3Failure):
-    """AMDGPU firmware is missing"""
-
-    def __init__(self, errors):
-        super().__init__()
-        self.description = "AMDGPU firmware is missing"
-        self.explanation = (
-            "\tThe amdgpu driver loads firmware from /lib/firmware/amdgpu\n"
-            "\tIn some cases missing firmware will prevent a successful suspend cycle.\n"
-            "\tUpgrade to a newer snapshot at https://gitlab.com/kernel-firmware/linux-firmware\n"
-        )
-        self.url = "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1053856"
-        for error in errors:
-            self.explanation += f"\t{error}"
-
-
-class AmdgpuPpFeatureMask(S0i3Failure):
-    """AMDGPU ppfeaturemask has been changed"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "AMDGPU ppfeaturemask changed"
-        self.explanation = (
-            "\tThe ppfeaturemask for the amdgpu driver has been changed\n"
-            "\tModifying this from the defaults may cause the system to not enter hardware sleep.\n"
-        )
-        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/2808#note_2379968"
-
-
-class MissingAmdPmc(S0i3Failure):
-    """AMD-PMC driver is missing"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "AMD-PMC driver is missing"
-        self.explanation = (
-            "\tThe amd-pmc driver is required for the kernel to instruct the\n"
-            "\tsoc to enter the hardware sleep state.\n"
-            "\tBe sure that you have enabled CONFIG_AMD_PMC in your kernel.\n"
-            "\n"
-            "\tIf CONFIG_AMD_PMC is enabled but the amd-pmc driver isn't loading\n"
-            "\tthen you may have found a bug and should report it."
-        )
-
-
-class MissingThunderbolt(S0i3Failure):
-    """Thunderbolt driver is missing"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "thunderbolt driver is missing"
-        self.explanation = (
-            "\tThe thunderbolt driver is required for the USB4 routers included\n"
-            "\twith the SOC to enter the proper power states.\n"
-            "\tBe sure that you have enabled CONFIG_USB4 in your kernel.\n"
-        )
-
-
-class MissingXhciHcd(S0i3Failure):
-    """xhci_hcd driver is missing"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "xhci_hcd driver is missing"
-        self.explanation = (
-            "\tThe xhci_hcd driver is required for the USB3 controllers included\n"
-            "\twith the SOC to enter the proper power states.\n"
-            "\tBe sure that you have enabled CONFIG_XHCI_PCI in your kernel.\n"
-        )
-
-
-class MissingDriver(S0i3Failure):
-    """driver is missing"""
-
-    def __init__(self, slot):
-        super().__init__()
-        self.description = f"{slot} driver is missing"
-        self.explanation = (
-            f"\tNo driver has been bound to PCI device {slot}\n"
-            "\tWithout a driver, the hardware may be able to enter a low power.\n"
-            "\tstate, but there may be spurious wake up events.\n"
-        )
-
-
-class AcpiBiosError(S0i3Failure):
-    """ACPI BIOS errors detected"""
-
-    def __init__(self, errors):
-        super().__init__()
-        self.description = "ACPI BIOS Errors detected"
-        self.explanation = (
-            "\tWhen running a firmware component utilized for s2idle\n"
-            "\tthe ACPI interpreter in the Linux kernel encountered some\n"
-            "\tproblems. This usually means it's a bug in the system BIOS\n"
-            "\tthat should be fixed the system manufacturer.\n"
-            "\n"
-            "\tYou may have problems with certain devices after resume or high\n"
-            "\tpower consumption when this error occurs.\n"
-        )
-        for error in errors:
-            self.explanation += f"\t{error}"
-
-
-class VendorWrong(S0i3Failure):
-    """Unsupported CPU vendor"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "Unsupported CPU vendor"
-        self.explanation = (
-            "\tThis tool specifically measures requirements utilized\n"
-            "\tby AMD's S0i3 architecture.  Some of them may apply to other\n"
-            "\tvendors, but definitely some are AMD specific."
-        )
-
-
-class UnsupportedModel(S0i3Failure):
-    """Unsupported CPU model"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "Unsupported CPU model"
-        self.explanation = (
-            "\tThis model does not support hardware s2idle.\n"
-            "\tAttempting to run s2idle will use a pure software suspend\n"
-            "\tand will not yield tangible power savings."
-        )
-
-
-class UserNvmeConfiguration(S0i3Failure):
-    """User has disabled NVME ACPI support"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "NVME ACPI support is disabled"
-        self.explanation = (
-            "\tThe kernel command line has been configured to not support NVME ACPI support.\n"
-            "\tThis is required for the NVME device to enter the proper power state.\n"
-        )
-
-
-class AcpiNvmeStorageD3Enable(S0i3Failure):
-    """NVME device is missing ACPI attributes"""
-
-    def __init__(self, disk, num_ssds):
-        super().__init__()
-        self.description = f"{disk} missing ACPI attributes"
-        self.explanation = (
-            "\tAn NVME device was found, but it doesn't specify the StorageD3Enable\n"
-            "\tattribute in the device specific data (_DSD).\n"
-            "\tThis is a BIOS bug, but it may be possible to work around in the kernel.\n"
-        )
-        if num_ssds > 1:
-            self.explanation += (
-                "\n"
-                "\tIf you added an aftermarket SSD to your system, the system vendor might not have added this\n"
-                "\tproperty to the BIOS for the second port which could cause this behavior.\n"
-                "\n"
-                "\tPlease re-run this script with the --acpidump argument and file a bug to "
-                "investigate.\n"
-            )
-        self.url = "https://bugzilla.kernel.org/show_bug.cgi?id=216440"
-
-
-class DevSlpHostIssue(S0i3Failure):
-    """AHCI controller doesn't support DevSlp"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "AHCI controller doesn't support DevSlp"
-        self.explanation = (
-            "\tThe AHCI controller is not configured to support DevSlp.\n"
-            "\tThis must be enabled in BIOS for s2idle in Linux.\n"
-        )
-
-
-class DevSlpDiskIssue(S0i3Failure):
-    """SATA disk doesn't support DevSlp"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "SATA disk doesn't support DevSlp"
-        self.explanation = (
-            "\tThe SATA disk does not support DevSlp.\n"
-            "\ts2idle in Linux requires SATA disks that support this feature.\n"
-        )
-
-
-class SleepModeWrong(S0i3Failure):
-    """System is not configured for Modern Standby"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = (
-            "The system hasn't been configured for Modern Standby in BIOS setup"
-        )
-        self.explanation = (
-            "\tAMD systems must be configured for Modern Standby in BIOS setup\n"
-            "\tfor s2idle to function properly in Linux.\n"
-            "\tOn some OEM systems this is referred to as 'Windows' sleep mode.\n"
-            "\tIf the BIOS is configured for S3 and you manually select s2idle\n"
-            "\tin /sys/power/mem_sleep, the system will not enter the deepest hardware state."
-        )
-
-
-class DeepSleep(S0i3Failure):
-    """Deep sleep is configured on the kernel command line"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = (
-            "The kernel command line is asserting the system to use deep sleep"
-        )
-        self.explanation = (
-            "\tAdding mem_sleep_default=deep doesn't work on AMD systems.\n"
-            "\tPlease remove it from the kernel command line."
-        )
-
-
-class FadtWrong(S0i3Failure):
-    """FADT doesn't support low power idle"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = (
-            "The kernel didn't emit a message that low power idle was supported"
-        )
-        self.explanation = (
-            "\tLow power idle is a bit documented in the FADT to indicate that\n"
-            "\tlow power idle is supported.\n"
-            "\tOnly newer kernels support emitting this message, so if you run on\n"
-            "\tan older kernel you may get a false negative.\n"
-            "\tWhen launched as root this script will try to directly introspect the\n"
-            "\tACPI tables to confirm this."
-        )
-
-
-class Irq1Workaround(S0i3Failure):
-    """IRQ1 wakeup source is active"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "The wakeup showed an IRQ1 wakeup source, which might be a platform firmware bug"
-        self.explanation = (
-            "\tA number of Renoir, Lucienne, Cezanne, & Barcelo platforms have a platform firmware\n"
-            "\tbug where IRQ1 is triggered during s0i3 resume.\n"
-            "\tYou may have tripped up on this bug as IRQ1 was active during resume.\n"
-            "\tIf you didn't press a keyboard key to wakeup the system then this can be\n"
-            "\tthe cause of spurious wakeups.\n"
-            "\n"
-            "\tTo fix it, first try to upgrade to the latest firmware from your manufacturer.\n"
-            "\tIf you're already upgraded to the latest firmware you can use one of two workarounds:\n"
-            "\t 1. Manually disable wakeups from IRQ1 by running this command each boot:\n"
-            "\t\t echo 'disabled' | sudo tee /sys/bus/serio/devices/serio0/power/wakeup \n"
-            "\t 2. Use the below linked patch in your kernel."
-        )
-        self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/platform/x86/amd/pmc.c?id=8e60615e8932167057b363c11a7835da7f007106"
-
-
-class KernelRingBufferWrapped(S0i3Failure):
-    """Kernel ringbuffer has wrapped"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "Kernel ringbuffer has wrapped"
-        self.explanation = (
-            "\tThis script relies upon analyzing the kernel log for markers.\n"
-            "\tThe kernel's log provided by dmesg uses a ring buffer.\n"
-            "\tWhen the ring buffer fills up it will wrap around and overwrite old messages.\n"
-            "\n"
-            "\tIn this case it's not possible to look for some of these markers\n"
-            "\n"
-            "\tPassing the pre-requisites check won't be possible without rebooting the machine.\n"
-            "\tIf you are sure your system meets pre-requisites, you can re-run the script using.\n"
-            "\tthe systemd logger or with --force.\n"
-        )
-
-
-class AmdHsmpBug(S0i3Failure):
-    """AMD HSMP is built into the kernel"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "amd-hsmp built in to kernel"
-        self.explanation = (
-            "\tThe kernel has been compiled with CONFIG_AMD_HSMP=y.\n"
-            "\tThis has been shown to cause suspend failures on some systems.\n"
-            "\n"
-            "\tEither recompile the kernel without CONFIG_AMD_HSMP,\n"
-            "\tor use initcall_blacklist=hsmp_plt_init on your kernel command line to avoid triggering problems\n"
-            "\n"
-        )
-        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/2414"
-
-
-class WCN6855Bug(S0i3Failure):
-    """WCN6855 firmware causes spurious wakeups"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "The firmware loaded for the WCN6855 causes spurious wakeups"
-        self.explanation = (
-            "\tDuring s2idle on AMD systems PCIe devices are put into D3cold. During wakeup they're transitioned back\n"
-            "\tinto the state they were before s2idle.  For many implementations this is D3hot.\n"
-            "\tIf an ACPI event has been triggered by the EC, the hardware will resume from s2idle,\n"
-            "\tbut the kernel should process the event and then put it back into s2idle.\n"
-            "\n"
-            "\tWhen this bug occurs, a GPIO connected to the WLAN card is active on the system making\n"
-            "\the GPIO controller IRQ also active.  The kernel sees that the ACPI event IRQ and GPIO\n"
-            "\tcontroller IRQ are both active and resumes the system.\n"
-            "\n"
-            "\tSome non-exhaustive events that will trigger this behavior:\n"
-            "\t * Suspending the system and then closing the lid.\n"
-            "\t * Suspending the system and then unplugging the AC adapter.\n"
-            "\t * Suspending the system and the EC notifying the OS of a battery level change.\n"
-            "\n"
-            "\tThis issue is fixed by updated WCN6855 firmware which will avoid triggering the GPIO.\n"
-            "\tThe version string containing the fix is 'WLAN.HSP.1.1-03125-QCAHSPSWPL_V1_V2_SILICONZ_LITE-3.6510.23'\n"
-        )
-        self.url = "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/commit/?id=c7a57ef688f7d99d8338a5d8edddc8836ff0e6de"
-
-
-class I2CHidBug(S0i3Failure):
-    """I2C HID device causes spurious wakeups"""
-
-    def __init__(self, name, remediation):
-        super().__init__()
-        self.description = f"The {name} device has been reported to cause high power consumption and spurious wakeups"
-        self.explanation = (
-            "\tI2C devices work in an initiator/receiver relationship where the device is the receiver. In order for the receiver to indicate\n"
-            "\tthe initiator needs to read data they will assert an attention GPIO pin.\n"
-            "\tWhen a device misbehaves it may assert this pin spuriously which can cause the SoC to wakeup prematurely.\n"
-            "\tThis typically manifests as high power consumption at runtime and spurious wakeups at suspend.\n"
-            "\n"
-            "\tThis issue can be worked around by unbinding the device from the kernel using this command:\n"
-            "\n"
-            f"\t{remediation}\n"
-            "\n"
-            "\tTo fix this issue permanently the kernel will need to avoid binding to this device."
-        )
-        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/2812"
-
-
-class SpuriousWakeup(S0i3Failure):
-    """System woke up prematurely"""
-
-    def __init__(self, duration):
-        super().__init__()
-        self.description = (
-            f"Userspace wasn't asleep at least {timedelta(seconds=duration)}"
-        )
-        self.explanation = (
-            f"\tThe system was programmed to sleep for {timedelta(seconds=duration)}, but woke up prematurely.\n"
-            "\tThis typically happens when the system was woken up from a non-timer based source.\n"
-            "\n"
-            "\tIf you didn't intentionally wake it up, then there may be a kernel or firmware bug\n"
-        )
-
-
-class LowHardwareSleepResidency(S0i3Failure):
-    """System had low hardware sleep residency"""
-
-    def __init__(self, duration, percent):
-        super().__init__()
-        self.description = "System had low hardware sleep residency"
-        self.explanation = (
-            f"\tThe system was asleep for {timedelta(seconds=duration)}, but only spent {percent:.2%}\n"
-            "\tof this time in a hardware sleep state.  In sleep cycles that are at least\n"
-            "\t60 seconds long it's expected you spend above 90 percent of the cycle in"
-            "\thardware sleep.\n"
-        )
-
-
-class MSRFailure(S0i3Failure):
-    """MSR access failed"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "PC6 or CC6 state disabled"
-        self.explanation = (
-            "\tThe PC6 state of the package or the CC6 state of CPU cores was disabled.\n"
-            "\tThis will prevent the system from getting to the deepest sleep state over suspend.\n"
-        )
-
-
-class TaintedKernel(S0i3Failure):
-    """Kernel is tainted"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "Kernel is tainted"
-        self.explanation = (
-            "\tA tainted kernel may exhibit unpredictable bugs that are difficult for this script to characterize.\n"
-            "\tIf this is intended behavior run the tool with --force.\n"
-        )
-        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3089"
-
-
-class DMArNotEnabled(S0i3Failure):
-    """DMAr is not enabled"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "Pre-boot DMA protection disabled"
-        self.explanation = (
-            "\tPre-boot IOMMU DMA protection has been disabled.\n"
-            "\tWhen the IOMMU is enabled this platform requires pre-boot DMA protection for suspend to work.\n"
-        )
-
-
-class MissingIommuACPI(S0i3Failure):
-    """IOMMU ACPI table errors"""
-
-    def __init__(self, device):
-        super().__init__()
-        self.description = f"Device {device} missing from ACPI tables"
-        self.explanation = (
-            f"\tThe ACPI device {device} is required for suspend to work when the IOMMU is enabled.\n"
-            "\tPlease check your BIOS settings and if configured correctly, report a bug to your system vendor.\n"
-        )
-        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/3738#note_2667140"
-
-
-class MissingIommuPolicy(S0i3Failure):
-    """ACPI table errors"""
-
-    def __init__(self, device):
-        super().__init__()
-        self.description = f"Device {device} does not have IOMMU policy applied"
-        self.explanation = (
-            f"\tThe ACPI device {device} is present but no IOMMU policy was set for it.\n"
-            "\tThis generally happens if the HID or UID don't match the ACPI IVRS table.\n"
-        )
-
-
-class IommuPageFault(S0i3Failure):
-    """IOMMU Page fault"""
-
-    def __init__(self, device):
-        super().__init__()
-        self.description = f"Page fault reported for {device}"
-        self.explanation = (
-            f"\tThe IOMMU reports a page fault caused by {device}. This can prevent suspend/resume from functioning properly\n"
-            "\tThe page fault can be the device itself, a problem in the firmware or a problem in the kernel.\n"
-            "\tReport a bug for further triage and investigation.\n"
-        )
-
-
-class SMTNotEnabled(S0i3Failure):
-    """SMT is not enabled"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "SMT is not enabled"
-        self.explanation = (
-            "\tDisabling SMT prevents cores from going into the correct state.\n"
-        )
-
-
-class ASpmWrong(S0i3Failure):
-    """ASPM is overridden"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "ASPM is overridden"
-        self.explanation = (
-            "\t Modifying ASPM may prevent PCIe devices from going into the\n"
-            "\t correct state and lead to system stability issues.\n"
-        )
-
-
-class UnservicedGpio(S0i3Failure):
-    """GPIO is not serviced"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "GPIO interrupt is not serviced"
-        self.explanation = (
-            "\t All GPIO controllers interrupts must be serviced to enter\n"
-            "\t hardware sleep.\n"
-            "\t Make sure that all drivers necessary to service GPIOs are loaded.\n"
-            "\t The most common cause is that i2c-hid-acpi is not loaded but the.\n"
-            "\t machine contains an I2C touchpad.\n"
-        )
-
-
-class DmiNotSetup(S0i3Failure):
-    """DMI isn't setup"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "DMI data was not scanned"
-        self.explanation = (
-            "\t If DMI data hasn't been scanned then quirks that are dependent\n"
-            "\t upon DMI won't be loaded.\n"
-            "\t Most notably, this will prevent the rtc-cmos driver from setting.\n"
-            "\t up properly by default. It may also prevent other drivers from working.\n"
-        )
-
-
-class LimitedCores(S0i3Failure):
-    """Number of CPU cores limited"""
-
-    def __init__(self, actual_cores, max_cores):
-        super().__init__()
-        self.description = "CPU cores have been limited"
-        self.explanation = (
-            f"\tThe CPU cores have been limited to {max_cores}, but the system\n"
-            f"\tactually has {actual_cores}. Limiting the cores will prevent the\n"
-            "\tthe system from going into a hardware sleep state.\n"
-            "\tThis is typically solved by increasing the kernel config CONFIG_NR_CPUS.\n"
-        )
-
-
-class RogAllyOldMcu(S0i3Failure):
-    """MCU firwmare is too old"""
-
-    def __init__(self, vmin, actual):
-        super().__init__()
-        self.description = "Rog Ally MCU firmware is too old"
-        self.explanation = (
-            f"\tThe MCU is version {actual}, but needs to be at least {vmin}\n"
-            f"\tto avoid major issues with interactions with suspend\n"
-        )
-
-
-class RogAllyMcuPowerSave(S0i3Failure):
-    """MCU powersave is disabled"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "Rog Ally MCU power save is disabled"
-        self.explanation = (
-            f"\tThe MCU powersave feature is disabled which will cause problems\n"
-            f"\twith the controller after suspend/resume.\n"
-        )
 
 
 class KernelLogger:
@@ -1394,7 +819,7 @@ class S0i3Validator:
         else:
             message = "ACPI FADT doesn't support Low-power S0 idle"
             print_color(message, "❌")
-            self.failures += [FadtWrong()]
+            self.failures += [amd_debug.failures.FadtWrong()]
         return found
 
     def check_msr(self):
@@ -1421,7 +846,7 @@ class S0i3Validator:
             for reg, expect_val in expect.items():
                 val = read_msr(reg, 0)
                 if not check_bits(val, expect_val):
-                    self.failures += [MSRFailure()]
+                    self.failures += [amd_debug.failures.MSRFailure()]
                     return False
                 logging.debug("MSR %s: %s", hex(reg), hex(val))
             print_color("PC6 and CC6 states are enabled", "✅")
@@ -1617,15 +1042,6 @@ class S0i3Validator:
             if self.cpu_family and self.cpu_model and self.cpu_model_string:
                 break
 
-        # check for supported vendor
-        if not valid:
-            self.failures += [VendorWrong()]
-            print_color(
-                "This tool is not designed for parts from this CPU vendor",
-                "❌",
-            )
-            return False
-
         # check for supported models
         if self.cpu_family == 0x17:
             if self.cpu_model in range(0x30, 0x3F):
@@ -1635,7 +1051,7 @@ class S0i3Validator:
                 valid = False
 
         if not valid:
-            self.failures += [UnsupportedModel()]
+            self.failures += [amd_debug.failures.UnsupportedModel()]
             print_color(
                 "This CPU model does not support hardware sleep over s2idle",
                 "❌",
@@ -1655,7 +1071,7 @@ class S0i3Validator:
                     f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
                     "❌",
                 )
-                self.failures += [LimitedCores(cpu_count, max_cpus)]
+                self.failures += [amd_debug.failures.LimitedCores(cpu_count, max_cpus)]
                 return False
             logging.debug("CPU core count: %d max: %d", cpu_count, max_cpus)
         except FileNotFoundError:
@@ -1684,7 +1100,7 @@ class S0i3Validator:
         p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "active")
         v = read_file(p)
         if v == "0":
-            self.failures += [SMTNotEnabled()]
+            self.failures += [amd_debug.failures.SMTNotEnabled()]
             print_color("SMT is not enabled", "❌")
             return False
         print_color("SMT enabled", "✅")
@@ -1695,7 +1111,7 @@ class S0i3Validator:
         p = os.path.join("/", "sys", "class", "dmi", "id")
         if not os.path.exists(p):
             print_color("DMI data was not setup", "🚦")
-            self.failures += [DmiNotSetup()]
+            self.failures += [amd_debug.failures.DmiNotSetup()]
         else:
             keys = {}
             filtered = [
@@ -1740,10 +1156,10 @@ class S0i3Validator:
         cmdline = read_file(os.path.join("/proc", "cmdline"))
         if "mem_sleep_default=deep" in cmdline:
             print_color("Kernel command line is configured for 'deep' sleep", "❌")
-            self.failures += [DeepSleep()]
+            self.failures += [amd_debug.failures.DeepSleep()]
             return False
         if "[s2idle]" not in read_file(fn):
-            self.failures += [SleepModeWrong()]
+            self.failures += [amd_debug.failures.SleepModeWrong()]
             print_color("System isn't configured for s2idle in firmware setup", "❌")
             return False
         print_color("System is configured for s2idle", "✅")
@@ -1761,7 +1177,7 @@ class S0i3Validator:
         check = os.path.exists(p) and read_file(p) == "Y"
         if ("nvme.noacpi" in cmdline) and check:
             print_color("NVME ACPI support is blocked by kernel command line", "❌")
-            self.failures += [UserNvmeConfiguration()]
+            self.failures += [amd_debug.failures.UserNvmeConfiguration()]
             return False
 
         if not self.kernel_log:
@@ -1807,7 +1223,9 @@ class S0i3Validator:
                     "❌",
                 )
                 num = len(invalid_nvme) + len(valid_nvme)
-                self.failures += [AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)]
+                self.failures += [
+                    amd_debug.failures.AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)
+                ]
         if valid_nvme:
             for disk, name in valid_nvme.items():
                 print_color(
@@ -1820,13 +1238,13 @@ class S0i3Validator:
             else:
                 invalid_nvme = True
                 print_color("SATA does not support DevSlp feature", "❌")
-                self.failures += [DevSlpDiskIssue()]
+                self.failures += [amd_debug.failures.DevSlpDiskIssue()]
 
             if valid_ahci:
                 print_color("AHCI is configured for DevSlp in BIOS", "✅")
             else:
                 print_color("AHCI is not configured for DevSlp in BIOS", "❌")
-                self.failures += [DevSlpHostIssue()]
+                self.failures += [amd_debug.failures.DevSlpHostIssue()]
 
         return (
             (len(invalid_nvme) == 0)
@@ -1946,7 +1364,7 @@ class S0i3Validator:
                     "HSMP driver `amd_hsmp` driver may conflict with amd_pmc",
                     "❌",
                 )
-                self.failures += [AmdHsmpBug()]
+                self.failures += [amd_debug.failures.AmdHsmpBug()]
                 return False
 
         cmdline = read_file(os.path.join("/proc", "cmdline"))
@@ -1955,7 +1373,7 @@ class S0i3Validator:
         p = os.path.join("/", "sys", "module", "amd_hsmp")
         if os.path.exists(p) and not blocked:
             print_color("`amd_hsmp` driver may conflict with amd_pmc", "❌")
-            self.failures += [AmdHsmpBug()]
+            self.failures += [amd_debug.failures.AmdHsmpBug()]
             return False
 
         print_color(
@@ -1991,7 +1409,7 @@ class S0i3Validator:
                 print_color(
                     "IOMMU is misconfigured: Pre-boot DMA protection not enabled", "❌"
                 )
-                self.failures += [DMArNotEnabled()]
+                self.failures += [amd_debug.failures.DMArNotEnabled()]
                 return False
             # check that MSFT0201 is present
             for dev in self.pyudev.list_devices(subsystem="acpi"):
@@ -1999,14 +1417,16 @@ class S0i3Validator:
                     found_acpi = True
             if not found_acpi:
                 print_color("IOMMU is misconfigured: missing MSFT0201 ACPI device", "❌")
-                self.failures += [MissingIommuACPI("MSFT0201")]
+                self.failures += [amd_debug.failures.MissingIommuACPI("MSFT0201")]
                 return False
             # check that policy is bound to it
             for dev in self.pyudev.list_devices(subsystem="platform"):
                 if "MSFT0201" in dev.sys_path:
                     p = os.path.join(dev.sys_path, "iommu")
                     if not os.path.exists(p):
-                        self.failures += [MissingIommuPolicy("MSFT0201")]
+                        self.failures += [
+                            amd_debug.failures.MissingIommuPolicy("MSFT0201")
+                        ]
                         return False
             print_color("IOMMU properly configured", "✅")
         return True
@@ -2146,7 +1566,7 @@ class S0i3Validator:
             self.check_port_pm_override()
             print_color(message, "✅")
             return True
-        self.failures += [MissingAmdPmc()]
+        self.failures += [amd_debug.failures.MissingAmdPmc()]
         print_color("PMC driver `amd_pmc` did not bind to any ACPI device", "❌")
         return False
 
@@ -2161,7 +1581,7 @@ class S0i3Validator:
                 break
         if policy != "[default]":
             print_color(f"ASPM policy set to {policy}", "❌")
-            self.failures += [ASpmWrong()]
+            self.failures += [amd_debug.failures.ASpmWrong()]
             return False
         print_color("ASPM policy set to 'default'", "✅")
         return True
@@ -2173,7 +1593,7 @@ class S0i3Validator:
             driver = device.properties.get("DRIVER")
             if not driver:
                 print_color(f"WLAN device in {slot} missing driver", "🚦")
-                self.failures += [MissingDriver(slot)]
+                self.failures += [amd_debug.failures.MissingDriver(slot)]
             print_color(f"WLAN driver `{driver}` bound to {slot}", "✅")
         return True
 
@@ -2185,7 +1605,7 @@ class S0i3Validator:
                 print_color(
                     f"USB3 controller for {slot} not using `xhci_hcd` driver", "❌"
                 )
-                self.failures += [MissingXhciHcd()]
+                self.failures += [amd_debug.failures.MissingXhciHcd()]
                 return False
             print_color(f"USB3 driver `xhci_hcd` bound to {slot}", "✅")
         return True
@@ -2198,7 +1618,7 @@ class S0i3Validator:
                 print_color(
                     f"USB4 controller for {slot} not using `thunderbolt` driver", "❌"
                 )
-                self.failures += [MissingThunderbolt()]
+                self.failures += [amd_debug.failures.MissingThunderbolt()]
                 return False
             print_color(f"USB4 driver `thunderbolt` bound to {slot}", "✅")
         return True
@@ -2228,7 +1648,7 @@ class S0i3Validator:
                     if re.search("edge", line) or re.search("level", line):
                         logging.debug(line)
                     if "🔥" in line:
-                        self.failures += [UnservicedGpio()]
+                        self.failures += [amd_debug.failures.UnservicedGpio()]
                         return False
 
             return True
@@ -2243,7 +1663,7 @@ class S0i3Validator:
         val = read_file(p)
         if val == "N":
             print_color("RTC driver `rtc_cmos` configured to use ACPI alarm", "🚦")
-            self.failures += [RtcAlarmWrong()]
+            self.failures += [amd_debug.failures.RtcAlarmWrong()]
             return False
         print_color("RTC driver `rtc_cmos` configured to use CMOS alarm", "✅")
         return True
@@ -2259,7 +1679,7 @@ class S0i3Validator:
                 continue
             if device.properties.get("DRIVER") != "amdgpu":
                 print_color("GPU driver `amdgpu` not loaded", "❌")
-                self.failures += [MissingAmdgpu()]
+                self.failures += [amd_debug.failures.MissingAmdgpu()]
                 return False
             slot = device.properties.get("PCI_SLOT_NAME")
             print_color(f"GPU driver `amdgpu` bound to {slot}", "✅")
@@ -2268,7 +1688,7 @@ class S0i3Validator:
             v = read_file(p)
             if v != "0xfff7bfff":
                 print_color(f"AMDGPU ppfeaturemask overridden to {v}", "❌")
-                self.failures += [AmdgpuPpFeatureMask()]
+                self.failures += [amd_debug.failures.AmdgpuPpFeatureMask()]
                 return False
         if not self.kernel_log:
             message = "Unable to test for amdgpu from kernel log"
@@ -2278,7 +1698,7 @@ class S0i3Validator:
         match = self.kernel_log.match_pattern("Direct firmware load for amdgpu.*failed")
         if match and not "amdgpu/isp" in match:
             print_color("GPU firmware missing", "❌")
-            self.failures += [MissingAmdgpuFirmware([match])]
+            self.failures += [amd_debug.failures.MissingAmdgpuFirmware([match])]
             return False
         return True
 
@@ -2311,7 +1731,7 @@ class S0i3Validator:
                     f"WCN6855 WLAN may cause spurious wakeups (fw build id {wcn6855})",
                     "❌",
                 )
-                self.failures += [WCN6855Bug()]
+                self.failures += [amd_debug.failures.WCN6855Bug()]
 
         return True
 
@@ -2477,7 +1897,7 @@ class S0i3Validator:
                 else:
                     symbol = "❌"
                     self.failures += [
-                        LowHardwareSleepResidency(
+                        amd_debug.failures.LowHardwareSleepResidency(
                             self.userspace_duration.total_seconds(), percent
                         )
                     ]
@@ -2543,7 +1963,7 @@ class S0i3Validator:
                     f"{name} may cause spurious wakeups",
                     "❌",
                 )
-                self.failures += [I2CHidBug(name, remediation)]
+                self.failures += [amd_debug.failures.I2CHidBug(name, remediation)]
                 return False
         return True
 
@@ -2864,7 +2284,7 @@ class S0i3Validator:
                     "Kernel ringbuffer has wrapped, unable to accurately validate pre-requisites",
                     "❌",
                 )
-                self.failures += [KernelRingBufferWrapped()]
+                self.failures += [amd_debug.failures.KernelRingBufferWrapped()]
                 return False
         else:
             return False
@@ -2912,7 +2332,7 @@ class S0i3Validator:
         taint &= ~BIT(9)
         if taint != 0:
             print_color(f"Kernel is tainted: {taint}", "❌")
-            self.failures += [TaintedKernel()]
+            self.failures += [amd_debug.failures.TaintedKernel()]
             return False
         return True
 
@@ -3152,7 +2572,7 @@ class S0i3Validator:
                     print_color("Kernel workaround for IRQ1 issue utilized", "✅")
                 else:
                     print_color("IRQ1 found during wakeup", Colors.WARNING)
-                    self.failures += [Irq1Workaround()]
+                    self.failures += [amd_debug.failures.Irq1Workaround()]
         if self.idle_masks:
             bit_changed = 0
             for i, mask_i in enumerate(self.idle_masks):
@@ -3174,10 +2594,10 @@ class S0i3Validator:
                 logging.debug("Used AMD uPEP GUID in LPS0 _DSM")
         if self.acpi_errors:
             print_color("ACPI BIOS errors found", "❌")
-            self.failures += [AcpiBiosError(self.acpi_errors)]
+            self.failures += [amd_debug.failures.AcpiBiosError(self.acpi_errors)]
         if self.page_faults:
             print_color("Page faults found", "❌")
-            self.failures += [IommuPageFault(self.page_faults)]
+            self.failures += [amd_debug.failures.IommuPageFault(self.page_faults)]
         if self.notify_devices:
             print_color(
                 f"Notify devices {self.notify_devices} found during suspend", "💤"
@@ -3208,7 +2628,9 @@ class S0i3Validator:
                 f"Userspace suspended for {self.userspace_duration} (< minimum expected {min_suspend_duration})",
                 "❌",
             )
-            self.failures += [SpuriousWakeup(self.requested_duration)]
+            self.failures += [
+                amd_debug.failures.SpuriousWakeup(self.requested_duration)
+            ]
         if self.kernel_duration:
             if self.userspace_duration:
                 percent = (
@@ -3318,7 +2740,7 @@ class S0i3Validator:
                 minv = None
             if minv and v < minv:
                 print_color(Headers.RogAllyMcuOld, "❌")
-                self.failures += [RogAllyOldMcu(minv, v)]
+                self.failures += [amd_debug.failures.RogAllyOldMcu(minv, v)]
                 return False
             else:
                 logging.debug("ASUS ROG MCU found with MCU version %d", v)
@@ -3331,7 +2753,7 @@ class S0i3Validator:
             v = int(read_file(p))
             if v < 1:
                 print_color(Headers.RogAllyPowerSave, "❌")
-                self.failures += [RogAllyMcuPowerSave()]
+                self.failures += [amd_debug.failures.RogAllyMcuPowerSave()]
                 return False
 
         return True
