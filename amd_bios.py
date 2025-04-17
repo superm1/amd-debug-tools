@@ -395,47 +395,45 @@ class AmdBios:
 
     def set_tracing(self, enable, disable):
         """Run the action"""
-        acpi_base = os.path.join("/", "sys", "module", "acpi")
-        debug_layer = os.path.join(acpi_base, "parameters", "trace_debug_layer")
-        debug_level = os.path.join(acpi_base, "parameters", "trace_debug_level")
-        trace_method_name = os.path.join(acpi_base, "parameters", "trace_method_name")
-        trace_state = os.path.join(acpi_base, "parameters", "trace_state")
-        if not os.path.exists(trace_state):
-            fatal_error(
-                "BIOS tracing not supported, please check your kernel for CONFIG_ACPI_DEBUG"
-            )
-        old_debug_level = read_file(debug_level)
-        old_debug_layer = read_file(debug_layer)
-        old_trace_method_name = read_file(trace_method_name)
-        old_trace_state = read_file(trace_state)
-        logging.debug(
-            "Level: %s, Layer: %s, Method: %s, State: %s",
-            old_debug_level,
-            old_debug_layer,
-            old_trace_method_name,
-            old_trace_state,
-        )
 
         if enable or disable:
             if not self.root_user:
                 fatal_error("Please run this script as root")
 
+        expected = {
+            "trace_debug_layer": 0x80,
+            "trace_debug_level": 0x10,
+            "trace_method_name": "\\M460",
+            "trace_state": "method",
+        }
+        actual = {}
+        acpi_base = os.path.join("/", "sys", "module", "acpi", "parameters")
+        for key, _value in expected.items():
+            p = os.path.join(acpi_base, key)
+            if not os.path.exists(p):
+                fatal_error(
+                    "BIOS tracing not supported, please check your kernel for CONFIG_ACPI_DEBUG"
+                )
+            actual[key] = read_file(p)
+        logging.debug(actual)
+
         if enable:
-            if not int(old_debug_level) & 0x10:
-                with open(debug_level, "w", encoding="utf-8") as w:
-                    w.write(int(old_debug_level | 0x10))
-            if not int(old_debug_layer) & 0x80:
-                with open(debug_layer, "w", encoding="utf-8") as w:
-                    w.write(int(old_debug_layer | 0x80))
-            if not "\\M460" in old_trace_method_name:
-                with open(trace_method_name, "w", encoding="utf-8") as w:
-                    w.write("\\M460")
-            if not "method" in old_trace_state:
-                with open(trace_state, "w", encoding="utf-8") as w:
-                    w.write("method")
+            for key, value in expected.items():
+                p = os.path.join(acpi_base, key)
+                t = actual[key]
+                if isinstance(value, int):
+                    if int(actual[key]) & value:
+                        continue
+                    t = str(int(t) | value)
+                else:
+                    if actual[key].strip() == str(value):
+                        continue
+                with open(p, "w", encoding="utf-8") as w:
+                    w.write(t)
             print_color("Enabled BIOS tracing", "✅")
         elif disable:
-            with open(trace_state, "w", encoding="utf-8") as w:
+            p = os.path.join(acpi_base, "trace_state")
+            with open(p, "w", encoding="utf-8") as w:
                 w.write("disable")
             print_color("Disabled BIOS tracing", "✅")
 
