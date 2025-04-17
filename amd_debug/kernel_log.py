@@ -16,17 +16,19 @@ class KernelLogger:
     def __init__(self):
         pass
 
-    def seek(self):
+    def seek(self, tim=None):
         """Seek to the beginning of the log"""
 
     def process_callback(self, callback, priority):
         """Process the log"""
 
-    def match_line(self, matches):
+    def match_line(self, matches) -> str:
         """Find lines that match all matches"""
+        return ""
 
-    def match_pattern(self, pattern):
+    def match_pattern(self, pattern) -> str:
         """Find lines that match a pattern"""
+        return ""
 
 
 class InputFile(KernelLogger):
@@ -101,13 +103,13 @@ class DmesgLogger(KernelLogger):
                 if match not in entry:
                     break
                 return entry
-        return None
+        return ""
 
-    def match_pattern(self, pattern):
+    def match_pattern(self, pattern) -> str:
         for entry in self.buffer.split("\n"):
             if re.search(pattern, entry):
                 return entry
-        return None
+        return ""
 
     def capture_header(self):
         """Capture the header of the log"""
@@ -197,14 +199,14 @@ class SystemdLogger(KernelLogger):
                 if match not in entry["MESSAGE"]:
                     break
                 return entry["MESSAGE"]
-        return None
+        return ""
 
     def match_pattern(self, pattern):
         """Find lines that match a pattern"""
         for entry in self.journal:
             if re.search(pattern, entry["MESSAGE"]):
                 return entry["MESSAGE"]
-        return None
+        return ""
 
 
 def get_kernel_log(input_file=None) -> KernelLogger:

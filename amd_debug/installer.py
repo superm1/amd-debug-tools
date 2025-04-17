@@ -33,6 +33,7 @@ class Headers:  # pylint: disable=too-few-public-methods
     MissingTabulate = "Data library `tabulate` is missing"
     MissingEthtool = "Ethtool is missing"
     InstallAction = "Attempting to install"
+    MissingFwupd = "Firmware update library `fwupd` is missing"
 
 
 class DistroPackage:
@@ -158,6 +159,18 @@ class TabulatePackage(DistroPackage):
         )
 
 
+class FwupdPackage(DistroPackage):
+    """Fwupd package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="gir1.2-fwupd-2.0",
+            rpm=None,
+            arch=None,
+            pip=None,
+        )
+
+
 class Installer:
     """Installer class"""
 
@@ -239,6 +252,24 @@ class Installer:
         except ModuleNotFoundError:
             self.tabulate = False
 
+        # test if fwupd can report device firmware versions
+        try:
+            import gi  # pylint: disable=import-outside-toplevel
+            from gi.repository import (
+                GLib as _,
+            )  # pylint: disable=import-outside-toplevel
+
+            gi.require_version("Fwupd", "2.0")
+            from gi.repository import (
+                Fwupd as _,
+            )  # pylint: disable=import-outside-toplevel
+
+            self.fwupd = True
+        except ImportError:
+            self.fwupd = False
+        except ValueError:
+            self.fwupd = False
+
     def set_requirements(self, *args):
         """Set the requirements for the installer"""
         self.requirements = args
@@ -278,6 +309,11 @@ class Installer:
         if "tabulate" in self.requirements and not self.tabulate:
             self.show_install_message(Headers.MissingTabulate)
             package = TabulatePackage()
+            if not package.install():
+                return False
+        if "fwupd" in self.requirements and not self.fwupd:
+            self.show_install_message(Headers.MissingFwupd)
+            package = FwupdPackage()
             if not package.install():
                 return False
 

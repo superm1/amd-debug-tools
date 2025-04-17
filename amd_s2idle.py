@@ -14,12 +14,21 @@ import sys
 import tempfile
 import time
 import struct
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 try:
     import amd_debug.failures
+    from amd_debug.installer import Installer
     from amd_debug.kernel_log import get_kernel_log, SystemdLogger, DmesgLogger
-    from amd_debug.common import read_file, print_color, fatal_error, BIT, AmdTool
+    from amd_debug.common import (
+        read_file,
+        print_color,
+        fatal_error,
+        BIT,
+        AmdTool,
+        get_distro,
+        get_pretty_distro,
+    )
 except ModuleNotFoundError:
     sys.exit(
         f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
@@ -35,28 +44,6 @@ except ModuleNotFoundError:
 except ImportError:
     DBUS = False
 
-# test if pip can be used to install anything
-try:
-    import pip as _
-
-    PIP = True
-except ModuleNotFoundError:
-    PIP = False
-
-# test if fwupd can report device firmware versions
-try:
-    import gi
-    from gi.repository import GLib as _
-
-    gi.require_version("Fwupd", "2.0")
-    from gi.repository import Fwupd  # pylint: disable=unused-import
-
-    FWUPD = True
-except ImportError:
-    FWUPD = False
-except ValueError:
-    FWUPD = False
-
 # used to capture linux firmware versions
 try:
     import apt
@@ -66,22 +53,6 @@ try:
 except ModuleNotFoundError:
     APT = False
 
-# used for various version comparison
-try:
-    from packaging import version
-
-    VERSION = True
-except ModuleNotFoundError:
-    VERSION = False
-
-# used to identify the distro
-try:
-    import distro
-
-    DISTRO = True
-except ModuleNotFoundError:
-    DISTRO = False
-
 
 class Defaults:
     """Default values for the script"""
@@ -89,8 +60,6 @@ class Defaults:
     duration = 10
     wait = 4
     count = 1
-    log_prefix = "s2idle_report"
-    log_suffix = "txt"
 
 
 class Headers:
@@ -106,12 +75,6 @@ class Headers:
     NvmeSimpleSuspend = "platform quirk: setting simple suspend"
     WokeFromIrq = "Woke up from IRQ"
     WakeTriggeredIrq = "Wakeup triggered from IRQ"
-    MissingFwupd = "Firmware update library `fwupd` is missing"
-    MissingPyudev = "Udev access library `pyudev` is missing"
-    MissingPackaging = "Python library `packaging` is missing"
-    MissingIasl = "ACPI extraction tool `iasl` is missing"
-    MissingJournald = "Python systemd/journald module is missing"
-    MissingEthtool = "Ethtool is missing"
     Irq1Workaround = "Disabling IRQ1 wakeup source to avoid platform firmware bug"
     DurationDescription = "How long should suspend cycles last in seconds"
     WaitDescription = "How long to wait in between suspend cycles in seconds"
@@ -207,122 +170,6 @@ def pm_debugging(func):
     return runner
 
 
-class DistroPackage:
-    """Base class for distro packages"""
-
-    def __init__(self, deb, rpm, arch, pip, root):
-        self.deb = deb
-        self.rpm = rpm
-        self.arch = arch
-        self.pip = pip
-        self.root = root
-
-    def install(self, dist):
-        """Install the package for a given distro"""
-        if not self.root:
-            sys.exit(1)
-        if dist == "ubuntu" or dist == "debian":
-            if not self.deb:
-                return False
-            installer = ["apt", "install", self.deb]
-        elif dist == "fedora":
-            if not self.rpm:
-                return False
-            release = read_file("/usr/lib/os-release")
-            variant = None
-            for line in release.split("\n"):
-                if line.startswith("VARIANT_ID"):
-                    variant = line.split("=")[-1]
-            if variant != "workstation":
-                return False
-            installer = ["dnf", "install", "-y", self.rpm]
-        elif dist == "arch" or os.path.exists("/etc/arch-release"):
-            if not self.arch:
-                return False
-            installer = ["pacman", "-Sy", self.arch]
-        else:
-            if not PIP or not self.pip:
-                return False
-            installer = ["python3", "-m", "pip", "install", "--upgrade", self.pip]
-
-        subprocess.check_call(installer)
-        return True
-
-
-class PyUdevPackage(DistroPackage):
-    """Pyudev package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="python3-pyudev",
-            rpm="python3-pyudev",
-            arch="python-pyudev",
-            pip="pyudev",
-            root=root,
-        )
-
-
-class IaslPackage(DistroPackage):
-    """Iasl package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="acpica-tools", rpm="acpica-tools", arch="acpica", pip=None, root=root
-        )
-
-
-class PackagingPackage(DistroPackage):
-    """Packaging package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="python3-packaging",
-            rpm=None,
-            arch="python-packaging",
-            pip="python3-setuptools",
-            root=root,
-        )
-
-
-class JournaldPackage(DistroPackage):
-    """Journald package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="python3-systemd",
-            rpm="python3-pyudev",
-            arch="python-systemd",
-            pip=None,
-            root=root,
-        )
-
-
-class EthtoolPackage(DistroPackage):
-    """Ethtool package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="ethtool",
-            rpm="ethtool",
-            arch="ethtool",
-            pip=None,
-            root=root,
-        )
-
-
-class FwupdPackage(DistroPackage):
-    """Fwupd package"""
-
-    def __init__(self, root):
-        super().__init__(
-            deb="gir1.2-fwupd-2.0",
-            rpm=None,
-            arch=None,
-            pip=None,
-            root=root,
-        )
-
-
 class WakeIRQ:
     """Class for wake IRQs"""
 
@@ -413,44 +260,6 @@ class S0i3Validator(AmdTool):
             if v == "1" and not self.root_user:
                 fatal_error("Unable to run with SELinux enabled without root")
 
-    def show_install_message(self, message):
-        """Show a message to install a package"""
-        action = Headers.InstallAction if self.root_user else Headers.RerunAction
-        message = f"{message}. {action}."
-        print_color(message, "👀")
-
-    def guess_distro(self):
-        """Guess the distro based on heuristics"""
-        self.distro = None
-        self.pretty_distro = None
-
-        if DISTRO:
-            try:
-                self.distro = distro.id()
-                self.pretty_distro = distro.distro.os_release_info()["pretty_name"]
-            except AttributeError:
-                print_color("Failed to discover distro using python-distro", "🚦")
-
-        if not self.distro or not self.pretty_distro:
-            p = os.path.join("/", "etc", "os-release")
-            if os.path.exists(p):
-                v = read_file(p)
-                for line in v.split("\n"):
-                    if "ID=" in line:
-                        self.distro = line.split("=")[-1].strip().strip('"')
-                    if "PRETTY_NAME=" in line:
-                        self.pretty_distro = line.split("=")[-1].strip().strip('"')
-        if not self.distro:
-            if os.path.exists("/etc/arch-release"):
-                self.distro = "arch"
-            elif os.path.exists("/etc/fedora-release"):
-                self.distro = "fedora"
-            elif os.path.exists("/etc/debian_version"):
-                self.distro = "debian"
-
-        if not self.distro:
-            fatal_error("Unable to identify distro")
-
     def __init__(self, acpidump, logind, debug_ec, log_file):
         super().__init__("amd_s2idle", log_file)
         # for installing and running suspend
@@ -466,48 +275,19 @@ class S0i3Validator(AmdTool):
         # turn on EC debug messages
         self.debug_ec = debug_ec
 
-        self.guess_distro()
+        self.distro = get_distro()
+        self.pretty_distro = get_pretty_distro()
 
-        # for analyzing devices
-        try:
-            from pyudev import Context  # pylint: disable=import-outside-toplevel
+        self.installer = Installer()
+        self.installer.set_requirements("pyudev", "iasl", "packaging", "fwupd")
+        if not self.installer.install_dependencies():
+            fatal_error("Failed to install dependencies")
 
-            self.pyudev = Context()
-        except ModuleNotFoundError:
-            self.pyudev = False
+        from pyudev import Context  # pylint: disable=import-outside-toplevel
 
-        if not self.pyudev:
-            self.show_install_message(Headers.MissingPyudev)
-            package = PyUdevPackage(self.root_user)
-            package.install(self.distro)
-            try:
-                from pyudev import Context  # pylint: disable=import-outside-toplevel
-            except ModuleNotFoundError:
-                fatal_error("Missing python-pyudev package, unable to identify devices")
-
-            self.pyudev = Context()
-
-        try:
-            self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
-        except FileNotFoundError:
-            self.show_install_message(Headers.MissingIasl)
-            package = IaslPackage(self.root_user)
-            self.iasl = package.install(self.distro)
+        self.pyudev = Context()
 
         self.kernel_log = get_kernel_log(None)
-
-        # for comparing SMU version
-        if not VERSION:
-            self.show_install_message(Headers.MissingPackaging)
-            package = PackagingPackage(self.root_user)
-            package.install(self.distro)
-            from packaging import version  # pylint: disable=import-outside-toplevel
-
-        # for reading firmware versions
-        if not FWUPD:
-            self.show_install_message(Headers.MissingFwupd)
-            package = FwupdPackage(self.root_user)
-            package.install(self.distro)
 
         self.cpu_family = ""
         self.cpu_model = ""
@@ -1029,9 +809,8 @@ class S0i3Validator(AmdTool):
             _ = subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
             return True
         except FileNotFoundError:
-            self.show_install_message(Headers.MissingEthtool)
-            package = EthtoolPackage(self.root_user)
-            return package.install(self.distro)
+            self.installer.set_requirements("ethtool")
+            return self.installer.install_dependencies()
 
     def check_network(self):
         """Check network devices for s2idle support"""
@@ -1204,6 +983,8 @@ class S0i3Validator(AmdTool):
 
     def check_port_pm_override(self):
         """Check for PCIe port power management override"""
+        from packaging import version  # pylint: disable=import-outside-toplevel
+
         if self.cpu_family != 0x19:
             return
         if self.cpu_model not in [0x74, 0x78]:
@@ -1832,9 +1613,6 @@ class S0i3Validator(AmdTool):
 
     def capture_acpi(self):
         """Capture ACPI tables to debug"""
-        if not self.iasl:
-            print_color(Headers.MissingIasl, "🚦")
-            return True
         if not self.root_user:
             logging.debug("Unable to capture ACPI tables without root")
             return True
@@ -2266,6 +2044,8 @@ class S0i3Validator(AmdTool):
 
     def cpu_offers_hpet_wa(self):
         """Check if the CPU offers the HPET workaround"""
+        from packaging import version  # pylint: disable=import-outside-toplevel
+
         show_warning = False
         if self.cpu_family == 0x17:
             if self.cpu_model in [0x68, 0x60]:
@@ -2285,6 +2065,8 @@ class S0i3Validator(AmdTool):
 
     def cpu_needs_irq1_wa(self):
         """Check if the CPU needs the IRQ1 workaround"""
+        from packaging import version  # pylint: disable=import-outside-toplevel
+
         if self.cpu_family == 0x17:
             if self.cpu_model in [0x68, 0x60]:
                 return True
@@ -2391,7 +2173,9 @@ class S0i3Validator(AmdTool):
                 "❌",
             )
             self.failures += [
-                amd_debug.failures.SpuriousWakeup(self.requested_duration)
+                amd_debug.failures.SpuriousWakeup(
+                    self.requested_duration, self.userspace_duration
+                )
             ]
         if self.kernel_duration:
             if self.userspace_duration:
