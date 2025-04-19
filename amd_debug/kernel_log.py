@@ -57,7 +57,7 @@ class DmesgLogger(KernelLogger):
         for line in result.stdout.decode("utf-8").split("\n"):
             if "--since" in line:
                 self.since_support = True
-        logging.debug("Since support: %d", self.since_support)
+        logging.debug("dmesg since support: %d", self.since_support)
 
         self.command = ["dmesg", "-t", "-k"]
         self._refresh_head()
@@ -170,4 +170,5 @@ def get_kernel_log(input_file=None) -> KernelLogger:
             kernel_log = DmesgLogger()
         except subprocess.CalledProcessError:
             kernel_log = None
+    logging.debug("Kernel log provider: %s", kernel_log.__class__.__name__)
     return kernel_log
