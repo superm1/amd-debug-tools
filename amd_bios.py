@@ -107,7 +107,7 @@ class AmdBios(AmdTool):
         if re.search(r"ex_trace_point", line):
             pass
         elif re.search(r"ex_trace_args", line):
-            t = line.split(":", 1)[-1].strip()
+            t = line.split(": ")[-1].strip()
             # extract format string using regex
             match = re.match(r"\"(.*?)\"(, .*)", t)
             if match:
