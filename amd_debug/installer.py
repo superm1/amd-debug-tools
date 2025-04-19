@@ -197,13 +197,26 @@ class Installer:
         except FileNotFoundError:
             self.ethtool = False
 
-        # add checks for journald
+        # add checks for cysystemd
         try:
-            from systemd import journal as _  # pylint: disable=import-outside-toplevel
+            from cysystemd.reader import (
+                JournalReader as _,
+            )  # pylint: disable=import-outside-toplevel
 
             self.journald = True
         except ModuleNotFoundError:
             self.journald = False
+
+        # add checks for python-systemd
+        if not self.journald:
+            try:
+                from systemd import (
+                    journal as _,
+                )  # pylint: disable=import-outside-toplevel
+
+                self.journald = True
+            except ModuleNotFoundError:
+                self.journald = False
         self.requirements = []
 
         # for checking for pandas

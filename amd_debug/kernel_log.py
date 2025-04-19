@@ -114,6 +114,58 @@ class DmesgLogger(KernelLogger):
         return self.buffer.split("\n")[0]
 
 
+class CySystemdLogger(KernelLogger):
+    """Class for logging using systemd journal using cython"""
+
+    def __init__(self):
+        from cysystemd.reader import JournalReader, JournalOpenMode, Rule
+
+        boot_reader = JournalReader()
+        boot_reader.open(JournalOpenMode.SYSTEM)
+        boot_reader.seek_tail()
+        boot_reader.skip_previous(1)
+
+        current_boot_id = None
+        for entry in boot_reader:
+            if hasattr(entry, "data") and "_BOOT_ID" in entry.data:
+                current_boot_id = entry.data["_BOOT_ID"]
+                break
+
+        rules = Rule("_BOOT_ID", current_boot_id) & Rule("_TRANSPORT", "kernel")
+
+        self.journal = JournalReader()
+        self.journal.open(JournalOpenMode.SYSTEM)
+        self.journal.add_filter(rules)
+
+    def seek(self, tim=None):
+        """Seek to the beginning of the log"""
+        if tim:
+            self.journal.seek_realtime(tim)
+        else:
+            self.journal.seek_head()
+
+    def process_callback(self, callback, _priority=None):
+        """Process the log"""
+        for entry in self.journal:
+            callback(entry["MESSAGE"], entry["PRIORITY"])
+
+    def match_line(self, matches):
+        """Find lines that match all matches"""
+        for entry in self.journal:
+            for match in matches:
+                if match not in entry["MESSAGE"]:
+                    break
+                return entry["MESSAGE"]
+        return None
+
+    def match_pattern(self, pattern):
+        """Find lines that match a pattern"""
+        for entry in self.journal:
+            if re.search(pattern, entry["MESSAGE"]):
+                return entry["MESSAGE"]
+        return None
+
+
 class SystemdLogger(KernelLogger):
     """Class for logging using systemd journal"""
 
@@ -162,9 +214,14 @@ def get_kernel_log(input_file=None) -> KernelLogger:
         kernel_log = InputFile(input_file)
     elif systemd_in_use():
         try:
-            kernel_log = SystemdLogger()
-        except ModuleNotFoundError:
-            pass
+            kernel_log = CySystemdLogger()
+        except ImportError:
+            kernel_log = None
+        if not kernel_log:
+            try:
+                kernel_log = SystemdLogger()
+            except ModuleNotFoundError:
+                pass
     if not kernel_log:
         try:
             kernel_log = DmesgLogger()
