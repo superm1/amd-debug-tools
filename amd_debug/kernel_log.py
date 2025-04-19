@@ -19,7 +19,7 @@ class KernelLogger:
     def seek(self):
         """Seek to the beginning of the log"""
 
-    def process_callback(self, callback):
+    def process_callback(self, callback, priority):
         """Process the log"""
 
     def match_line(self, matches):
@@ -38,10 +38,10 @@ class InputFile(KernelLogger):
         self.seeked = False
         self.buffer = read_file(fname)
 
-    def process_callback(self, callback):
+    def process_callback(self, callback, priority=None):
         """Process the log"""
         for entry in self.buffer.split("\n"):
-            callback(entry)
+            callback(entry, priority)
 
 
 class DmesgLogger(KernelLogger):
