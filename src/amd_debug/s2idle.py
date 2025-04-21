@@ -308,6 +308,11 @@ def parse_args():
         default=Defaults.format,
         help="Report format",
     )
+    report_cmd.add_argument(
+        "--debug",
+        action="store_true",
+        help="Include report debug data",
+    )
 
     # if running in a venv, install/uninstall hook options
     if sys.prefix != sys.base_prefix:
