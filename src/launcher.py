@@ -15,7 +15,7 @@ if __name__ == "__main__":
     if exe == "amd_s2idle.py":
         from amd_debug import s2idle
 
-        sys.exit(s2idle.main(False))
+        sys.exit(s2idle.main())
     elif exe == "amd_bios.py":
         from amd_debug import bios
 

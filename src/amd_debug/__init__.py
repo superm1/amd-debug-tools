@@ -1,7 +1,7 @@
-def amd_s2idle(packaged=False):
+def amd_s2idle():
     from . import s2idle
 
-    s2idle.main(packaged)
+    s2idle.main()
 
 
 def amd_bios():

@@ -15,6 +15,7 @@ from amd_debug.common import (
     read_file,
     relaunch_sudo,
     show_log_info,
+    version,
 )
 from amd_debug.kernel_log import get_kernel_log
 
@@ -94,6 +95,7 @@ class AmdBios(AmdTool):
             with open(p, "w", encoding="utf-8") as w:
                 w.write("disable")
             print_color("Disabled BIOS tracing", "✅")
+        return True
 
     def _analyze_kernel_log_line(self, line, priority):
         """Analyze a line from the kernel log"""
@@ -153,29 +155,30 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Parse a combined kernel/BIOS log.",
     )
-    parser.add_argument(
-        "--log",
-        help="Location of log file",
+    subparsers = parser.add_subparsers(help="Possible commands", dest="command")
+    parse_cmd = subparsers.add_parser(
+        "parse", help="Parse log for kernel and BIOS messages"
     )
-    parser.add_argument(
+    parse_cmd.add_argument(
         "--input",
         help="Optional input file to parse",
     )
-    parser.add_argument(
+    parse_cmd.add_argument(
+        "--log",
+        help="Location of log file",
+    )
+    trace_cmd = subparsers.add_parser("trace", help="Enable or disable tracing")
+    trace_cmd.add_argument(
         "--enable",
         action="store_true",
         help="Enable BIOS AML tracing",
     )
-    parser.add_argument(
+    trace_cmd.add_argument(
         "--disable",
         action="store_true",
         help="Disable BIOS AML tracing",
     )
-    parser.add_argument(
-        "--parse",
-        action="store_true",
-        help="Parse log for kernel and BIOS messages",
-    )
+    subparsers.add_parser("version", help="Show version information")
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -186,15 +189,17 @@ def parse_args():
 
 def main():
     """Main function"""
-
     args = parse_args()
-
-    if args.enable and args.disable:
-        raise ValueError("can't set both enable and disable")
-
-    app = AmdBios(args.input, args.log)
-    if not args.input:
+    if args.command == "trace":
+        if args.enable and args.disable:
+            sys.exit("can't set both enable and disable")
+        if not args.enable and not args.disable:
+            sys.exit("must set either enable or disable")
+        app = AmdBios(None, None)
         app.set_tracing(args.enable, args.disable)
-    if args.parse:
+    elif args.command == "parse":
+        app = AmdBios(args.input, args.log)
         app.run()
+    elif args.command == "version":
+        print(version())
     show_log_info()

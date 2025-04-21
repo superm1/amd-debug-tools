@@ -4,12 +4,11 @@
 import argparse
 import sys
 import os
-import importlib.metadata
 import subprocess
 import sqlite3
 
 from datetime import date, timedelta, datetime
-from amd_debug.common import is_root, relaunch_sudo, show_log_info
+from amd_debug.common import is_root, relaunch_sudo, show_log_info, version
 
 from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
@@ -138,7 +137,7 @@ def prompt_test_arguments(duration, wait, count, rand) -> list:
     return [duration, wait, count]
 
 
-def report(since, until, fname, fmt, debug, log) -> None:
+def report(since, until, fname, fmt, debug, log) -> bool:
     """Generate a report from previous sleep cycles"""
     try:
         since, until, fname, fmt = prompt_report_arguments(since, until, fname, fmt)
@@ -149,30 +148,37 @@ def report(since, until, fname, fmt, debug, log) -> None:
             since=since, until=until, fname=fname, fmt=fmt, debug=debug, log_file=log
         )
     except sqlite3.OperationalError as e:
-        sys.exit(f"Failed to generate report: {e}")
+        print(f"Failed to generate report: {e}")
+        return False
     except PermissionError as e:
-        sys.exit(f"Failed to generate report: {e}")
+        print(f"Failed to generate report: {e}")
+        return False
     try:
         app.run()
     except PermissionError as e:
-        sys.exit(f"Failed to generate report: {e}")
+        print(f"Failed to generate report: {e}")
+        return False
     except ValueError as e:
-        sys.exit(f"Failed to generate report: {e}")
+        print(f"Failed to generate report: {e}")
+        return False
     display_report_file(fname, fmt)
+    return True
 
 
-def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> None:
+def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> bool:
     """Run a test"""
     app = Installer()
     app.set_requirements("iasl", "ethtool")
     if not app.install_dependencies():
-        sys.exit("Failed to install dependencies")
+        print("Failed to install dependencies")
+        return False
 
     try:
         app = PrerequisiteValidator(log_file=log, debug=debug)
         run = app.run()
     except PermissionError as e:
-        sys.exit(f"Failed to run prerequisite check: {e}")
+        print(f"Failed to run prerequisite check: {e}")
+        return False
     app.report()
 
     if run or force:
@@ -231,76 +237,81 @@ def uninstall() -> None:
         sys.exit("Failed to remove")
 
 
-def version() -> str:
-    """Get version of the tool"""
-    return importlib.metadata.version("amd-debug-tools")
-
-
-def parse_args(packaged):
+def parse_args():
     """Parse command line arguments"""
-    choices = ["report", "test", "version"]
-    if not packaged:
-        choices.append("install")
-        choices.append("uninstall")
-
     parser = argparse.ArgumentParser(
-        description=f"Swiss army knife for analyzing Linux s2idle problems (version {version()})",
+        description="Swiss army knife for analyzing Linux s2idle problems",
         epilog="The tool can run an immediate test with the 'test' command or can be used to hook into systemd for building reports later.\n"
         "All optional arguments will be prompted if needed.\n"
         "To use non-interactively, please populate all optional arguments.",
     )
-    parser.add_argument(
-        "action",
-        choices=choices,
-        help="Action to perform",
-    )
-    parser.add_argument("--count", help=Headers.CountDescription)
-    parser.add_argument(
-        "--log",
-        help=Headers.LogDescription,
-    )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(help="Possible commands", dest="action")
+    test_cmd = subparsers.add_parser("test", help="Run amd-s2idle test and report")
+    test_cmd.add_argument("--count", help=Headers.CountDescription)
+    test_cmd.add_argument(
         "--duration",
         help=Headers.DurationDescription,
     )
-    parser.add_argument(
+    test_cmd.add_argument(
         "--wait",
         help=Headers.WaitDescription,
     )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Run suspend test even if prerequisites failed",
-    )
-    parser.add_argument(
+    test_cmd.add_argument(
         "--debug",
         action="store_true",
         help="Display report debug data",
     )
-    parser.add_argument(
-        "--since",
-        help=Headers.SinceDescription,
+    test_cmd.add_argument(
+        "--logind", action="store_true", help="Use logind to suspend system"
     )
-    parser.add_argument(
-        "--until",
-        default=Defaults.until.isoformat(),
-        help=Headers.UntilDescription,
+    test_cmd.add_argument(
+        "--random",
+        action="store_true",
+        help="Run sleep cycles for random durations and wait, using the --duration and --wait arguments as an upper bound",
     )
-    parser.add_argument("--report-file", help=Headers.ReportFileDescription)
-    parser.add_argument(
+    test_cmd.add_argument(
+        "--force",
+        action="store_true",
+        help="Run suspend test even if prerequisites failed",
+    )
+    test_cmd.add_argument(
+        "--log",
+        help=Headers.LogDescription,
+    )
+    test_cmd.add_argument(
         "--format",
         choices=Defaults.format_choices,
         default=Defaults.format,
         help="Report format",
     )
-    parser.add_argument(
-        "--random",
-        action="store_true",
-        help="Run sleep cycles for random durations and wait, using the --duration and --wait arguments as an upper bound",
+    test_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
+
+    report_cmd = subparsers.add_parser(
+        "report", help="Generate amd-s2idle report from previous runs"
     )
-    parser.add_argument(
-        "--logind", action="store_true", help="Use logind to suspend system"
+    report_cmd.add_argument(
+        "--since",
+        help=Headers.SinceDescription,
     )
+    report_cmd.add_argument(
+        "--until",
+        default=Defaults.until.isoformat(),
+        help=Headers.UntilDescription,
+    )
+    report_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
+    report_cmd.add_argument(
+        "--format",
+        choices=Defaults.format_choices,
+        default=Defaults.format,
+        help="Report format",
+    )
+
+    # if running in a venv, install/uninstall hook options
+    if sys.prefix != sys.base_prefix:
+        subparsers.add_parser("install", help="Install systemd s2idle hook")
+        subparsers.add_parser("uninstall", help="Uninstall systemd s2idle hook")
+
+    subparsers.add_parser("version", help="Show version information")
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -309,13 +320,10 @@ def parse_args(packaged):
     return parser.parse_args()
 
 
-def main(packaged):
+def main():
     """Main function"""
-    args = parse_args(packaged)
-    if args.force and args.action != "test":
-        sys.exit("Force can only be used with test")
-    if args.since and args.action != "report":
-        sys.exit("Since can only be used with report")
+    args = parse_args()
+    ret = False
     if args.action == "install":
         relaunch_sudo()
         install(args.log)
@@ -323,12 +331,12 @@ def main(packaged):
         relaunch_sudo()
         uninstall()
     elif args.action == "report":
-        report(
+        ret = report(
             args.since, args.until, args.report_file, args.format, args.debug, args.log
         )
     elif args.action == "test":
         relaunch_sudo()
-        test(
+        ret = test(
             args.duration,
             args.wait,
             args.count,
@@ -342,6 +350,8 @@ def main(packaged):
         )
     elif args.action == "version":
         print(version())
+        return
     else:
         sys.exit("no action specified")
-    show_log_info()
+    if not ret:
+        show_log_info()

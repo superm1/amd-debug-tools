@@ -3,17 +3,19 @@
 """CPPC triage script for AMD systems"""
 
 import os
-import re
 import argparse
+import re
+import sys
 
 from amd_debug.common import (
+    AmdTool,
+    get_pretty_distro,
     print_color,
     read_file,
-    relaunch_sudo,
-    get_pretty_distro,
     read_msr,
+    relaunch_sudo,
     show_log_info,
-    AmdTool,
+    version,
 )
 
 
@@ -275,7 +277,9 @@ class AmdPstateTriage(AmdTool):
             self.gather_cpu_info()
         except FileNotFoundError:
             print_color("Unable to gather CPU information", "❌")
+            return False
         self.gather_msrs()
+        return True
 
 
 def parse_args():
@@ -284,15 +288,26 @@ def parse_args():
         description="Collect useful information for debugging amd-pstate issues.",
         epilog="Arguments are optional",
     )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(help="Possible commands", dest="command")
+    triage_cmd = subparsers.add_parser("triage", help="Run amd-pstate triage")
+    triage_cmd.add_argument(
         "--log",
         help="Location of log file",
     )
+    subparsers.add_parser("version", help="Show version information")
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     return parser.parse_args()
 
 
 def main():
+    """Main function"""
     args = parse_args()
-    triage = AmdPstateTriage(args.log)
-    triage.run()
+    if args.command == "version":
+        print(version())
+        return
+    elif args.command == "triage":
+        triage = AmdPstateTriage(args.log)
+        triage.run()
     show_log_info()

@@ -38,12 +38,12 @@ after the system enters and exits the s2idle state.
 This will also install a bash completion script that can be used for other
 commands.
 
-**NOTE:** This command is not supported when installed from a debian package.
+**NOTE:** This command is only supported when run from a venv.
 
 ### `amd-s2idle uninstall`
 This will uninstall the systemd hook and remove the bash completion script.
 
-**NOTE:** This command is not supported when installed from a debian package.
+**NOTE:** This command is only supported when run from a venv.
 
 ### `amd-s2idle test`
 This will run a suspend cycle with a timer based wakeup and capture relevant
@@ -90,14 +90,24 @@ It's suggested that you use `--since` and `--until` to focus on the cycles that 
 `amd-bios` is a a tool that can be used to enable or disable BIOS AML debug logging
 -and to parse a kernel log that contains BIOS logs.
 
-### `amd-bios --enable`
-Determine if the system supports enabling BIOS AML debug logging and enable it if possible.
+### `amd-bios trace`
+Modify BIOS AML trace debug logging.
 
-### `amd-bios --disable`
-Disables tracing of BIOS AML debug logging.
+One of the following arguments must be set for this command:
 
-### `amd-bios --parse`
+        --enable    Enable BIOS AML tracing
+        --disable   Disable BIOS AML tracing
+
+### `amd-bios parse`
 Parses a kernel log that contains BIOS AML debug logging and produces a report.
+
+The following optional arguments are supported for this command:
+
+        --input INPUT  Optional input file to parse
+        --log LOG      Location of log file
+
+### `amd-bios version`
+This will print the version of the tool and exit.
 
 ## amd-pstate
 `amd-pstate` is a tool used for identification of issues with amd-pstate.
