@@ -178,6 +178,10 @@ def parse_args():
         action="store_true",
         help="Disable BIOS AML tracing",
     )
+    trace_cmd.add_argument(
+        "--log",
+        help="Location of log file",
+    )
     subparsers.add_parser("version", help="Show version information")
 
     if len(sys.argv) == 1:
@@ -195,7 +199,7 @@ def main():
             sys.exit("can't set both enable and disable")
         if not args.enable and not args.disable:
             sys.exit("must set either enable or disable")
-        app = AmdBios(None, None)
+        app = AmdBios(None, args.log)
         app.set_tracing(args.enable, args.disable)
     elif args.command == "parse":
         app = AmdBios(args.input, args.log)
