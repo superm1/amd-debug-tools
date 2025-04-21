@@ -8,12 +8,13 @@ import re
 import sys
 
 from amd_debug.common import (
-    read_file,
+    AmdTool,
+    fatal_error,
+    get_log_priority,
     print_color,
+    read_file,
     relaunch_sudo,
     show_log_info,
-    fatal_error,
-    AmdTool,
 )
 from amd_debug.kernel_log import get_kernel_log
 
@@ -94,7 +95,7 @@ class AmdBios(AmdTool):
                 w.write("disable")
             print_color("Disabled BIOS tracing", "✅")
 
-    def _analyze_kernel_log_line(self, line, _priority):
+    def _analyze_kernel_log_line(self, line, priority):
         """Analyze a line from the kernel log"""
         if re.search(r"ex_trace_point", line):
             pass
@@ -140,7 +141,7 @@ class AmdBios(AmdTool):
         else:
             # strip timestamp
             t = re.sub(r"^\[\s*\d+\.\d+\]", "", line).strip()
-            print_color(t, "🐧")
+            print_color(t, get_log_priority(priority))
 
     def run(self):
         """Exfiltrate from the kernel log"""
