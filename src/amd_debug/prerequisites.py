@@ -566,6 +566,9 @@ class PrerequisiteValidator(AmdTool):
         except PermissionError:
             self.db.record_prereq("%s" % Headers.RootError, "👀")
             return False
+        except FileNotFoundError:
+            self.db.record_prereq("Kernel doesn't support power management", "❌")
+            return False
         return True
 
     def capture_linux_firmware(self):
