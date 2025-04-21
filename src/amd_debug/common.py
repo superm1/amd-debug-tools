@@ -284,6 +284,8 @@ def _git_describe() -> str:
         return result.strip()
     except subprocess.CalledProcessError:
         return None
+    except FileNotFoundError:
+        return None
 
 
 def version() -> str:
