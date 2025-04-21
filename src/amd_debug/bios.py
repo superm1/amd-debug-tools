@@ -151,7 +151,6 @@ def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
         description="Parse a combined kernel/BIOS log.",
-        epilog="If not arguments are provided the tool will parse log from a live system.",
     )
     parser.add_argument(
         "--log",
@@ -171,6 +170,15 @@ def parse_args():
         action="store_true",
         help="Disable BIOS AML tracing",
     )
+    parser.add_argument(
+        "--parse",
+        action="store_true",
+        help="Parse log for kernel and BIOS messages",
+    )
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
 
     return parser.parse_args()
 
@@ -186,6 +194,6 @@ def main():
     app = AmdBios(args.input, args.log)
     if not args.input:
         app.set_tracing(args.enable, args.disable)
-    if not args.enable and not args.disable:
+    if args.parse:
         app.run()
     show_log_info()
