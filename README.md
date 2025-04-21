@@ -7,16 +7,27 @@ It is suggested to install tools in a virtual environment either using
 `pipx` or `python3 -m venv`.
 
 ### From PyPI
-To install from PyPI, run the following command:
+`amd-debug-tools` is distributed as a python wheel, which is a
+binary package format for Python. To install from PyPI, run the following
+command:
 
     pipx install amd-debug-tools
 
 ### From source
-To build from source, it's suggested that you create a wheel and install it.
-This can be done by running the following commands:
+To build the package from source, you will need to the `python3-build`
+package natively installed by your distribution package manager. Then you
+can generate and install a wheel by running the following commands:
 
-    make
+    python3 -m build
     pipx install dist/amd-debug-tools-*.whl
+
+### Ensuring path
+If you have not used a `pipx` environment before, you may need to run the following command
+to set up the environment:
+
+    pipx ensurepath
+
+This will add the `pipx` environment to your path.
 
 ## amd-s2idle
 `amd-s2idle` is a tool used for analyzing the entry and exit of the s2idle
@@ -97,6 +108,10 @@ One of the following arguments must be set for this command:
 
         --enable    Enable BIOS AML tracing
         --disable   Disable BIOS AML tracing
+
+The following optional arguments are supported for this command:
+
+        --log LOG   Location of log file
 
 ### `amd-bios parse`
 Parses a kernel log that contains BIOS AML debug logging and produces a report.
