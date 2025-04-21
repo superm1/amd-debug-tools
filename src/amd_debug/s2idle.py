@@ -150,6 +150,8 @@ def report(since, until, fname, fmt, debug, log) -> None:
         )
     except sqlite3.OperationalError as e:
         sys.exit(f"Failed to generate report: {e}")
+    except PermissionError as e:
+        sys.exit(f"Failed to generate report: {e}")
     try:
         app.run()
     except PermissionError as e:
