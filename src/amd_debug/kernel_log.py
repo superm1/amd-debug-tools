@@ -138,6 +138,8 @@ class CySystemdLogger(KernelLogger):
             if hasattr(entry, "data") and "_BOOT_ID" in entry.data:
                 current_boot_id = entry.data["_BOOT_ID"]
                 break
+        if not current_boot_id:
+            raise RuntimeError("Unable to find current boot ID")
 
         rules = Rule("_BOOT_ID", current_boot_id) & Rule("_TRANSPORT", "kernel")
 
@@ -228,6 +230,9 @@ def get_kernel_log(input_file=None) -> KernelLogger:
         try:
             kernel_log = CySystemdLogger()
         except ImportError:
+            kernel_log = None
+        except RuntimeError as e:
+            logging.debug(e)
             kernel_log = None
         if not kernel_log:
             try:
