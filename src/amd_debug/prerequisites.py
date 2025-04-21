@@ -17,7 +17,6 @@ from amd_debug.wake import WakeIRQ
 from amd_debug.kernel_log import get_kernel_log, SystemdLogger, DmesgLogger
 from amd_debug.common import (
     BIT,
-    Colors,
     clear_temporary_message,
     get_distro,
     get_pretty_distro,
@@ -612,7 +611,7 @@ class PrerequisiteValidator(AmdTool):
         if show_warning:
             self.db.record_prereq(
                 "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
-                Colors.WARNING,
+                "🚦",
             )
         return True
 
@@ -675,7 +674,7 @@ class PrerequisiteValidator(AmdTool):
                     else:
                         self.db.record_prereq(
                             f"Platform may have low hardware sleep residency with Wake-on-lan disabled. Run `ethtool -s {interface} wol g` to enable it if necessary.",
-                            Colors.WARNING,
+                            "🚦",
                         )
         return True
 
@@ -747,7 +746,7 @@ class PrerequisiteValidator(AmdTool):
                 ) and ver in device.get_version():
                     self.db.record_prereq(
                         f"Platform may have problems resuming.  Upgrade the firmware for '{device.get_name()}' if you have problems.",
-                        Colors.WARNING,
+                        "🚦",
                     )
         return True
 
@@ -1110,7 +1109,7 @@ class PrerequisiteValidator(AmdTool):
             return True
         self.db.record_prereq(
             "Platform may hang resuming.  Upgrade your firmware or add pcie_port_pm=off to kernel command line if you have problems.",
-            Colors.WARNING,
+            "🚦",
         )
         return False
 
@@ -1187,7 +1186,7 @@ class PrerequisiteValidator(AmdTool):
             if not check():
                 result = False
         if not result:
-            self.db.record_prereq(Headers.BrokenPrerequisites, Colors.UNDERLINE)
+            self.db.record_prereq(Headers.BrokenPrerequisites, "💯")
         self.db.sync()
         clear_temporary_message(len(msg))
         return result
@@ -1207,6 +1206,6 @@ class PrerequisiteValidator(AmdTool):
 
         if len(self.failures) == 0:
             return True
-        print_color(Headers.ExplanationReport, Colors.HEADER)
+        print_color(Headers.ExplanationReport, "🗣️")
         for item in self.failures:
             item.get_failure()
