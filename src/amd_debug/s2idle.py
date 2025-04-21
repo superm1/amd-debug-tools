@@ -246,6 +246,12 @@ def parse_args():
         "To use non-interactively, please populate all optional arguments.",
     )
     subparsers = parser.add_subparsers(help="Possible commands", dest="action")
+    parser.add_argument(
+        "--log",
+        help=Headers.LogDescription,
+    )
+
+    # 'test' command
     test_cmd = subparsers.add_parser("test", help="Run amd-s2idle test and report")
     test_cmd.add_argument("--count", help=Headers.CountDescription)
     test_cmd.add_argument(
@@ -275,10 +281,6 @@ def parse_args():
         help="Run suspend test even if prerequisites failed",
     )
     test_cmd.add_argument(
-        "--log",
-        help=Headers.LogDescription,
-    )
-    test_cmd.add_argument(
         "--format",
         choices=Defaults.format_choices,
         default=Defaults.format,
@@ -286,6 +288,7 @@ def parse_args():
     )
     test_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
 
+    # 'report' command
     report_cmd = subparsers.add_parser(
         "report", help="Generate amd-s2idle report from previous runs"
     )
