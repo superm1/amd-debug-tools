@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import glob
+import math
 import os
 import re
 import random
@@ -899,7 +900,7 @@ class SleepValidator(AmdTool):
             else:
                 self.requested_duration = duration
                 requested_wait = wait
-            run_countdown("Suspending system", requested_wait / 2)
+            run_countdown("Suspending system", math.ceil(requested_wait / 2))
             self.prep()
             self.db.record_debug(
                 f"{Headers.SuspendDuration} {timedelta(seconds=self.requested_duration)}",
@@ -915,7 +916,7 @@ class SleepValidator(AmdTool):
             self.program_wakealarm()
             if not self.suspend_system():
                 return False
-            run_countdown("Collecting data", requested_wait / 2)
+            run_countdown("Collecting data", math.ceil(requested_wait / 2))
             self.post()
             self.db.sync()
             self.report_cycle()
