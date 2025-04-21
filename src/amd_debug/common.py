@@ -290,7 +290,15 @@ def _git_describe() -> str:
 
 def version() -> str:
     """Get version of the tool"""
-    return importlib.metadata.version("amd-debug-tools")
+    ver = "unknown"
+    try:
+        ver = importlib.metadata.version("amd-debug-tools")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    describe = _git_describe()
+    if describe:
+        ver = f"{ver} [{describe}]"
+    return ver
 
 
 class AmdTool:
@@ -300,6 +308,3 @@ class AmdTool:
         self.log = _configure_log(log_prefix, log_file)
         logging.debug("command: %s", sys.argv)
         logging.debug("Version: %s", version())
-        describe = _git_describe()
-        if describe:
-            logging.debug(describe)
