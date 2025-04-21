@@ -7,6 +7,19 @@ from pyudev import Context
 from amd_debug.common import read_file
 
 
+class WakeGPIO:
+    """Class for wake GPIOs"""
+
+    def __init__(self, num):
+        self.num = int(num)
+        self.name = ""
+
+    def __str__(self):
+        if self.name:
+            return f"{self.num} ({self.name})"
+        return f"{self.num}"
+
+
 class WakeIRQ:
     """Class for wake IRQs"""
 

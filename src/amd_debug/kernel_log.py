@@ -7,7 +7,7 @@ import re
 import subprocess
 from datetime import timedelta
 
-from amd_debug.common import systemd_in_use, read_file
+from amd_debug.common import systemd_in_use, read_file, fatal_error
 
 
 class KernelLogger:
@@ -16,8 +16,11 @@ class KernelLogger:
     def __init__(self):
         pass
 
-    def seek(self, tim=None):
+    def seek(self):
         """Seek to the beginning of the log"""
+
+    def seek_tail(self, tim=None):
+        """Seek to the end of the log"""
 
     def process_callback(self, callback, priority):
         """Process the log"""
@@ -71,8 +74,13 @@ class DmesgLogger(KernelLogger):
         if result.returncode == 0:
             self.buffer = result.stdout.decode("utf-8")
 
-    def seek(self, tim=None):
+    def seek(self):
         """Seek to the beginning of the log"""
+        if self.seeked:
+            self._refresh_head()
+
+    def seek_tail(self, tim=None):
+        """Seek to the end of the log"""
         if tim:
             if self.since_support:
                 # look 10 seconds back because dmesg time isn't always accurate
@@ -88,8 +96,6 @@ class DmesgLogger(KernelLogger):
                 self.buffer = result.stdout.decode("utf-8")
                 if self.since_support:
                     self.seeked = True
-        elif self.seeked:
-            self._refresh_head()
 
     def process_callback(self, callback, _priority=None):
         """Process the log"""
@@ -139,12 +145,13 @@ class CySystemdLogger(KernelLogger):
         self.journal.open(JournalOpenMode.SYSTEM)
         self.journal.add_filter(rules)
 
-    def seek(self, tim=None):
+    def seek(self):
         """Seek to the beginning of the log"""
-        if tim:
-            self.journal.seek_realtime(tim)
-        else:
-            self.journal.seek_head()
+        self.journal.seek_head()
+
+    def seek_tail(self, tim=None):
+        """Seek to the end of the log (ignore tim)"""
+        self.journal.seek_tail()
 
     def process_callback(self, callback, _priority=None):
         """Process the log"""
@@ -180,12 +187,15 @@ class SystemdLogger(KernelLogger):
         self.journal.add_match(_TRANSPORT="kernel")
         self.journal.add_match(PRIORITY=journal.LOG_DEBUG)
 
-    def seek(self, tim=None):
+    def seek(self):
         """Seek to the beginning of the log"""
+        self.journal.seek_head()
+
+    def seek_tail(self, tim=None):
         if tim:
             self.journal.seek_realtime(tim)
         else:
-            self.journal.seek_head()
+            self.journal.seek_tail()
 
     def process_callback(self, callback, _priority=None):
         """Process the log"""
@@ -227,7 +237,8 @@ def get_kernel_log(input_file=None) -> KernelLogger:
     if not kernel_log:
         try:
             kernel_log = DmesgLogger()
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            fatal_error(f"{e}")
             kernel_log = None
     logging.debug("Kernel log provider: %s", kernel_log.__class__.__name__)
     return kernel_log

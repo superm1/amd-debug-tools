@@ -5,6 +5,7 @@
 This module contains common utility functions and classes for various amd-debug-tools.
 """
 
+import importlib.metadata
 import logging
 import os
 import platform
@@ -85,7 +86,16 @@ def fatal_error(message):
     sys.exit(1)
 
 
-def configure_log(prefix, log) -> str:
+def show_log_info():
+    """Show log information"""
+    logger = logging.getLogger()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            filename = handler.baseFilename
+            print(f"Logs are saved to: {filename}")
+
+
+def _configure_log(prefix, log) -> str:
     """Configure logging for the tool"""
     if not log:
         user = os.environ.get("SUDO_USER")
@@ -196,7 +206,10 @@ def BIT(num):  # pylint: disable=invalid-name
 def get_log_priority(num):
     """Maps an integer debug level to a priority type"""
     if num:
-        num = int(num)
+        try:
+            num = int(num)
+        except ValueError:
+            return num
         if num == 7:
             return "🦟"
         elif num == 4:
@@ -233,21 +246,8 @@ def get_property_pyudev(properties, key, fallback=""):
         return ""
 
 
-def _git_describe() -> str:
-    """Get the git description of the current commit"""
-    try:
-        result = subprocess.check_output(
-            ["git", "log", "-1", '--format=commit %h ("%s")'],
-            cwd=os.path.dirname(__file__),
-            text=True,
-        )
-        return result.strip()
-    except subprocess.CalledProcessError as e:
-        logging.error("Git command failed: %s", e)
-        return None
-
-
 def read_msr(msr, cpu):
+    """Read a Model-Specific Register (MSR) value from the CPU."""
     p = f"/dev/cpu/{cpu}/msr"
     if not os.path.exists(p) and is_root():
         os.system("modprobe msr")
@@ -265,13 +265,39 @@ def read_msr(msr, cpu):
     return val
 
 
+def relaunch_sudo() -> None:
+    """Relaunch the script with sudo if not already running as root"""
+    if not is_root():
+        logging.debug("Relaunching with sudo")
+        os.execvp("sudo", ["sudo", "-E"] + sys.argv)
+
+
+def _git_describe() -> str:
+    """Get the git description of the current commit"""
+    try:
+        result = subprocess.check_output(
+            ["git", "log", "-1", '--format=commit %h ("%s")'],
+            cwd=os.path.dirname(__file__),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        return result.strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def version() -> str:
+    """Get version of the tool"""
+    return importlib.metadata.version("amd-debug-tools")
+
+
 class AmdTool:
     """Base class for AMD tools"""
 
     def __init__(self, log_prefix, log_file):
-        self.log = configure_log(log_prefix, log_file)
+        self.log = _configure_log(log_prefix, log_file)
         logging.debug("command: %s", sys.argv)
-        logging.debug(_git_describe())
-
-    def __del__(self):
-        print(f"Logs are saved to {self.log}")
+        logging.debug("Version: %s", version())
+        describe = _git_describe()
+        if describe:
+            logging.debug(describe)
