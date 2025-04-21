@@ -242,10 +242,7 @@ class AmdPstateTriage(AmdTool):
             print_color("Unable to check MSRs: MSR kernel module not loaded", "❌")
             return False
         except PermissionError:
-            if not self.root_user:
-                print_color("Run as root to check MSRs", "🚦")
-            else:
-                print_color("MSR checks unavailable", "🚦")
+            print_color("MSR checks unavailable", "🚦")
             return
 
         msr_df = msr_df.sort_values(by="CPU #")
