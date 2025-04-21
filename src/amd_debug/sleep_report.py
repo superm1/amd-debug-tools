@@ -9,13 +9,13 @@ from tabulate import tabulate
 
 from amd_debug.database import SleepDatabase
 from amd_debug.common import (
-    print_color,
-    get_group_color,
-    Colors,
-    print_temporary_message,
-    clear_temporary_message,
-    get_log_priority,
     AmdTool,
+    Colors,
+    clear_temporary_message,
+    get_group_color,
+    get_log_priority,
+    print_color,
+    print_temporary_message,
 )
 
 from amd_debug.failures import (
