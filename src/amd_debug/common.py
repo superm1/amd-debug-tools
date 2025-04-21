@@ -112,6 +112,7 @@ def _configure_log(prefix, log) -> str:
             with open(log, "w", encoding="utf-8") as f:
                 f.write("")
             if "SUDO_UID" in os.environ:
+                os.chown(path, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
                 os.chown(log, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
     # for saving a log file for analysis
     logging.basicConfig(
