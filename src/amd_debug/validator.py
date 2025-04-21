@@ -19,7 +19,6 @@ from amd_debug.common import (
     print_color,
     read_file,
     check_lockdown,
-    Colors,
     run_countdown,
     BIT,
     AmdTool,
@@ -885,13 +884,13 @@ class SleepValidator(AmdTool):
         if rand:
             print_color(
                 f"Running {count} cycle random test with max duration of {duration}s and a max wait of {wait}s",
-                Colors.HEADER,
+                "🗣️",
             )
         elif count > 1:
             length = timedelta(seconds=(duration + wait) * count)
             print_color(
                 f"Running {count} cycles (Test finish expected @ {datetime.now() + length})".format(),
-                Colors.HEADER,
+                "🗣️",
             )
         for i in range(1, count + 1):
             if rand:
@@ -911,7 +910,7 @@ class SleepValidator(AmdTool):
                 header = ""
             print_color(
                 f"{header}Started at {self.last_suspend} (cycle finish expected @ {datetime.now() + timedelta(seconds=self.requested_duration + requested_wait)})",
-                Colors.HEADER,
+                "🗣️",
             )
             self.program_wakealarm()
             if not self.suspend_system():
@@ -938,7 +937,7 @@ class SleepValidator(AmdTool):
 
     def report_cycle(self):
         """Report the results of the last cycle"""
-        print_color(Headers.LastCycleResults, Colors.HEADER)
+        print_color(Headers.LastCycleResults, "🗣️")
 
         app = SleepReport(
             since=self.last_suspend,
