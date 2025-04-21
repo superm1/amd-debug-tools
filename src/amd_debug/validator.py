@@ -759,6 +759,7 @@ class SleepValidator(AmdTool):
         )
 
     def post(self):
+        """Post-process the suspend test results"""
         checks = [
             self.analyze_kernel_log,
             self.capture_wakeup_irq_data,
@@ -782,6 +783,7 @@ class SleepValidator(AmdTool):
         )
 
     def prep(self):
+        """Prepare the system for suspend testing"""
         self.last_suspend = datetime.now()
         self.kernel_log.seek_tail(self.last_suspend)
         self.db.start_cycle(self.last_suspend)
