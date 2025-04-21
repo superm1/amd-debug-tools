@@ -51,7 +51,7 @@ def get_group_color(group) -> str:
         color = Colors.DEBUG
     elif any(mk in group for mk in ["❌", "👀"]):
         color = Colors.FAIL
-    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱", "🫆"]):
+    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱"]):
         color = Colors.OK
     else:
         color = group

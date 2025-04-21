@@ -86,7 +86,7 @@ class AmdPstateTriage(AmdTool):
         for f in ("status", "prefcore"):
             p = os.path.join("/", "sys", "devices", "system", "cpu", "amd_pstate", f)
             if os.path.exists(p):
-                print_color(f"'{f}':\t{read_file(p)}", "🫆")
+                print_color(f"'{f}':\t{read_file(p)}", "○")
 
     def gather_kernel_info(self):
         """Gather kernel information"""
