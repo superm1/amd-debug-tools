@@ -56,12 +56,15 @@ if __name__ == "__main__":
     if args.path:
         sys.path.append(args.path)
 
-    from amd_debug.validator import (
-        SleepValidator,
-    )  # pylint: disable=import-outside-toplevel
-    from amd_debug.prerequisites import (
-        PrerequisiteValidator,
-    )  # pylint: disable=import-outside-toplevel
+    try:
+        from amd_debug.validator import (
+            SleepValidator,
+        )  # pylint: disable=import-outside-toplevel
+        from amd_debug.prerequisites import (
+            PrerequisiteValidator,
+        )  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:
+        sys.exit(0)
 
     app = SleepValidator(args.log, args.debug)
     if args.action == "pre":
