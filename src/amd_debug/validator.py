@@ -222,7 +222,7 @@ class SleepValidator(AmdTool):
                     continue
                 target = os.path.join(root, fname)
                 val = 0
-                with open(target, "r") as r:
+                with open(target, "r", encoding="utf-8") as r:
                     val = int(r.read().split()[0])
                 if fname in self.gpes and self.gpes[fname] != val:
                     self.db.record_debug(
@@ -235,10 +235,10 @@ class SleepValidator(AmdTool):
 
         def get_input_sibling_name(pyudev, parent):
             """Get the name of the input sibling"""
-            for input in pyudev.list_devices(subsystem="input", parent=parent):
-                if not "NAME" in input.properties:
+            for inp in pyudev.list_devices(subsystem="input", parent=parent):
+                if not "NAME" in inp.properties:
                     continue
-                return input.properties["NAME"]
+                return inp.properties["NAME"]
             return ""
 
         devices = []
@@ -489,8 +489,6 @@ class SleepValidator(AmdTool):
                 val = read_file(p)
                 for line in val.split("\n"):
                     if "Last S0i3 Status" in line:
-                        if "Success" in line:
-                            result = True
                         continue
                     if "Time (in us) in S0i3" in line:
                         self.hw_sleep_duration = int(line.split(":")[1]) / 10**6
@@ -807,9 +805,9 @@ class SleepValidator(AmdTool):
         for device in self.pyudev.list_devices(subsystem="rtc"):
             wakealarm = os.path.join(device.sys_path, "wakealarm")
         if wakealarm:
-            with open(wakealarm, "w") as w:
+            with open(wakealarm, "w", encoding="utf-8") as w:
                 w.write("0")
-            with open(wakealarm, "w") as w:
+            with open(wakealarm, "w", encoding="utf-8") as w:
                 w.write("+%s\n" % self.requested_duration)
         else:
             print_color("No RTC device found, please manually wake system", "🚦")
