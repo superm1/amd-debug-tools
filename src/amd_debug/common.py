@@ -128,10 +128,7 @@ def check_lockdown():
     fn = os.path.join("/", "sys", "kernel", "security", "lockdown")
     if not os.path.exists(fn):
         return False
-    try:
-        lockdown = read_file(fn)
-    except FileNotFoundError:
-        return True
+    lockdown = read_file(fn)
     if lockdown.split()[0] != "[none]":
         return lockdown
     return False
