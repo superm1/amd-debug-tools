@@ -220,7 +220,7 @@ class DevSlpHostIssue(S0i3Failure):
 
     def __init__(self):
         super().__init__()
-        self.description = "AHCI controller doesn't support DevSlp "
+        self.description = "AHCI controller doesn't support DevSlp"
         self.explanation = (
             "The AHCI controller is not configured to support DevSlp. "
             "This must be enabled in BIOS for s2idle in Linux."
@@ -262,7 +262,7 @@ class DeepSleep(S0i3Failure):
     def __init__(self):
         super().__init__()
         self.description = (
-            "The kernel command line is asserting the system to use deep sleep "
+            "The kernel command line is asserting the system to use deep sleep"
         )
         self.explanation = (
             "Adding mem_sleep_default=deep doesn't work on AMD systems. "
@@ -276,7 +276,7 @@ class FadtWrong(S0i3Failure):
     def __init__(self):
         super().__init__()
         self.description = (
-            "The kernel didn't emit a message that low power idle was supported "
+            "The kernel didn't emit a message that low power idle was supported"
         )
         self.explanation = (
             "Low power idle is a bit documented in the FADT to indicate that "
@@ -583,6 +583,6 @@ class RogAllyMcuPowerSave(S0i3Failure):
         super().__init__()
         self.description = "Rog Ally MCU power save is disabled"
         self.explanation = (
-            "The MCU powersave feature is disabled which will cause problems"
+            "The MCU powersave feature is disabled which will cause problems "
             "with the controller after suspend/resume."
         )
