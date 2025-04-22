@@ -152,8 +152,11 @@ class CySystemdLogger(KernelLogger):
         self.journal.seek_head()
 
     def seek_tail(self, tim=None):
-        """Seek to the end of the log (ignore tim)"""
-        self.journal.seek_tail()
+        """Seek to the end of the log"""
+        if tim:
+            self.journal.seek_realtime(tim)
+        else:
+            self.journal.seek_tail()
 
     def process_callback(self, callback, _priority=None):
         """Process the log"""

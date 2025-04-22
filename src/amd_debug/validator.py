@@ -8,7 +8,7 @@ import re
 import random
 import subprocess
 import time
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from packaging import version
 
 from amd_debug.sleep_report import SleepReport
@@ -785,7 +785,7 @@ class SleepValidator(AmdTool):
     def prep(self):
         """Prepare the system for suspend testing"""
         self.last_suspend = datetime.now()
-        self.kernel_log.seek_tail(self.last_suspend)
+        self.kernel_log.seek_tail()
         self.db.start_cycle(self.last_suspend)
         self.kernel_duration = 0
         self.hw_sleep_duration = 0
@@ -933,6 +933,7 @@ class SleepValidator(AmdTool):
         """Called after resume"""
         t0 = self.db.get_last_cycle()
         self.last_suspend = datetime.strptime(str(t0[0]), "%Y%m%d%H%M%S")
+        self.kernel_log.seek_tail(self.last_suspend.replace(tzinfo=timezone.utc))
         self.db.start_cycle(self.last_suspend)
         self.post()
         self.db.sync()
