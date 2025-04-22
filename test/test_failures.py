@@ -135,6 +135,7 @@ class TestFailures(unittest.TestCase):
         self.assertEqual(cls.get_description(), "CPU cores have been limited")
         cls = amd_debug.failures.RogAllyOldMcu(1, 2)
         self.assertEqual(cls.get_description(), "Rog Ally MCU firmware is too old")
+        os.environ["TERM"] = "dumb"
         cls = amd_debug.failures.RogAllyMcuPowerSave()
         self.assertEqual(cls.get_description(), "Rog Ally MCU power save is disabled")
         failure = "The MCU powersave feature is disabled which will cause problems with the controller after suspend/resume."
@@ -142,7 +143,7 @@ class TestFailures(unittest.TestCase):
         cls.get_failure()
         mocked_print.assert_has_calls(
             [
-                call("🚦 \x1b[32mRog Ally MCU power save is disabled\x1b[0m"),
+                call("🚦 Rog Ally MCU power save is disabled"),
                 call(failure),
             ]
         )
