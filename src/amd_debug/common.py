@@ -219,14 +219,14 @@ def get_log_priority(num):
 
 def minimum_kernel(major, minor) -> bool:
     """Checks if the kernel version is at least major.minor"""
-    version = platform.uname().release.split(".")
-    kmajor = int(version[0])
-    kminor = int(version[1])
-    if kmajor > major:
+    ver = platform.uname().release.split(".")
+    kmajor = int(ver[0])
+    kminor = int(ver[1])
+    if kmajor > int(major):
         return True
-    if kmajor < major:
+    if kmajor < int(major):
         return False
-    return kminor >= minor
+    return kminor >= int(minor)
 
 
 def systemd_in_use() -> bool:
