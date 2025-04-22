@@ -8,3 +8,4 @@ amd*.md
 *.html
 deb_dist/
 *.tar.gz
+.coverage
