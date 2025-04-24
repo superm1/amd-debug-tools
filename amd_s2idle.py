@@ -1256,7 +1256,7 @@ class S0i3Validator:
         elif kernel_log == "dmesg":
             self.kernel_log = DmesgLogger()
 
-    def __init__(self, acpidump, logind, debug_ec, kernel_log):
+    def __init__(self, acpidump, logind, debug_ec, kernel_log, use_wakeup_count):
         # for installing and running suspend
         self.root_user = os.geteuid() == 0
         self.check_selinux()
@@ -1361,6 +1361,7 @@ class S0i3Validator:
         self.irq1_workaround = False
         self.page_faults = []
         self.wakeup_count = {}
+        self.use_wakeup_count = use_wakeup_count
 
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
@@ -2328,6 +2329,9 @@ class S0i3Validator:
                 return None
             return read_file(p)
 
+        if not self.use_wakeup_count:
+            return
+
         wakeup_count = {}
         for device in self.pyudev.list_devices(subsystem="input"):
             count = get_wakeup_count(device)
@@ -3268,15 +3272,16 @@ class S0i3Validator:
                 print_color(f"Unable to communicate with logind: {e}", "❌")
                 return False
         else:
-            p = os.path.join("/", "sys", "power", "wakeup_count")
-            f = read_file(p)
-            try:
-                with open(p, "w", encoding="utf-8") as w:
-                    w.write(str(int(f)))
-            except OSError as e:
-                print_color("Failed to set wakeup count", "❌")
-                logging.debug(e)
-                return False
+            if self.use_wakeup_count:
+                p = os.path.join("/", "sys", "power", "wakeup_count")
+                f = read_file(p)
+                try:
+                    with open(p, "w", encoding="utf-8") as w:
+                        w.write(str(int(f)))
+                except OSError as e:
+                    print_color("Failed to set wakeup count", "❌")
+                    logging.debug(e)
+                    return False
             p = os.path.join("/", "sys", "power", "state")
             try:
                 with open(p, "w") as fd:
@@ -3449,6 +3454,9 @@ def parse_args():
     parser.add_argument(
         "--logind", action="store_true", help="Use logind to suspend system"
     )
+    parser.add_argument(
+        "--wakeup-count", action="store_true", help="Monitor wakeup count"
+    )
     parser.add_argument("--debug-ec", action="store_true", help=Headers.EcDebugging)
     return parser.parse_args()
 
@@ -3500,7 +3508,13 @@ if __name__ == "__main__":
     if arg.logind and not DBUS:
         fatal_error("Unable to use logind without dbus, please install python3-dbus")
 
-    app = S0i3Validator(arg.acpidump, arg.logind, arg.debug_ec, arg.kernel_log_provider)
+    app = S0i3Validator(
+        arg.acpidump,
+        arg.logind,
+        arg.debug_ec,
+        arg.kernel_log_provider,
+        arg.wakeup_count,
+    )
     if app.prerequisites() or arg.force:
         try:
             d, w, c = configure_suspend(
