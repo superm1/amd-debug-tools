@@ -83,8 +83,9 @@ def parse_hw_sleep(hw):
 class SleepReport(AmdTool):
     """Sleep report class"""
 
-    def __init__(self, since, until, fname, fmt, log_file, debug):
-        super().__init__("amd-s2idle", log_file)
+    def __init__(self, since, until, fname, fmt, debug):
+        log_prefix = "s2idle" if debug else None
+        super().__init__(log_prefix)
 
         self.db = SleepDatabase()
         self.fname = fname

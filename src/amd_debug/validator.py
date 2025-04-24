@@ -116,8 +116,9 @@ def pm_debugging(func):
 class SleepValidator(AmdTool):
     """Class to validate the sleep state"""
 
-    def __init__(self, log_file, debug):
-        super().__init__("amd-s2idle", log_file)
+    def __init__(self, debug):
+        log_prefix = "s2idle" if debug else None
+        super().__init__(log_prefix)
 
         from pyudev import Context
 
@@ -960,7 +961,6 @@ class SleepValidator(AmdTool):
             fname=None,
             fmt="stdout",
             debug=self.display_debug,
-            log_file=self.log,
         )
         app.run(inc_prereq=False)
         return

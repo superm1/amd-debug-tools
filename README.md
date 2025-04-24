@@ -111,7 +111,7 @@ One of the following arguments must be set for this command:
 
 The following optional arguments are supported for this command:
 
-        --log LOG   Location of log file
+        --debug               Enable debug logging
 
 ### `amd-bios parse`
 Parses a kernel log that contains BIOS AML debug logging and produces a report.
@@ -119,7 +119,7 @@ Parses a kernel log that contains BIOS AML debug logging and produces a report.
 The following optional arguments are supported for this command:
 
         --input INPUT  Optional input file to parse
-        --log LOG      Location of log file
+        --debug               Enable debug logging
 
 ### `amd-bios version`
 This will print the version of the tool and exit.

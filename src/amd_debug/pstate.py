@@ -72,8 +72,9 @@ def AMD_CPPC_EPP_PERF(x):
 class AmdPstateTriage(AmdTool):
     """Class for handling the triage process"""
 
-    def __init__(self, log_file):
-        super().__init__("amd-pstate", log_file)
+    def __init__(self, logging):
+        log_prefix = "pstate" if logging else None
+        super().__init__(log_prefix)
         relaunch_sudo()
 
         pretty = get_pretty_distro()
@@ -291,8 +292,9 @@ def parse_args():
     subparsers = parser.add_subparsers(help="Possible commands", dest="command")
     triage_cmd = subparsers.add_parser("triage", help="Run amd-pstate triage")
     triage_cmd.add_argument(
-        "--log",
-        help="Location of log file",
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
     )
     subparsers.add_parser("version", help="Show version information")
     if len(sys.argv) == 1:
@@ -308,6 +310,6 @@ def main():
         print(version())
         return
     elif args.command == "triage":
-        triage = AmdPstateTriage(args.log)
+        triage = AmdPstateTriage(args.debug)
         triage.run()
     show_log_info()

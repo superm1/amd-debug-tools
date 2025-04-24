@@ -27,8 +27,9 @@ class AmdBios(AmdTool):
     AmdBios is a class which fetches the BIOS events from kernel logs.
     """
 
-    def __init__(self, inf, log_file):
-        super().__init__("bios", log_file)
+    def __init__(self, inf, debug):
+        log_prefix = "bios" if debug else None
+        super().__init__(log_prefix)
         self.distro = None
         self.pretty_distro = None
         self.kernel_log = get_kernel_log(inf)
@@ -164,8 +165,9 @@ def parse_args():
         help="Optional input file to parse",
     )
     parse_cmd.add_argument(
-        "--log",
-        help="Location of log file",
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
     )
     trace_cmd = subparsers.add_parser("trace", help="Enable or disable tracing")
     trace_cmd.add_argument(
@@ -179,8 +181,9 @@ def parse_args():
         help="Disable BIOS AML tracing",
     )
     trace_cmd.add_argument(
-        "--log",
-        help="Location of log file",
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
     )
     subparsers.add_parser("version", help="Show version information")
 
@@ -199,10 +202,10 @@ def main():
             sys.exit("can't set both enable and disable")
         if not args.enable and not args.disable:
             sys.exit("must set either enable or disable")
-        app = AmdBios(None, args.log)
+        app = AmdBios(None, args.debug)
         app.set_tracing(args.enable, args.disable)
     elif args.command == "parse":
-        app = AmdBios(args.input, args.log)
+        app = AmdBios(args.input, args.debug)
         app.run()
     elif args.command == "version":
         print(version())

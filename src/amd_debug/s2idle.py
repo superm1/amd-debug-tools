@@ -137,16 +137,14 @@ def prompt_test_arguments(duration, wait, count, rand) -> list:
     return [duration, wait, count]
 
 
-def report(since, until, fname, fmt, debug, log) -> bool:
+def report(since, until, fname, fmt, debug) -> bool:
     """Generate a report from previous sleep cycles"""
     try:
         since, until, fname, fmt = prompt_report_arguments(since, until, fname, fmt)
     except KeyboardInterrupt:
         sys.exit("\nReport generation cancelled")
     try:
-        app = SleepReport(
-            since=since, until=until, fname=fname, fmt=fmt, debug=debug, log_file=log
-        )
+        app = SleepReport(since=since, until=until, fname=fname, fmt=fmt, debug=debug)
     except sqlite3.OperationalError as e:
         print(f"Failed to generate report: {e}")
         return False
@@ -165,7 +163,7 @@ def report(since, until, fname, fmt, debug, log) -> bool:
     return True
 
 
-def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> bool:
+def test(duration, wait, count, fmt, fname, force, debug, rand, logind) -> bool:
     """Run a test"""
     app = Installer()
     app.set_requirements("iasl", "ethtool")
@@ -174,7 +172,7 @@ def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> 
         return False
 
     try:
-        app = PrerequisiteValidator(log_file=log, debug=debug)
+        app = PrerequisiteValidator(debug)
         run = app.run()
     except PermissionError as e:
         print(f"Failed to run prerequisite check: {e}")
@@ -182,7 +180,7 @@ def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> 
     app.report()
 
     if run or force:
-        app = SleepValidator(log_file=log, debug=debug)
+        app = SleepValidator(debug)
         try:
             duration, wait, count = prompt_test_arguments(duration, wait, count, rand)
             since, until, fname, fmt = prompt_report_arguments(
@@ -199,9 +197,7 @@ def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> 
             logind=logind,
         )
 
-        app = SleepReport(
-            since=since, until=until, fname=fname, fmt=fmt, log_file=log, debug=True
-        )
+        app = SleepReport(since=since, until=until, fname=fname, fmt=fmt, debug=True)
         app.run()
 
         # open report in browser if it's html
@@ -211,14 +207,14 @@ def test(duration, wait, count, fmt, fname, force, debug, rand, logind, log) -> 
     return False
 
 
-def install(log) -> None:
+def install(debug) -> None:
     """Install the tool"""
     installer = Installer()
     installer.set_requirements("iasl", "ethtool")
     if not installer.install_dependencies():
         sys.exit("Failed to install dependencies")
     try:
-        app = PrerequisiteValidator(log_file=log, debug=False)
+        app = PrerequisiteValidator(debug)
         run = app.run()
     except PermissionError as e:
         sys.exit(f"Failed to run prerequisite check: {e}")
@@ -247,8 +243,9 @@ def parse_args():
     )
     subparsers = parser.add_subparsers(help="Possible commands", dest="action")
     parser.add_argument(
-        "--log",
-        help=Headers.LogDescription,
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
     )
 
     # 'test' command
@@ -261,11 +258,6 @@ def parse_args():
     test_cmd.add_argument(
         "--wait",
         help=Headers.WaitDescription,
-    )
-    test_cmd.add_argument(
-        "--debug",
-        action="store_true",
-        help="Display report debug data",
     )
     test_cmd.add_argument(
         "--logind", action="store_true", help="Use logind to suspend system"
@@ -308,11 +300,6 @@ def parse_args():
         default=Defaults.format,
         help="Report format",
     )
-    report_cmd.add_argument(
-        "--debug",
-        action="store_true",
-        help="Include report debug data",
-    )
 
     # if running in a venv, install/uninstall hook options
     if sys.prefix != sys.base_prefix:
@@ -339,9 +326,7 @@ def main():
         relaunch_sudo()
         uninstall()
     elif args.action == "report":
-        ret = report(
-            args.since, args.until, args.report_file, args.format, args.debug, args.log
-        )
+        ret = report(args.since, args.until, args.report_file, args.format, args.debug)
     elif args.action == "test":
         relaunch_sudo()
         ret = test(
@@ -354,7 +339,6 @@ def main():
             args.debug,
             args.random,
             args.logind,
-            args.log,
         )
     elif args.action == "version":
         print(version())

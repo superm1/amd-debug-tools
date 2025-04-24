@@ -92,12 +92,13 @@ def show_log_info():
     for handler in logger.handlers:
         if isinstance(handler, logging.FileHandler):
             filename = handler.baseFilename
-            print(f"Logs are saved to: {filename}")
+            if filename != "/dev/null":
+                print(f"Debug logs are saved to: {filename}")
 
 
-def _configure_log(prefix, log) -> str:
+def _configure_log(prefix) -> str:
     """Configure logging for the tool"""
-    if not log:
+    if prefix:
         user = os.environ.get("SUDO_USER")
         home = os.path.expanduser(f"~{user if user else ''}")
         path = os.environ.get("XDG_DATA_HOME") or os.path.join(
@@ -114,11 +115,15 @@ def _configure_log(prefix, log) -> str:
             if "SUDO_UID" in os.environ:
                 os.chown(path, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
                 os.chown(log, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+        level = logging.DEBUG
+    else:
+        log = "/dev/null"
+        level = logging.WARNING
     # for saving a log file for analysis
     logging.basicConfig(
         format="%(asctime)s %(levelname)s:\t%(message)s",
         filename=log,
-        level=logging.DEBUG,
+        level=level,
     )
     return log
 
@@ -302,7 +307,7 @@ def version() -> str:
 class AmdTool:
     """Base class for AMD tools"""
 
-    def __init__(self, log_prefix, log_file):
-        self.log = _configure_log(log_prefix, log_file)
+    def __init__(self, prefix):
+        self.log = _configure_log(prefix)
         logging.debug("command: %s", sys.argv)
         logging.debug("Version: %s", version())
