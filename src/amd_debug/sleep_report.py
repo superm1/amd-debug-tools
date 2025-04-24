@@ -440,7 +440,9 @@ class SleepReport(AmdTool):
         clear_temporary_message(characters)
         for line in msg.split("\n"):
             color = Colors.OK
-            text = line
+            text = line.strip()
+            if not text:
+                continue
             for group in ["🗣️", "❌", "🚦", "🦟", "💯", "○"]:
                 if line.startswith(group):
                     text = line.split(group)[-1]
