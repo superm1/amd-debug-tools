@@ -28,6 +28,7 @@ from amd_debug.common import (
     print_color,
     run_countdown,
     systemd_in_use,
+    running_ssh,
 )
 
 color_dict = {
@@ -266,3 +267,10 @@ class TestCommon(unittest.TestCase):
         ) as mock_file:
             self.assertFalse(systemd_in_use())
             mock_file.assert_called_once_with("/proc/1/comm", "r", encoding="utf-8")
+
+    def test_running_in_ssh(self):
+        """Test running_in_ssh function"""
+        with patch("os.environ", {"SSH_TTY": "/dev/pts/0"}):
+            self.assertTrue(running_ssh())
+        with patch("os.environ", {}):
+            self.assertFalse(running_ssh())

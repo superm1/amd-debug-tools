@@ -275,6 +275,10 @@ def relaunch_sudo() -> None:
         os.execvp("sudo", ["sudo", "-E"] + sys.argv)
 
 
+def running_ssh():
+    return "SSH_CLIENT" in os.environ or "SSH_TTY" in os.environ
+
+
 def _git_describe() -> str:
     """Get the git description of the current commit"""
     try:

@@ -8,7 +8,7 @@ import subprocess
 import sqlite3
 
 from datetime import date, timedelta, datetime
-from amd_debug.common import is_root, relaunch_sudo, show_log_info, version
+from amd_debug.common import is_root, relaunch_sudo, show_log_info, version, running_ssh
 
 from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
@@ -22,7 +22,6 @@ class Defaults:
     duration = 10
     wait = 4
     count = 1
-    format = "html"
     since = date.today() - timedelta(days=60)
     until = date.today() + timedelta(days=1)
     format_choices = ["txt", "md", "html", "stdout"]
@@ -70,6 +69,12 @@ def get_report_file(report_file, extension) -> str:
     return report_file
 
 
+def get_report_format() -> str:
+    if running_ssh():
+        return "txt"
+    return "html"
+
+
 def prompt_report_arguments(since, until, fname, fmt) -> str:
     """Prompt user for report configuration"""
     if not since:
@@ -92,9 +97,9 @@ def prompt_report_arguments(since, until, fname, fmt) -> str:
         sys.exit(f"Invalid date, use YYYY-MM-DD: {e}")
 
     if not fmt:
-        fmt = input(f"{Headers.FormatDescription} (default {Defaults.format})? ")
+        fmt = input(f"{Headers.FormatDescription} (default {get_report_format()})? ")
         if not fmt:
-            fmt = Defaults.format
+            fmt = get_report_format()
         if fmt not in Defaults.format_choices:
             sys.exit(f"Invalid format: {fmt}")
     return [since, until, get_report_file(fname, fmt), fmt]
@@ -275,7 +280,7 @@ def parse_args():
     test_cmd.add_argument(
         "--format",
         choices=Defaults.format_choices,
-        default=Defaults.format,
+        default=running_ssh(),
         help="Report format",
     )
     test_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
@@ -297,7 +302,7 @@ def parse_args():
     report_cmd.add_argument(
         "--format",
         choices=Defaults.format_choices,
-        default=Defaults.format,
+        default=running_ssh(),
         help="Report format",
     )
 
