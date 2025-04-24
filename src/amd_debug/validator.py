@@ -815,6 +815,18 @@ class SleepValidator(AmdTool):
     @pm_debugging
     def suspend_system(self):
         """Suspend the system using the dbus or sysfs interface"""
+
+        def get_wakeup_count():
+            """Get the wakeup count"""
+            p = os.path.join("/", "sys", "power", "wakeup_count")
+            if not os.path.exists(p):
+                return 0
+            try:
+                with open(p, "r", encoding="utf-8") as r:
+                    return int(r.read())
+            except OSError:
+                return 0
+
         if self.logind:
             try:
                 import dbus
@@ -841,17 +853,17 @@ class SleepValidator(AmdTool):
                 self.db.record_cycle_data("Missing dbus", "❌")
                 return False
         else:
-            p = os.path.join("/", "sys", "power", "wakeup_count")
-            f = read_file(p)
+            old = get_wakeup_count()
             try:
+                p = os.path.join("/", "sys", "power", "state")
                 with open(p, "w", encoding="utf-8") as w:
-                    w.write(str(int(f)))
+                    w.write("mem")
             except OSError as e:
-                self.db.record_cycle_data(f"Failed to set wakeup count: {e}", "❌")
+                new = get_wakeup_count()
+                self.db.record_cycle_data(
+                    f"Failed to set suspend state ({old} -> {new}): {e}", "❌"
+                )
                 return False
-            p = os.path.join("/", "sys", "power", "state")
-            with open(p, "w", encoding="utf-8") as w:
-                w.write("mem")
             return True
 
     def unlock_session(self):
@@ -914,6 +926,8 @@ class SleepValidator(AmdTool):
             )
             self.program_wakealarm()
             if not self.suspend_system():
+                self.db.sync()
+                self.report_cycle()
                 return False
             run_countdown("Collecting data", math.ceil(requested_wait / 2))
             self.post()
