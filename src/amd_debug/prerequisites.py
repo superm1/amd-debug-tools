@@ -196,6 +196,7 @@ class PrerequisiteValidator(AmdTool):
     def check_storage(self):
         """Check if storage devices are supported"""
         has_sata = False
+        has_ahci = False
         valid_nvme = {}
         invalid_nvme = {}
         valid_sata = False
@@ -214,57 +215,64 @@ class PrerequisiteValidator(AmdTool):
             pci_slot_name = dev.properties["PCI_SLOT_NAME"]
             vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE", "")
             model = dev.properties.get("ID_MODEL_FROM_DATABASE", "")
-            message = "{vendor} {model}".format(vendor=vendor, model=model)
+            message = f"{vendor} {model}"
             self.kernel_log.seek()
-            pattern = "%s.*%s" % (pci_slot_name, Headers.NvmeSimpleSuspend)
+            pattern = f"{pci_slot_name}.*{Headers.NvmeSimpleSuspend}"
             if self.kernel_log.match_pattern(pattern):
                 valid_nvme[pci_slot_name] = message
             if pci_slot_name not in valid_nvme:
                 invalid_nvme[pci_slot_name] = message
 
+        for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="ahci"):
+            has_ahci = True
+            break
+
         for dev in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
             has_sata = True
             break
 
-        if has_sata:
-            # Test AHCI
+        # Test AHCI
+        if has_ahci:
             self.kernel_log.seek()
-            matches = ["ahci", "flags", "sds", "sadm"]
-            if self.kernel_log.match_line(matches):
+            pattern = "ahci.*flags.*sds.*sadm"
+            if self.kernel_log.match_pattern(pattern):
                 valid_ahci = True
-            # Test SATA
+        # Test SATA
+        if has_sata:
             self.kernel_log.seek()
-            matches = ["ata", "Features", "Dev-Sleep"]
-            if self.kernel_log.match_line(matches):
+            pattern = "ata.*Features.*Dev-Sleep"
+            if self.kernel_log.match_pattern(pattern):
                 valid_sata = True
+
         if invalid_nvme:
-            for disk in invalid_nvme:
-                message = "NVME {disk} is not configured for s2idle in BIOS".format(
-                    disk=invalid_nvme[disk].strip()
+            for disk, name in invalid_nvme.items():
+                print_color(
+                    f"NVME {name.strip()} is not configured for s2idle in BIOS",
+                    "❌",
                 )
-                self.db.record_prereq(message, "❌")
                 num = len(invalid_nvme) + len(valid_nvme)
                 self.failures += [AcpiNvmeStorageD3Enable(invalid_nvme[disk], num)]
         if valid_nvme:
-            for disk in valid_nvme:
-                message = "NVME {disk} is configured for s2idle in BIOS".format(
-                    disk=valid_nvme[disk].strip()
+            for disk, name in valid_nvme.items():
+                print_color(
+                    f"NVME {name.strip()} is configured for s2idle in BIOS",
+                    "✅",
                 )
-                self.db.record_prereq(message, "✅")
         if has_sata:
             if valid_sata:
                 message = "SATA supports DevSlp feature"
+                self.db.record_prereq(message, "✅")
             else:
-                invalid_nvme = True
                 message = "SATA does not support DevSlp feature"
                 self.db.record_prereq(message, "❌")
                 self.failures += [DevSlpDiskIssue()]
-
+        if has_ahci:
             if valid_ahci:
                 message = "AHCI is configured for DevSlp in BIOS"
+                self.db.record_prereq(message, "✅")
             else:
                 message = "AHCI is not configured for DevSlp in BIOS"
-                self.db.record_prereq(message, "❌")
+                self.db.record_prereq(message, "🚦")
                 self.failures += [DevSlpHostIssue()]
 
         return (
