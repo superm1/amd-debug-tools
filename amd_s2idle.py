@@ -1792,7 +1792,7 @@ class S0i3Validator:
             has_ahci = True
             break
 
-        for dev in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
+        for dev in self.pyudev.list_devices(subsystem="block", ID_BUS="ata"):
             has_sata = True
             break
 
