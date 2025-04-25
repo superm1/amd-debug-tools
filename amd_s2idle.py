@@ -475,7 +475,8 @@ class DevSlpHostIssue(S0i3Failure):
         self.description = "AHCI controller doesn't support DevSlp"
         self.explanation = (
             "\tThe AHCI controller is not configured to support DevSlp.\n"
-            "\tThis must be enabled in BIOS for s2idle in Linux.\n"
+            "\tThis must be enabled in BIOS for s2idle in Linux when a SATA\n"
+            "\tdrive is in use."
         )
 
 
@@ -1753,6 +1754,7 @@ class S0i3Validator:
     def check_storage(self):
         """Check storage devices for s2idle support"""
         has_sata = False
+        has_ahci = False
         valid_nvme = {}
         invalid_nvme = {}
         valid_sata = False
@@ -1786,21 +1788,27 @@ class S0i3Validator:
             if pci_slot_name not in valid_nvme:
                 invalid_nvme[pci_slot_name] = message
 
-            for dev in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
-                has_sata = True
-                break
+        for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="ahci"):
+            has_ahci = True
+            break
 
-            if has_sata:
-                # Test AHCI
-                self.kernel_log.seek()
-                matches = ["ahci", "flags", "sds", "sadm"]
-                if self.kernel_log.match_line(matches):
-                    valid_ahci = True
-                # Test SATA
-                self.kernel_log.seek()
-                matches = ["ata", "Features", "Dev-Sleep"]
-                if self.kernel_log.match_line(matches):
-                    valid_sata = True
+        for dev in self.pyudev.list_devices(subsystem="ata", DRIVER="ahci"):
+            has_sata = True
+            break
+
+        # Test AHCI
+        if has_ahci:
+            self.kernel_log.seek()
+            pattern = "ahci.*flags.*sds.*sadm"
+            if self.kernel_log.match_pattern(pattern):
+                valid_ahci = True
+        # Test SATA
+        if has_sata:
+            self.kernel_log.seek()
+            pattern = "ata.*Features.*Dev-Sleep"
+            if self.kernel_log.match_pattern(pattern):
+                valid_sata = True
+
         if invalid_nvme:
             for disk, name in invalid_nvme.items():
                 print_color(
@@ -1819,14 +1827,13 @@ class S0i3Validator:
             if valid_sata:
                 print_color("SATA supports DevSlp feature", "✅")
             else:
-                invalid_nvme = True
                 print_color("SATA does not support DevSlp feature", "❌")
                 self.failures += [DevSlpDiskIssue()]
-
+        if has_ahci:
             if valid_ahci:
                 print_color("AHCI is configured for DevSlp in BIOS", "✅")
             else:
-                print_color("AHCI is not configured for DevSlp in BIOS", "❌")
+                print_color("AHCI is not configured for DevSlp in BIOS", "🚦")
                 self.failures += [DevSlpHostIssue()]
 
         return (
