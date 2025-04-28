@@ -234,7 +234,7 @@ class PrerequisiteValidator(AmdTool):
         # Test AHCI
         if has_ahci:
             self.kernel_log.seek()
-            pattern = "ahci.*flags.*sds.*sadm"
+            pattern = "ahci.*flags.*sadm.*sds"
             if self.kernel_log.match_pattern(pattern):
                 valid_ahci = True
         # Test SATA
