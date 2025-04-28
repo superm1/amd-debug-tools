@@ -2870,7 +2870,7 @@ class S0i3Validator:
                 Colors.WARNING,
             )
             header = self.kernel_log.capture_header()
-            if not header.startswith("Linux version"):
+            if not re.search(r"Linux version .*", header):
                 print_color(
                     "Kernel ringbuffer has wrapped, unable to accurately validate pre-requisites",
                     "❌",
