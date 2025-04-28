@@ -2662,15 +2662,24 @@ class S0i3Validator:
         for root, _dirs, files in os.walk(base, topdown=False):
             for fname in files:
                 target = os.path.join(root, fname)
-                # capture all DSDT/SSDT when run with --acpidump
+                # capture all DSDT/SSDT/IVRS when run with --acpidump
                 if self.acpidump:
-                    if not "DSDT" in fname and not "SSDT" in fname:
+                    if (
+                        not "DSDT" in fname
+                        and not "SSDT" in fname
+                        and not "IVRS" in fname
+                    ):
                         continue
                 else:
-                    with open(target, "rb") as f:
-                        s = f.read()
-                        if s.find(b"_AEI") < 0:
-                            continue
+                    if "SSDT" in fname:
+                        with open(target, "rb") as f:
+                            s = f.read()
+                            if s.find(b"_AEI") < 0:
+                                continue
+                    elif "IVRS" in fname:
+                        pass
+                    else:
+                        continue
                 try:
                     tmpd = tempfile.mkdtemp()
                     prefix = os.path.join(tmpd, "acpi")
