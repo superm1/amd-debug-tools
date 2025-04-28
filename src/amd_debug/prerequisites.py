@@ -555,7 +555,7 @@ class PrerequisiteValidator(AmdTool):
                 "🚦",
             )
             header = self.kernel_log.capture_header()
-            if not header.startswith("Linux version"):
+            if not re.search(r"Linux version .*", header):
                 self.db.record_prereq(
                     "Kernel ring buffer has wrapped, unable to accurately validate pre-requisites",
                     "❌",
