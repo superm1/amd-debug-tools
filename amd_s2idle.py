@@ -206,43 +206,6 @@ def pm_debugging(func):
         with open(pm_debug_messages, "w", encoding="utf-8") as w:
             w.write("1")
 
-        # enable ACPI debugging
-        old_debug_level = None
-        old_debug_layer = None
-        old_trace_state = None
-        old_trace_method = None
-        acpi_base = os.path.join("/", "sys", "module", "acpi")
-        acpi_debug_layer = os.path.join(acpi_base, "parameters", "trace_debug_layer")
-        acpi_debug_level = os.path.join(acpi_base, "parameters", "trace_debug_level")
-        acpi_trace_method = os.path.join(acpi_base, "parameters", "trace_method_name")
-        acpi_trace_state = os.path.join(acpi_base, "parameters", "trace_state")
-        if (
-            os.path.exists(acpi_debug_level)
-            and os.path.exists(acpi_debug_layer)
-            and os.path.exists(acpi_trace_state)
-            and os.path.exists(acpi_trace_method)
-        ):
-            # backup old settings
-            old_debug_level = read_file(acpi_debug_level)
-            old_debug_layer = read_file(acpi_debug_layer)
-            old_trace_state = read_file(acpi_trace_state)
-            old_trace_method = read_file(acpi_trace_method)
-
-            # enable ACPI_LV_INFO
-            debug_level = int(old_debug_level, 16) | BIT(2)
-            with open(acpi_debug_level, "w", encoding="utf-8") as w:
-                w.write(str(debug_level))
-
-            # enable ACPI_EVENTS
-            debug_layer = int(old_debug_layer, 16) | BIT(2)
-            with open(acpi_debug_layer, "w", encoding="utf-8") as w:
-                w.write(str(debug_layer))
-            with open(acpi_trace_state, "w", encoding="utf-8") as w:
-                w.write("enable")
-            logging.debug("Enabled ACPI debugging for ACPI_LV_INFO/ACPI_EVENTS")
-        else:
-            print_color("ACPI Notify() debugging not available", "👀")
-
         # getting the returned value
         ret = func(*args, **kwargs)
 
@@ -250,19 +213,6 @@ def pm_debugging(func):
         with open(pm_debug_messages, "w", encoding="utf-8") as w:
             w.write("0")
 
-        # disable ACPI debugging
-        if old_debug_level:
-            with open(acpi_debug_level, "w", encoding="utf-8") as w:
-                w.write(old_debug_level)
-        if old_debug_layer:
-            with open(acpi_debug_layer, "w", encoding="utf-8") as w:
-                w.write(old_debug_layer)
-        if old_trace_method:
-            with open(acpi_trace_method, "w", encoding="utf-8") as w:
-                w.write(old_trace_method)
-        if old_trace_state:
-            with open(acpi_trace_state, "w", encoding="utf-8") as w:
-                w.write(old_trace_state)
         return ret
 
     return runner
@@ -1189,6 +1139,83 @@ class WakeIRQ:
         return f"{self.name}{actions}"
 
 
+ACPI_METHOD = "M460"
+
+
+class AcpicaTracer:
+    """Class for ACPI tracing"""
+
+    def __init__(self):
+        self.acpi_base = os.path.join("/", "sys", "module", "acpi", "parameters")
+        keys = [
+            "trace_debug_layer",
+            "trace_debug_level",
+            "trace_method_name",
+            "trace_state",
+        ]
+        self.original = {}
+        self.supported = False
+        for key in keys:
+            fname = os.path.join(self.acpi_base, key)
+            if not os.path.exists(fname):
+                print_color("ACPI Notify() debugging not available", "👀")
+                return
+            v = read_file(fname)
+            if v and v != "(null)":
+                self.original[key] = v
+        self.supported = True
+
+    def _write_expected(self, expected):
+        for key, value in expected.items():
+            p = os.path.join(self.acpi_base, key)
+            if isinstance(value, int):
+                t = str(int(value))
+            else:
+                t = value
+            with open(p, "w", encoding="utf-8") as w:
+                w.write(t)
+
+    def trace_notify(self):
+        """Trace notify events"""
+        if not self.supported:
+            return
+        expected = {
+            "trace_debug_layer": BIT(2),
+            "trace_debug_level": BIT(2),
+            "trace_state": "enable",
+        }
+        self._write_expected(expected)
+        logging.debug("Enabled ACPI debugging for ACPI_LV_INFO/ACPI_EVENTS")
+
+    def trace_bios(self):
+        """Trace BIOS events"""
+        if not self.supported:
+            return
+        expected = {
+            "trace_debug_layer": BIT(7),
+            "trace_debug_level": BIT(4),
+            "trace_method_name": f"\\{ACPI_METHOD}",
+            "trace_state": "method",
+        }
+        self._write_expected(expected)
+        logging.debug("Enabled ACPI debugging for BIOS")
+
+    def disable(self):
+        """Disable ACPI tracing"""
+        if not self.supported:
+            return
+        expected = {
+            "trace_state": "disable",
+        }
+        self._write_expected(expected)
+
+    def restore(self):
+        """Restore original ACPI tracing settings"""
+        if not self.supported:
+            return
+        self._write_expected(self.original)
+
+
 class S0i3Validator:
     """
     S0i3Validator class performs various checks and validations for
@@ -1266,7 +1293,9 @@ class S0i3Validator:
         elif kernel_log == "dmesg":
             self.kernel_log = DmesgLogger()
 
-    def __init__(self, acpidump, logind, debug_ec, kernel_log, use_wakeup_count):
+    def __init__(
+        self, acpidump, logind, debug_ec, kernel_log, use_wakeup_count, acpi_debug_kind
+    ):
         # for installing and running suspend
         self.root_user = os.geteuid() == 0
         self.check_selinux()
@@ -1279,6 +1308,9 @@ class S0i3Validator:
 
         # turn on EC debug messages
         self.debug_ec = debug_ec
+
+        # type of acpi debugging
+        self.acpi_debug_kind = acpi_debug_kind
 
         self.guess_distro()
 
@@ -3387,6 +3419,12 @@ class S0i3Validator:
             wakealarm = os.path.join(device.sys_path, "wakealarm")
         self.toggle_dynamic_debugging(True)
 
+        acpica_tracing = AcpicaTracer()
+        if self.acpi_debug_kind == "notify":
+            acpica_tracing.trace_notify()
+        elif self.acpi_debug_kind == "bios":
+            acpica_tracing.trace_bios()
+
         for i in range(1, count + 1):
             self.capture_gpes()
             self.capture_lid()
@@ -3428,6 +3466,7 @@ class S0i3Validator:
                 self.run_countdown("Collecting data", wait / 2)
                 self.analyze_results()
         self.toggle_dynamic_debugging(False)
+        acpica_tracing.restore()
         return True
 
     def get_failure_report(self):
@@ -3481,6 +3520,12 @@ def parse_args():
     )
     parser.add_argument(
         "--wakeup-count", action="store_true", help="Monitor wakeup count"
+    )
+    parser.add_argument(
+        "--acpi-debug-kind",
+        default="notify",
+        choices=["notify", "bios", "none"],
+        help="Type of ACPI debug messages to enable during suspend",
     )
     parser.add_argument("--debug-ec", action="store_true", help=Headers.EcDebugging)
     return parser.parse_args()
@@ -3539,6 +3584,7 @@ if __name__ == "__main__":
         arg.debug_ec,
         arg.kernel_log_provider,
         arg.wakeup_count,
+        arg.acpi_debug_kind,
     )
     if app.prerequisites() or arg.force:
         try:
