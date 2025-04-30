@@ -67,27 +67,33 @@ def pm_debugging(func):
         old_debug_level = None
         old_debug_layer = None
         old_trace_state = None
+        old_trace_method = None
         acpi_base = os.path.join("/", "sys", "module", "acpi")
         acpi_debug_layer = os.path.join(acpi_base, "parameters", "trace_debug_layer")
         acpi_debug_level = os.path.join(acpi_base, "parameters", "trace_debug_level")
+        acpi_trace_method = os.path.join(acpi_base, "parameters", "trace_method_name")
         acpi_trace_state = os.path.join(acpi_base, "parameters", "trace_state")
         if (
             os.path.exists(acpi_debug_level)
             and os.path.exists(acpi_debug_layer)
             and os.path.exists(acpi_trace_state)
+            and os.path.exists(acpi_trace_method)
         ):
             # backup old settings
             old_debug_level = read_file(acpi_debug_level)
             old_debug_layer = read_file(acpi_debug_layer)
             old_trace_state = read_file(acpi_trace_state)
+            old_trace_method = read_file(acpi_trace_method)
 
             # enable ACPI_LV_INFO
+            debug_level = int(old_debug_level, 16) | BIT(2)
             with open(acpi_debug_level, "w", encoding="utf-8") as w:
-                w.write("0x00000004")
+                w.write(str(debug_level))
 
             # enable ACPI_EVENTS
+            debug_layer = int(old_debug_layer, 16) | BIT(2)
             with open(acpi_debug_layer, "w", encoding="utf-8") as w:
-                w.write("0x00000004")
+                w.write(str(debug_layer))
             with open(acpi_trace_state, "w", encoding="utf-8") as w:
                 w.write("enable")
 
@@ -105,9 +111,12 @@ def pm_debugging(func):
         if old_debug_layer:
             with open(acpi_debug_layer, "w", encoding="utf-8") as w:
                 w.write(old_debug_layer)
+        if old_trace_method:
+            with open(acpi_trace_method, "w", encoding="utf-8") as w:
+                w.write(old_trace_method)
         if old_trace_state:
             with open(acpi_trace_state, "w", encoding="utf-8") as w:
-                w.write("disable")
+                w.write(old_trace_state)
         return ret
 
     return runner
