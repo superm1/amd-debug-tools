@@ -12,12 +12,12 @@ from amd_debug.common import (
     fatal_error,
     get_log_priority,
     print_color,
-    read_file,
     relaunch_sudo,
     show_log_info,
     version,
 )
 from amd_debug.kernel_log import get_kernel_log
+from amd_debug.acpi import AcpicaTracer
 
 ACPI_METHOD = "M460"
 
@@ -30,72 +30,22 @@ class AmdBios(AmdTool):
     def __init__(self, inf, debug):
         log_prefix = "bios" if debug else None
         super().__init__(log_prefix)
-        self.distro = None
-        self.pretty_distro = None
         self.kernel_log = get_kernel_log(inf)
 
-    def set_tracing(self, enable, disable):
+    def set_tracing(self, enable):
         """Run the action"""
+        relaunch_sudo()
 
-        def search_acpi_tables(pattern):
-            """Search for a pattern in ACPI tables"""
-            p = os.path.join("/", "sys", "firmware", "acpi", "tables")
+        tracer = AcpicaTracer()
+        ret = tracer.trace_bios() if enable else tracer.disable()
+        if ret:
+            action = "enabled" if enable else "disabled"
+            print_color(f"Set BIOS tracing to {action}", "✅")
+        else:
+            fatal_error(
+                "BIOS tracing not supported, please check your kernel for CONFIG_ACPI_DEBUG"
+            )
 
-            for fn in os.listdir(p):
-                if not fn.startswith("SSDT") and not fn.startswith("DSDT"):
-                    continue
-                fp = os.path.join(p, fn)
-                with open(fp, "rb") as file:
-                    content = file.read()
-                    if pattern.encode() in content:
-                        return True
-            return False
-
-        if enable or disable:
-            relaunch_sudo()
-
-        expected = {
-            "trace_debug_layer": 0x80,
-            "trace_debug_level": 0x10,
-            "trace_method_name": f"\\{ACPI_METHOD}",
-            "trace_state": "method",
-        }
-        actual = {}
-        acpi_base = os.path.join("/", "sys", "module", "acpi", "parameters")
-        for key, _value in expected.items():
-            p = os.path.join(acpi_base, key)
-            if not os.path.exists(p):
-                fatal_error(
-                    "BIOS tracing not supported, please check your kernel for CONFIG_ACPI_DEBUG"
-                )
-            actual[key] = read_file(p)
-        logging.debug(actual)
-
-        if enable:
-            # check that ACPI tables have \_SB.\M460
-            if not search_acpi_tables(ACPI_METHOD):
-                fatal_error(
-                    f"{sys.argv[0]} will not work on this system: ACPI tables do not contain {ACPI_METHOD}"
-                )
-            for key, value in expected.items():
-                p = os.path.join(acpi_base, key)
-                t = actual[key]
-                if isinstance(value, int):
-                    if int(actual[key]) & value:
-                        continue
-                    t = str(int(t) | value)
-                else:
-                    if actual[key].strip() == str(value):
-                        continue
-                    t = value
-                with open(p, "w", encoding="utf-8") as w:
-                    w.write(t)
-            print_color("Enabled BIOS tracing", "✅")
-        elif disable:
-            p = os.path.join(acpi_base, "trace_state")
-            with open(p, "w", encoding="utf-8") as w:
-                w.write("disable")
-            print_color("Disabled BIOS tracing", "✅")
         return True
 
     def _analyze_kernel_log_line(self, line, priority):
@@ -203,7 +153,7 @@ def main():
         if not args.enable and not args.disable:
             sys.exit("must set either enable or disable")
         app = AmdBios(None, args.debug)
-        app.set_tracing(args.enable, args.disable)
+        app.set_tracing(True if args.enable else False)
     elif args.command == "parse":
         app = AmdBios(args.input, args.debug)
         app.run()
