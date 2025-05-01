@@ -1,16 +1,37 @@
-def amd_s2idle():
-    from . import s2idle
+#!/usr/bin/python3
+# SPDX-License-Identifier: MIT
 
-    s2idle.main()
+
+def amd_s2idle():
+    """Launch the amd-s2idle tool."""
+    from . import s2idle  # pylint: disable=import-outside-toplevel
+
+    return s2idle.main()
 
 
 def amd_bios():
-    from . import bios
+    """Launch the amd-bios tool."""
+    from . import bios  # pylint: disable=import-outside-toplevel
 
-    bios.main()
+    return bios.main()
 
 
 def amd_pstate():
-    from . import pstate
+    """Launch the amd-pstate tool."""
+    from . import pstate  # pylint: disable=import-outside-toplevel
 
-    pstate.main()
+    return pstate.main()
+
+
+def launch_tool(tool_name):
+    """Launch a tool with the given name and arguments."""
+    tools = {
+        "amd_s2idle.py": amd_s2idle,
+        "amd_bios.py": amd_bios,
+        "amd_pstate.py": amd_pstate,
+    }
+    if tool_name in tools:
+        return tools[tool_name]()
+    else:
+        print(f"\033[91mUnknown exe: {tool_name}\033[0m")
+        return False
