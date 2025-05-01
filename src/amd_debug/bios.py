@@ -17,8 +17,6 @@ from amd_debug.common import (
 from amd_debug.kernel_log import get_kernel_log, sscanf_bios_args
 from amd_debug.acpi import AcpicaTracer
 
-ACPI_METHOD = "M460"
-
 
 class AmdBios(AmdTool):
     """
