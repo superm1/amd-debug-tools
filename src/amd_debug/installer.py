@@ -190,7 +190,7 @@ class Installer:
             )
         else:
             print_color("Systemd path does not exist, not removing hook", "🚦")
-        f = "amd-s2icle"
+        f = "amd-s2idle"
         d = os.path.join(
             "/",
             "usr",
