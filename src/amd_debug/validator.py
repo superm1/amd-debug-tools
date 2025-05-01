@@ -556,6 +556,7 @@ class SleepValidator(AmdTool):
         if bios_args:
             if isinstance(bios_args, str):
                 line = bios_args
+                priority = 7
             else:
                 return
         elif "Timekeeping suspended for" in line:
@@ -603,6 +604,7 @@ class SleepValidator(AmdTool):
                 device = device.group(1)
                 if device not in self.notify_devices:
                     self.notify_devices += [device]
+            priority = 7
         # AMD-Vi: Event logged [IO_PAGE_FAULT device=0000:00:0c.0 domain=0x0000 address=0x7e800000 flags=0x0050]
         elif "Event logged [IO_PAGE_FAULT" in line:
             # get the device from string
