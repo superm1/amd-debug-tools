@@ -154,7 +154,7 @@ class CySystemdLogger(KernelLogger):
     def seek_tail(self, tim=None):
         """Seek to the end of the log"""
         if tim:
-            self.journal.seek_realtime(tim)
+            self.journal.seek_realtime_usec(tim)
         else:
             self.journal.seek_tail()
 
