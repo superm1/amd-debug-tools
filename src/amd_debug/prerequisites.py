@@ -101,7 +101,7 @@ class PrerequisiteValidator(AmdTool):
     """Class to validate the prerequisites for s2idle"""
 
     def __init__(self, tool_debug):
-        log_prefix = "bios" if tool_debug else None
+        log_prefix = "s2idle" if tool_debug else None
         super().__init__(log_prefix)
 
         self.kernel_log = get_kernel_log()
