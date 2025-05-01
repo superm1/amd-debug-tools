@@ -111,21 +111,6 @@ class Installer:
             self.base, "/", "lib", "systemd", "system-sleep"
         )
 
-        # for fetching acpi tables
-        try:
-            self.iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
-        except subprocess.CalledProcessError:
-            self.iasl = False
-        except FileNotFoundError:
-            self.iasl = False
-
-        # for checking WoL
-        try:
-            _ = subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
-            self.ethtool = True
-        except FileNotFoundError:
-            self.ethtool = False
-
         # test if fwupd can report device firmware versions
         try:
             import gi  # pylint: disable=import-outside-toplevel
@@ -151,16 +136,20 @@ class Installer:
 
     def install_dependencies(self) -> bool:
         """Install the dependencies"""
-        if "iasl" in self.requirements and not self.iasl:
-            self.show_install_message(Headers.MissingIasl)
-            package = IaslPackage()
-            if not package.install():
-                return False
-        if "ethtool" in self.requirements and not self.ethtool:
-            self.show_install_message(Headers.MissingEthtool)
-            package = EthtoolPackage()
-            if not package.install():
-                return False
+        if "iasl" in self.requirements:
+            iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
+            if not iasl:
+                self.show_install_message(Headers.MissingIasl)
+                package = IaslPackage()
+                if not package.install():
+                    return False
+        if "ethtool" in self.requirements:
+            ethtool = subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
+            if not ethtool:
+                self.show_install_message(Headers.MissingEthtool)
+                package = EthtoolPackage()
+                if not package.install():
+                    return False
         if "fwupd" in self.requirements and not self.fwupd:
             self.show_install_message(Headers.MissingFwupd)
             package = FwupdPackage()
