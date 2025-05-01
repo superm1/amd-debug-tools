@@ -102,17 +102,21 @@ def parse_args():
         parser.print_help(sys.stderr)
         sys.exit(1)
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.command == "trace":
+        if args.enable and args.disable:
+            sys.exit("can't set both enable and disable")
+        if not args.enable and not args.disable:
+            sys.exit("must set either enable or disable")
+
+    return args
 
 
 def main():
     """Main function"""
     args = parse_args()
     if args.command == "trace":
-        if args.enable and args.disable:
-            sys.exit("can't set both enable and disable")
-        if not args.enable and not args.disable:
-            sys.exit("must set either enable or disable")
         app = AmdBios(None, args.debug)
         app.set_tracing(True if args.enable else False)
     elif args.command == "parse":
