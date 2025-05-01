@@ -292,9 +292,9 @@ def parse_args():
     subparsers = parser.add_subparsers(help="Possible commands", dest="command")
     triage_cmd = subparsers.add_parser("triage", help="Run amd-pstate triage")
     triage_cmd.add_argument(
-        "--debug",
+        "--tool-debug",
         action="store_true",
-        help="Enable debug logging",
+        help="Enable tool debug logging",
     )
     subparsers.add_parser("version", help="Show version information")
     if len(sys.argv) == 1:
@@ -310,6 +310,6 @@ def main():
         print(version())
         return
     elif args.command == "triage":
-        triage = AmdPstateTriage(args.debug)
+        triage = AmdPstateTriage(args.tool_debug)
         triage.run()
     show_log_info()

@@ -142,14 +142,21 @@ def prompt_test_arguments(duration, wait, count, rand) -> list:
     return [duration, wait, count]
 
 
-def report(since, until, fname, fmt, debug) -> bool:
+def report(since, until, fname, fmt, tool_debug, report_debug) -> bool:
     """Generate a report from previous sleep cycles"""
     try:
         since, until, fname, fmt = prompt_report_arguments(since, until, fname, fmt)
     except KeyboardInterrupt:
         sys.exit("\nReport generation cancelled")
     try:
-        app = SleepReport(since=since, until=until, fname=fname, fmt=fmt, debug=debug)
+        app = SleepReport(
+            since=since,
+            until=until,
+            fname=fname,
+            fmt=fmt,
+            tool_debug=tool_debug,
+            report_debug=report_debug,
+        )
     except sqlite3.OperationalError as e:
         print(f"Failed to generate report: {e}")
         return False
@@ -204,7 +211,14 @@ def test(
             logind=logind,
         )
 
-        app = SleepReport(since=since, until=until, fname=fname, fmt=fmt, debug=True)
+        app = SleepReport(
+            since=since,
+            until=until,
+            fname=fname,
+            fmt=fmt,
+            tool_debug=debug,
+            report_debug=True,
+        )
         app.run()
 
         # open report in browser if it's html
@@ -249,11 +263,6 @@ def parse_args():
         "To use non-interactively, please populate all optional arguments.",
     )
     subparsers = parser.add_subparsers(help="Possible commands", dest="action")
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug logging",
-    )
 
     # 'test' command
     test_cmd = subparsers.add_parser("test", help="Run amd-s2idle test and report")
@@ -286,6 +295,11 @@ def parse_args():
         help="Report format",
     )
     test_cmd.add_argument(
+        "--tool-debug",
+        action="store_true",
+        help="Enable tool debug logging",
+    )
+    test_cmd.add_argument(
         "--bios-debug",
         action="store_true",
         help="Enable BIOS debug logging instead of notify logging",
@@ -312,6 +326,16 @@ def parse_args():
         default=running_ssh(),
         help="Report format",
     )
+    report_cmd.add_argument(
+        "--tool-debug",
+        action="store_true",
+        help="Enable tool debug logging",
+    )
+    report_cmd.add_argument(
+        "--report-debug",
+        action="store_true",
+        help="Include debug messages in report (WARNING: can significantly increase report size)",
+    )
 
     # if running in a venv, install/uninstall hook options
     if sys.prefix != sys.base_prefix:
@@ -333,12 +357,19 @@ def main():
     ret = False
     if args.action == "install":
         relaunch_sudo()
-        install(args.debug)
+        install(args.tool_debug)
     elif args.action == "uninstall":
         relaunch_sudo()
         uninstall()
     elif args.action == "report":
-        ret = report(args.since, args.until, args.report_file, args.format, args.debug)
+        ret = report(
+            args.since,
+            args.until,
+            args.report_file,
+            args.format,
+            args.tool_debug,
+            args.report_debug,
+        )
     elif args.action == "test":
         relaunch_sudo()
         ret = test(
@@ -348,7 +379,7 @@ def main():
             args.format,
             args.report_file,
             args.force,
-            args.debug,
+            args.tool_debug,
             args.random,
             args.logind,
             args.bios_debug,

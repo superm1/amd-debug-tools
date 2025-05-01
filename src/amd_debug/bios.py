@@ -76,9 +76,9 @@ def parse_args():
         help="Optional input file to parse",
     )
     parse_cmd.add_argument(
-        "--debug",
+        "--tool-debug",
         action="store_true",
-        help="Enable debug logging",
+        help="Enable tool debug logging",
     )
     trace_cmd = subparsers.add_parser("trace", help="Enable or disable tracing")
     trace_cmd.add_argument(
@@ -92,9 +92,9 @@ def parse_args():
         help="Disable BIOS AML tracing",
     )
     trace_cmd.add_argument(
-        "--debug",
+        "--tool-debug",
         action="store_true",
-        help="Enable debug logging",
+        help="Enable tool debug logging",
     )
     subparsers.add_parser("version", help="Show version information")
 
@@ -117,10 +117,10 @@ def main():
     """Main function"""
     args = parse_args()
     if args.command == "trace":
-        app = AmdBios(None, args.debug)
+        app = AmdBios(None, args.tool_debug)
         app.set_tracing(True if args.enable else False)
     elif args.command == "parse":
-        app = AmdBios(args.input, args.debug)
+        app = AmdBios(args.input, args.tool_debug)
         app.run()
     elif args.command == "version":
         print(version())

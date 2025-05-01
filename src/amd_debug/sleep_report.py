@@ -83,15 +83,15 @@ def parse_hw_sleep(hw):
 class SleepReport(AmdTool):
     """Sleep report class"""
 
-    def __init__(self, since, until, fname, fmt, debug):
-        log_prefix = "s2idle" if debug else None
+    def __init__(self, since, until, fname, fmt, tool_debug, report_debug):
+        log_prefix = "s2idle" if tool_debug else None
         super().__init__(log_prefix)
 
         self.db = SleepDatabase()
         self.fname = fname
         self.since = since
         self.until = until
-        self.debug = debug
+        self.debug = report_debug
         self.format = fmt
         self.failures = []
         self.df = self.db.report_summary_dataframe(self.since, self.until)

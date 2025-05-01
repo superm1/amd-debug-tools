@@ -937,7 +937,8 @@ class SleepValidator(AmdTool):
             until=self.last_suspend,
             fname=None,
             fmt="stdout",
-            debug=self.display_debug,
+            tool_debug=self.display_debug,
+            report_debug=False,
         )
         app.run(inc_prereq=False)
         return

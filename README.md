@@ -70,6 +70,7 @@ The following optional arguments are supported for this command:
         --force               Run a test cycle even if the system fails to pass prerequisite checks
         --random              Run sleep cycles for random durations and waits, using the --duration and --wait arguments as an upper bound
         --logind              Use logind to suspend the system
+        --tool-debug          Enable debug logging
         --bios-debug          Enable BIOS debug logging instead of notify logging
 
 If the tool is launched with an environment that can call `xdg-open`, the report
@@ -85,6 +86,8 @@ The following optional arguments are supported for this command:
         --until UNTIL         Date to end the report at
         --format FORMAT       Format of the report to produce (html, txt or md)
         --report-file         File to write the report to
+        --tool-debug          Enable tool debug logging
+        --report-debug        Include debug messages in the report
 
 If the tool is launched with an environment that can call `xdg-open`, the report
 will be opened in a browser.
@@ -93,7 +96,7 @@ will be opened in a browser.
 This will print the version of the tool and exit.
 
 ### Debug output
-All commands support the `--debug` argument which will enable extra debug output. This is often needed for debugging issues with a particular cycle.
+All commands support the `--tool-debug` argument which will enable extra debug output. This is often needed for debugging issues with a particular cycle.
 
 **NOTE:** enabling debug output significantly increases the size of the report.
 It's suggested that you use `--since` and `--until` to focus on the cycles that you are interested in.
@@ -107,12 +110,12 @@ Modify BIOS AML trace debug logging.
 
 One of the following arguments must be set for this command:
 
-        --enable    Enable BIOS AML tracing
-        --disable   Disable BIOS AML tracing
+        --enable       Enable BIOS AML tracing
+        --disable      Disable BIOS AML tracing
 
 The following optional arguments are supported for this command:
 
-        --debug               Enable debug logging
+        --tool-debug   Enable tool debug logging
 
 ### `amd-bios parse`
 Parses a kernel log that contains BIOS AML debug logging and produces a report.
@@ -120,7 +123,7 @@ Parses a kernel log that contains BIOS AML debug logging and produces a report.
 The following optional arguments are supported for this command:
 
         --input INPUT  Optional input file to parse
-        --debug               Enable debug logging
+        --tool-debug   Enable tool debug logging
 
 ### `amd-bios version`
 This will print the version of the tool and exit.
