@@ -80,6 +80,8 @@ class TestAcpi(unittest.TestCase):
             self.assertTrue(tracer.disable())
             self.assertTrue(tracer.restore())
 
+    def test_acpica_trace_no_acpi_debug(self):
+        """Test AcpicaTracer class when ACPI tracing is not supported"""
         with patch("os.path.exists", return_value=False), patch(
             "builtins.open", mock_open(read_data="foo")
         ):
