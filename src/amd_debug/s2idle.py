@@ -333,7 +333,7 @@ def main():
     ret = False
     if args.action == "install":
         relaunch_sudo()
-        install(args.log)
+        install(args.debug)
     elif args.action == "uninstall":
         relaunch_sudo()
         uninstall()
