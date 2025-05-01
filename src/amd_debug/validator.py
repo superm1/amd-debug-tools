@@ -15,7 +15,7 @@ from pyudev import Context
 from amd_debug.sleep_report import SleepReport
 from amd_debug.database import SleepDatabase
 from amd_debug.battery import Batteries
-from amd_debug.kernel_log import get_kernel_log
+from amd_debug.kernel_log import get_kernel_log, sscanf_bios_args
 from amd_debug.common import (
     print_color,
     read_file,
@@ -552,7 +552,13 @@ class SleepValidator(AmdTool):
         self.db.record_debug(f"/proc/cmdline: {cmdline}")
 
     def _analyze_kernel_log_line(self, line, priority):
-        if "Timekeeping suspended for" in line:
+        bios_args = sscanf_bios_args(line)
+        if bios_args:
+            if isinstance(bios_args, str):
+                line = bios_args
+            else:
+                return
+        elif "Timekeeping suspended for" in line:
             self.cycle_count += 1
             for f in line.split():
                 try:
