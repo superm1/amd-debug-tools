@@ -29,42 +29,42 @@ class MSR:  # pylint: disable=too-few-public-methods
     MSR_AMD_CPPC_STATUS = 0xC00102B4
 
 
-def AMD_CPPC_CAP_LOWEST_PERF(x):
+def amd_cppc_cap_lowest_perf(x):
     """Return the lowest performance value from the given input."""
     return x & 0xFF
 
 
-def AMD_CPPC_CAP_LOWNONLIN_PERF(x):
+def amd_cppc_cap_lownonlin_perf(x):
     """Return the lowest nonlinear performance value from the given input."""
     return (x >> 8) & 0xFF
 
 
-def AMD_CPPC_CAP_NOMINAL_PERF(x):
+def amd_cppc_cap_nominal_perf(x):
     """Return the nominal performance value from the given input."""
     return (x >> 16) & 0xFF
 
 
-def AMD_CPPC_CAP_HIGHEST_PERF(x):
+def amd_cppc_cap_highest_perf(x):
     """Return the highest performance value from the given input."""
     return (x >> 24) & 0xFF
 
 
-def AMD_CPPC_MAX_PERF(x):
+def amd_cppc_max_perf(x):
     """Return the maximum performance value from the given input."""
     return x & 0xFF
 
 
-def AMD_CPPC_MIN_PERF(x):
+def amd_cppc_min_perf(x):
     """Return the minimum performance value from the given input."""
     return (x >> 8) & 0xFF
 
 
-def AMD_CPPC_DES_PERF(x):
+def amd_cppc_des_perf(x):
     """Return the desired performance value from the given input."""
     return (x >> 16) & 0xFF
 
 
-def AMD_CPPC_EPP_PERF(x):
+def amd_cppc_epp_perf(x):
     """Return the energy performance preference value from the given input."""
     return (x >> 24) & 0xFF
 
@@ -207,10 +207,10 @@ class AmdPstateTriage(AmdTool):
                 req = read_msr(MSR.MSR_AMD_CPPC_REQ, cpu)
                 row = [
                     cpu,
-                    AMD_CPPC_MIN_PERF(req),
-                    AMD_CPPC_MAX_PERF(req),
-                    AMD_CPPC_DES_PERF(req),
-                    AMD_CPPC_EPP_PERF(req),
+                    amd_cppc_min_perf(req),
+                    amd_cppc_max_perf(req),
+                    amd_cppc_des_perf(req),
+                    amd_cppc_epp_perf(req),
                 ]
                 df = pd.concat(
                     [pd.DataFrame([row], columns=df.columns), df], ignore_index=True
@@ -231,10 +231,10 @@ class AmdPstateTriage(AmdTool):
 
                 row = [
                     cpu,
-                    AMD_CPPC_CAP_LOWEST_PERF(cap1),
-                    AMD_CPPC_CAP_LOWNONLIN_PERF(cap1),
-                    AMD_CPPC_CAP_NOMINAL_PERF(cap1),
-                    AMD_CPPC_CAP_HIGHEST_PERF(cap1),
+                    amd_cppc_cap_lowest_perf(cap1),
+                    amd_cppc_cap_lownonlin_perf(cap1),
+                    amd_cppc_cap_nominal_perf(cap1),
+                    amd_cppc_cap_highest_perf(cap1),
                 ]
                 cap_df = pd.concat(
                     [pd.DataFrame([row], columns=cap_df.columns), cap_df],
