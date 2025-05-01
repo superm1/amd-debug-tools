@@ -99,7 +99,7 @@ def show_log_info():
 
 def _configure_log(prefix) -> str:
     """Configure logging for the tool"""
-    if logging.root.handlers[:] is not None:
+    if len(logging.root.handlers) > 0:
         return
 
     if prefix:
