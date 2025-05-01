@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: MIT
 """s2idle analysis tool"""
 import argparse
-import logging
-import os
 import re
 import sys
 
@@ -16,7 +14,7 @@ from amd_debug.common import (
     show_log_info,
     version,
 )
-from amd_debug.kernel_log import get_kernel_log
+from amd_debug.kernel_log import get_kernel_log, sscanf_bios_args
 from amd_debug.acpi import AcpicaTracer
 
 ACPI_METHOD = "M460"
@@ -50,47 +48,12 @@ class AmdBios(AmdTool):
 
     def _analyze_kernel_log_line(self, line, priority):
         """Analyze a line from the kernel log"""
-        if re.search(r"ex_trace_point", line):
-            pass
-        elif re.search(r"ex_trace_args", line):
-            t = line.split(": ")[-1].strip()
-            # extract format string using regex
-            match = re.match(r"\"(.*?)\"(, .*)", t)
-            if match:
-                format_string = match.group(1)  # Format string inside quotes
-                format_string = format_string.strip().strip("\\n")
-                args_part = match.group(2).strip(", ")  # Remaining arguments
-
-                # extract argument values
-                arguments = args_part.split(", ")
-
-                # extract format specifiers from the string
-                format_specifiers = re.findall(
-                    r"%[xXdD]", format_string
-                )  # Adjusting case sensitivity
-
-                converted_args = []
-                for specifier, value in zip(format_specifiers, arguments):
-                    if value == "Unknown":
-                        converted_args.append(
-                            -1
-                        )  # Handle unknown values like ACPI Buffer
-                        continue
-                    if specifier.lower() == "%x":  # Hexadecimal conversion
-                        converted_args.append(int(value, 16))
-                    else:  # Decimal conversion
-                        try:
-                            converted_args.append(int(value))
-                        except ValueError:
-                            converted_args.append(
-                                int(value, 16)
-                            )  # Fallback to hex if decimal fails
-
-                # apply formatting while ignoring extra unused zeros
-                formatted_string = format_string % tuple(
-                    converted_args[: len(format_specifiers)]
-                )
-                print_color(formatted_string, "🖴")
+        bios_args = sscanf_bios_args(line)
+        if bios_args:
+            if isinstance(bios_args, str):
+                print_color(bios_args, "🖴")
+            else:
+                return
         else:
             # strip timestamp
             t = re.sub(r"^\[\s*\d+\.\d+\]", "", line).strip()

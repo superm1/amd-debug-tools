@@ -12,6 +12,7 @@ import platform
 import time
 import struct
 import subprocess
+import re
 import sys
 from datetime import date, timedelta
 

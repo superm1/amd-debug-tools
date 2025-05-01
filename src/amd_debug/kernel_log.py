@@ -10,6 +10,58 @@ from datetime import timedelta
 from amd_debug.common import systemd_in_use, read_file, fatal_error
 
 
+def sscanf_bios_args(line):
+    """Extracts the format string and arguments from a BIOS trace line"""
+    if re.search(r"ex_trace_point", line):
+        return True
+    elif re.search(r"ex_trace_args", line):
+        parts = line.split(": ", 1)
+        if len(parts) < 2:
+            return None
+
+        t = parts[1].strip()
+        match = re.match(r'"(.*?)"(,.*)', t)
+        if match:
+            format_string = match.group(1).strip().replace("\\n", "")
+            args_part = match.group(2).strip(", ")
+            arguments = [arg.strip() for arg in args_part.split(",")]
+
+            format_specifiers = re.findall(r"%([xXdD])", format_string)
+
+            converted_args = []
+            arg_index = 0
+            for specifier in format_specifiers:
+                if arg_index < len(arguments):
+                    value = arguments[arg_index]
+                    if value == "Unknown":
+                        converted_args.append(-1)
+                    elif specifier.lower() == "x":
+                        try:
+                            converted_args.append(int(value, 16))
+                        except ValueError:
+                            return None
+                    else:  # Decimal conversion
+                        try:
+                            converted_args.append(int(value))
+                        except ValueError:
+                            try:
+                                converted_args.append(int(value, 16))
+                            except ValueError:
+                                return None
+                    arg_index += 1
+                else:
+                    break
+
+            try:
+                return format_string % tuple(converted_args)
+            except TypeError:
+                return None
+        else:
+            # If no format string is found, assume no format modifiers and return True
+            return True
+    return None
+
+
 class KernelLogger:
     """Base class for kernel loggers"""
 
