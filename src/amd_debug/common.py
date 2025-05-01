@@ -317,5 +317,5 @@ class AmdTool:
 
     def __init__(self, prefix):
         self.log = _configure_log(prefix)
-        logging.debug("command: %s", sys.argv)
+        logging.debug("command: %s (module: %s)", sys.argv, type(self).__name__)
         logging.debug("Version: %s", version())
