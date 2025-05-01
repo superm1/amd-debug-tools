@@ -9,6 +9,7 @@ from amd_debug.common import (
     AmdTool,
     fatal_error,
     get_log_priority,
+    minimum_kernel,
     print_color,
     relaunch_sudo,
     show_log_info,
@@ -27,6 +28,14 @@ class AmdBios(AmdTool):
         log_prefix = "bios" if debug else None
         super().__init__(log_prefix)
         self.kernel_log = get_kernel_log(inf)
+
+        if not minimum_kernel(6, 16):
+            print_color(
+                "Support for BIOS debug logging was merged in mainline 6.16, "
+                "this tool may not work correctly unless support is manually "
+                "backported",
+                "🚦",
+            )
 
     def set_tracing(self, enable):
         """Run the action"""
