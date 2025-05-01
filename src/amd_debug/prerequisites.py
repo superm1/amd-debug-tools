@@ -100,8 +100,8 @@ class Headers:
 class PrerequisiteValidator(AmdTool):
     """Class to validate the prerequisites for s2idle"""
 
-    def __init__(self, debug):
-        log_prefix = "bios" if debug else None
+    def __init__(self, tool_debug):
+        log_prefix = "bios" if tool_debug else None
         super().__init__(log_prefix)
 
         self.kernel_log = get_kernel_log()
@@ -114,7 +114,7 @@ class PrerequisiteValidator(AmdTool):
         self.failures = []
         self.db = SleepDatabase()
         self.db.start_cycle(datetime.now())
-        self.debug = debug
+        self.debug = tool_debug
         self.distro = get_distro()
         self.cmdline = read_file(os.path.join("/proc", "cmdline"))
         self.irqs = []

@@ -10,6 +10,7 @@ import subprocess
 import time
 from datetime import timedelta, datetime, timezone
 from packaging import version
+from pyudev import Context
 
 from amd_debug.sleep_report import SleepReport
 from amd_debug.database import SleepDatabase
@@ -23,6 +24,7 @@ from amd_debug.common import (
     BIT,
     AmdTool,
 )
+from amd_debug.acpi import AcpicaTracer
 from amd_debug.failures import (
     AcpiBiosError,
     Irq1Workaround,
@@ -57,66 +59,16 @@ def soc_needs_irq1_wa(family, model, smu_version):
 def pm_debugging(func):
     """Decorator to enable pm_debug_messages"""
 
-    def runner(*args, **kwargs):
-        # enable PM debugging
+    def toggle_pm_debug(enable):
         pm_debug_messages = os.path.join("/", "sys", "power", "pm_debug_messages")
         with open(pm_debug_messages, "w", encoding="utf-8") as w:
-            w.write("1")
+            w.write("1" if enable else "0")
 
-        # enable ACPI debugging
-        old_debug_level = None
-        old_debug_layer = None
-        old_trace_state = None
-        old_trace_method = None
-        acpi_base = os.path.join("/", "sys", "module", "acpi")
-        acpi_debug_layer = os.path.join(acpi_base, "parameters", "trace_debug_layer")
-        acpi_debug_level = os.path.join(acpi_base, "parameters", "trace_debug_level")
-        acpi_trace_method = os.path.join(acpi_base, "parameters", "trace_method_name")
-        acpi_trace_state = os.path.join(acpi_base, "parameters", "trace_state")
-        if (
-            os.path.exists(acpi_debug_level)
-            and os.path.exists(acpi_debug_layer)
-            and os.path.exists(acpi_trace_state)
-            and os.path.exists(acpi_trace_method)
-        ):
-            # backup old settings
-            old_debug_level = read_file(acpi_debug_level)
-            old_debug_layer = read_file(acpi_debug_layer)
-            old_trace_state = read_file(acpi_trace_state)
-            old_trace_method = read_file(acpi_trace_method)
-
-            # enable ACPI_LV_INFO
-            debug_level = int(old_debug_level, 16) | BIT(2)
-            with open(acpi_debug_level, "w", encoding="utf-8") as w:
-                w.write(str(debug_level))
-
-            # enable ACPI_EVENTS
-            debug_layer = int(old_debug_layer, 16) | BIT(2)
-            with open(acpi_debug_layer, "w", encoding="utf-8") as w:
-                w.write(str(debug_layer))
-            with open(acpi_trace_state, "w", encoding="utf-8") as w:
-                w.write("enable")
-
-        # getting the returned value
+    def runner(*args, **kwargs):
+        toggle_pm_debug(True)
         ret = func(*args, **kwargs)
+        toggle_pm_debug(False)
 
-        # disable PM debugging
-        with open(pm_debug_messages, "w", encoding="utf-8") as w:
-            w.write("0")
-
-        # disable ACPI debugging
-        if old_debug_level:
-            with open(acpi_debug_level, "w", encoding="utf-8") as w:
-                w.write(old_debug_level)
-        if old_debug_layer:
-            with open(acpi_debug_layer, "w", encoding="utf-8") as w:
-                w.write(old_debug_layer)
-        if old_trace_method:
-            with open(acpi_trace_method, "w", encoding="utf-8") as w:
-                w.write(old_trace_method)
-        if old_trace_state:
-            with open(acpi_trace_state, "w", encoding="utf-8") as w:
-                w.write(old_trace_state)
         return ret
 
     return runner
@@ -125,17 +77,17 @@ def pm_debugging(func):
 class SleepValidator(AmdTool):
     """Class to validate the sleep state"""
 
-    def __init__(self, debug):
-        log_prefix = "s2idle" if debug else None
+    def __init__(self, tool_debug, bios_debug):
+        log_prefix = "s2idle" if tool_debug else None
         super().__init__(log_prefix)
-
-        from pyudev import Context
 
         self.pyudev = Context()
 
         self.kernel_log = get_kernel_log()
         self.db = SleepDatabase()
         self.batteries = Batteries()
+        self.acpica = AcpicaTracer()
+        self.bios_debug = bios_debug
         self.cpu_family = ""
         self.cpu_model = ""
         self.cpu_model_string = ""
@@ -148,7 +100,7 @@ class SleepValidator(AmdTool):
         self.hw_sleep_duration = 0
         self.failures = []
         self.gpes = {}
-        self.display_debug = debug
+        self.display_debug = tool_debug
         self.lockdown = check_lockdown()
         self.logind = False
         self.upep = False
@@ -779,6 +731,7 @@ class SleepValidator(AmdTool):
             self.capture_amdgpu_ips_status,
             self.capture_thermal,
             self.capture_input_wakeup_count,
+            self.acpica.restore,
         ]
         for check in checks:
             check()
@@ -807,6 +760,10 @@ class SleepValidator(AmdTool):
         self.capture_amdgpu_ips_status()
         self.capture_thermal()
         self.capture_input_wakeup_count()
+        if self.bios_debug:
+            self.acpica.trace_bios()
+        else:
+            self.acpica.trace_notify()
         self.db.record_cycle()
 
     def program_wakealarm(self):

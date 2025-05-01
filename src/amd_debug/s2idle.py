@@ -168,7 +168,9 @@ def report(since, until, fname, fmt, debug) -> bool:
     return True
 
 
-def test(duration, wait, count, fmt, fname, force, debug, rand, logind) -> bool:
+def test(
+    duration, wait, count, fmt, fname, force, debug, rand, logind, bios_debug
+) -> bool:
     """Run a test"""
     app = Installer()
     app.set_requirements("iasl", "ethtool")
@@ -185,7 +187,7 @@ def test(duration, wait, count, fmt, fname, force, debug, rand, logind) -> bool:
     app.report()
 
     if run or force:
-        app = SleepValidator(debug)
+        app = SleepValidator(tool_debug=debug, bios_debug=bios_debug)
         try:
             duration, wait, count = prompt_test_arguments(duration, wait, count, rand)
             since, until, fname, fmt = prompt_report_arguments(
@@ -283,6 +285,11 @@ def parse_args():
         default=running_ssh(),
         help="Report format",
     )
+    test_cmd.add_argument(
+        "--bios-debug",
+        action="store_true",
+        help="Enable BIOS debug logging instead of notify logging",
+    )
     test_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
 
     # 'report' command
@@ -344,6 +351,7 @@ def main():
             args.debug,
             args.random,
             args.logind,
+            args.bios_debug,
         )
     elif args.action == "version":
         print(version())

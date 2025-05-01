@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import argparse
+import logging
 import sys
 
 
@@ -66,10 +67,14 @@ if __name__ == "__main__":
     except ModuleNotFoundError:
         sys.exit(0)
 
-    app = SleepValidator(args.log, args.debug)
+    logging.basicConfig(
+        filename=args.log, level=logging.DEBUG if args.debug else logging.WARNING
+    )
+
+    app = SleepValidator(tool_debug=args.debug, bios_debug=False)
     if args.action == "pre":
         if args.mode == "suspend":
-            prereq = PrerequisiteValidator(log_file=args.log, debug=args.debug)
+            prereq = PrerequisiteValidator(tool_debug=args.debug)
             prereq.capture_once()
             app.systemd_pre_hook()
         sys.exit(0)
@@ -83,9 +88,9 @@ if __name__ == "__main__":
         if not args.count or not args.duration or not args.wait:
             sys.exit("Must specify count, duration and args")
 
-        app = PrerequisiteValidator(log_file=args.log, debug=args.debug)
+        app = PrerequisiteValidator(tool_debug=args.debug)
         if app.run() or args.force:
-            app = SleepValidator(log_file=args.log, debug=args.debug)
+            app = SleepValidator(tool_debug=args.debug, bios_debug=False)
             app.run(
                 duration=int(args.duration),
                 wait=int(args.wait),

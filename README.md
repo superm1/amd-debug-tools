@@ -70,6 +70,7 @@ The following optional arguments are supported for this command:
         --force               Run a test cycle even if the system fails to pass prerequisite checks
         --random              Run sleep cycles for random durations and waits, using the --duration and --wait arguments as an upper bound
         --logind              Use logind to suspend the system
+        --bios-debug          Enable BIOS debug logging instead of notify logging
 
 If the tool is launched with an environment that can call `xdg-open`, the report
 will be opened in a browser.

@@ -98,6 +98,9 @@ def show_log_info():
 
 def _configure_log(prefix) -> str:
     """Configure logging for the tool"""
+    if logging.root.handlers[:] is not None:
+        return
+
     if prefix:
         user = os.environ.get("SUDO_USER")
         home = os.path.expanduser(f"~{user if user else ''}")
