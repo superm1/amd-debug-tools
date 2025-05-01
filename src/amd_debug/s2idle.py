@@ -339,8 +339,22 @@ def parse_args():
 
     # if running in a venv, install/uninstall hook options
     if sys.prefix != sys.base_prefix:
-        subparsers.add_parser("install", help="Install systemd s2idle hook")
-        subparsers.add_parser("uninstall", help="Uninstall systemd s2idle hook")
+        install_cmd = subparsers.add_parser(
+            "install", help="Install systemd s2idle hook"
+        )
+        uninstall_cmd = subparsers.add_parser(
+            "uninstall", help="Uninstall systemd s2idle hook"
+        )
+        install_cmd.add_argument(
+            "--tool-debug",
+            action="store_true",
+            help="Enable tool debug logging",
+        )
+        uninstall_cmd.add_argument(
+            "--tool-debug",
+            action="store_true",
+            help="Enable tool debug logging",
+        )
 
     subparsers.add_parser("version", help="Show version information")
 
