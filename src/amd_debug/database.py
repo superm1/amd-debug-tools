@@ -26,24 +26,18 @@ def migrate(cur, user_version) -> None:
 class SleepDatabase:
     """Database class to store sleep cycle data"""
 
-    def __init__(self, use_home=False) -> None:
+    def __init__(self) -> None:
         self.db = None
         self.last_suspend = None
         self.cycle_data_cnt = 0
         self.debug_cnt = 0
-        new = False
-        if use_home:
-            user = os.environ.get("SUDO_USER")
-            home = os.path.expanduser("~{user}".format(user=user if user else ""))
-            path = os.environ.get("XDG_DATA_HOME") or os.path.join(
-                home, ".local", "share", "amd-s2idle"
-            )
-        else:
-            # if we were packaged we would have a directory in /var/lib
-            path = os.path.join("/", "var", "lib", "amd-s2idle")
-            if not os.path.exists(path):
-                path = os.path.join("/", "var", "local", "lib", "amd-s2idle")
+
+        # if we were packaged we would have a directory in /var/lib
+        path = os.path.join("/", "var", "lib", "amd-s2idle")
+        if not os.path.exists(path):
+            path = os.path.join("/", "var", "local", "lib", "amd-s2idle")
         os.makedirs(path, exist_ok=True)
+
         f = os.path.join(path, "data.db")
         new = not os.path.exists(f)
         self.db = sqlite3.connect(f)
