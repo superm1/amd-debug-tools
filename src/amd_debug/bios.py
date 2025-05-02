@@ -29,6 +29,10 @@ class AmdBios(AmdTool):
         super().__init__(log_prefix)
         self.kernel_log = get_kernel_log(inf)
 
+    def set_tracing(self, enable):
+        """Run the action"""
+        relaunch_sudo()
+
         if not minimum_kernel(6, 16):
             print_color(
                 "Support for BIOS debug logging was merged in mainline 6.16, "
@@ -36,10 +40,6 @@ class AmdBios(AmdTool):
                 "backported",
                 "🚦",
             )
-
-    def set_tracing(self, enable):
-        """Run the action"""
-        relaunch_sudo()
 
         tracer = AcpicaTracer()
         ret = tracer.trace_bios() if enable else tracer.disable()
