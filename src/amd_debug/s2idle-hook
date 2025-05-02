@@ -48,8 +48,7 @@ def parse_args():
     )
 
     parser.add_argument("--log", default="/dev/null")
-    if sys.prefix != sys.base_prefix:
-        parser.add_argument("--path", default="%PATH%")
+    parser.add_argument("--path", default="")
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -63,7 +62,7 @@ if __name__ == "__main__":
     if args.mode != "suspend":
         sys.exit(0)
 
-    if sys.prefix != sys.base_prefix and args.path:
+    if args.path:
         sys.path.append(args.path)
 
     logging.basicConfig(

@@ -203,10 +203,14 @@ class Installer:
             f = "s2idle-hook"
             s = os.path.join(d, f)
             t = os.path.join(self.systemd_path, f)
-            with open(s, "r") as r:
-                with open(t, "w") as w:
+            with open(s, "r", encoding="utf-8") as r:
+                with open(t, "w", encoding="utf-8") as w:
                     for line in r.readlines():
-                        line = line.replace("%PATH%", os.path.join(d, ".."))
+                        if 'parser.add_argument("--path")' in line:
+                            line = line.replace(
+                                'default=""',
+                                f"default=\"{os.path.join(d, '..')}\"",
+                            )
                         w.write(line)
             os.chmod(t, 0o755)
             print_color(
