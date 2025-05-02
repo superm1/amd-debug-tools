@@ -38,7 +38,10 @@ def parse_args():
         choices=["pre", "post"],
         help="Action to perform",
     )
-
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+    )
     parser.add_argument(
         "mode",
         help="Mode to perform",
