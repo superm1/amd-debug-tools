@@ -206,7 +206,7 @@ class Installer:
             with open(s, "r", encoding="utf-8") as r:
                 with open(t, "w", encoding="utf-8") as w:
                     for line in r.readlines():
-                        if 'parser.add_argument("--path")' in line:
+                        if 'parser.add_argument("--path"' in line:
                             line = line.replace(
                                 'default=""',
                                 f"default=\"{os.path.join(d, '..')}\"",
