@@ -179,11 +179,12 @@ class TestInstaller(unittest.TestCase):
         self.assertTrue(ret)
 
     @patch("builtins.print")
+    @patch("os.path.exists", return_value=False)
     @patch("os.execvp", return_value=None)
     @patch("amd_debug.installer.get_distro", return_value="gentoo")
     @patch("subprocess.call", return_value=1)
     def test_install_iasl_gentoo(
-        self, _mock_call, _mock_distro, _fake_sudo, _mock_print
+        self, _mock_call, _mock_distro, _fake_sudo, _mock_exists, _mock_print
     ):
         """Test install requirements function"""
         installer = Installer()
