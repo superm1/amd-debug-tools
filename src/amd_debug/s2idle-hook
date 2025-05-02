@@ -6,15 +6,36 @@ import logging
 import sys
 
 
+def main(action, debug):
+    """Main function to run the systemd hook"""
+    try:
+        from amd_debug.validator import (
+            SleepValidator,
+        )  # pylint: disable=import-outside-toplevel
+        from amd_debug.prerequisites import (
+            PrerequisiteValidator,
+        )  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:
+        return
+
+    app = SleepValidator(tool_debug=debug, bios_debug=False)
+    if action == "pre":
+        prereq = PrerequisiteValidator(tool_debug=debug)
+        prereq.capture_once()
+        app.systemd_pre_hook()
+    elif action == "post":
+        app.systemd_post_hook()
+
+
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description="amd-s2idle hook",
+        description="amd-s2idle systemd hook",
     )
 
     parser.add_argument(
         "action",
-        choices=["pre", "post", "test"],
+        choices=["pre", "post"],
         help="Action to perform",
     )
 
@@ -23,28 +44,9 @@ def parse_args():
         help="Mode to perform",
     )
 
-    parser.add_argument("--count")
     parser.add_argument("--log", default="/dev/null")
-    parser.add_argument(
-        "--duration",
-    )
-    parser.add_argument(
-        "--wait",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--random",
-        action="store_true",
-    )
-    parser.add_argument("--logind", action="store_true")
-    parser.add_argument("--path", default="%PATH%")
+    if sys.prefix != sys.base_prefix:
+        parser.add_argument("--path", default="%PATH%")
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -54,49 +56,15 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.path:
-        sys.path.append(args.path)
 
-    try:
-        from amd_debug.validator import (
-            SleepValidator,
-        )  # pylint: disable=import-outside-toplevel
-        from amd_debug.prerequisites import (
-            PrerequisiteValidator,
-        )  # pylint: disable=import-outside-toplevel
-    except ModuleNotFoundError:
+    if args.mode != "suspend":
         sys.exit(0)
+
+    if sys.prefix != sys.base_prefix and args.path:
+        sys.path.append(args.path)
 
     logging.basicConfig(
         filename=args.log, level=logging.DEBUG if args.debug else logging.WARNING
     )
 
-    app = SleepValidator(tool_debug=args.debug, bios_debug=False)
-    if args.action == "pre":
-        if args.mode == "suspend":
-            prereq = PrerequisiteValidator(tool_debug=args.debug)
-            prereq.capture_once()
-            app.systemd_pre_hook()
-        sys.exit(0)
-
-    if args.action == "post":
-        if args.mode == "suspend":
-            app.systemd_post_hook()
-        sys.exit(0)
-
-    if args.action == "test":
-        if not args.count or not args.duration or not args.wait:
-            sys.exit("Must specify count, duration and args")
-
-        app = PrerequisiteValidator(tool_debug=args.debug)
-        if app.run() or args.force:
-            app = SleepValidator(tool_debug=args.debug, bios_debug=False)
-            app.run(
-                duration=int(args.duration),
-                wait=int(args.wait),
-                count=int(args.count),
-                rand=args.random,
-                logind=args.logind,
-            )
-            sys.exit(0)
-        sys.exit(1)
+    main(args.action, args.debug)
