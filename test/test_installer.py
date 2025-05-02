@@ -23,6 +23,9 @@ class TestInstaller(unittest.TestCase):
     def setUpClass(cls):
         logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
+    def setUp(self):
+        self.installer = Installer()
+
     @patch("builtins.print")
     @patch("shutil.copy", return_value=None)
     @patch("os.chmod", return_value=None)
@@ -32,8 +35,7 @@ class TestInstaller(unittest.TestCase):
         self, _mock_call, _mock_open, _mock_chmod, _mock_shutil, _mock_print
     ):
         """Test install hook function"""
-        installer = Installer()
-        installer.install()
+        self.installer.install()
 
     @patch("builtins.print")
     @patch("shutil.copy", return_value=None)
@@ -44,9 +46,8 @@ class TestInstaller(unittest.TestCase):
         self, _mock_call, _mock_open, _mock_chmod, _mock_shutil, _mock_print
     ):
         """Test install hook function, but some paths are missing"""
-        installer = Installer()
         with patch("os.path.exists", return_value=False):
-            installer.install()
+            self.installer.install()
 
     @patch("builtins.print")
     @patch("os.remove", return_value=None)
@@ -57,25 +58,22 @@ class TestInstaller(unittest.TestCase):
         self, _mock_call, _mock_get_distro, _mock_open, _mock_remove, _mock_print
     ):
         """Test remove hook function"""
-        installer = Installer()
         with patch("os.path.exists", return_value=True):
-            installer.remove()
+            self.installer.remove()
 
     @patch("builtins.print")
     @patch("os.path.exists", return_value=False)
     @patch("subprocess.call", return_value=0)
     def test_remove_hook_missing_path(self, _mock_call, _mock_exists, _mock_print):
         """Test remove hook function when the file is missing"""
-        installer = Installer()
-        installer.remove()
+        self.installer.remove()
 
     @patch("builtins.print")
     @patch("subprocess.call", return_value=0)
     def test_already_installed_iasl(self, _mock_call, _mock_print):
         """Test that an already installed iasl is found"""
-        installer = Installer()
-        installer.set_requirements("iasl")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("iasl")
+        ret = self.installer.install_dependencies()
         self.assertTrue(ret)
 
     @patch("builtins.print")
@@ -87,9 +85,8 @@ class TestInstaller(unittest.TestCase):
         self, _mock_call, _mock_check_call, _mock_distro, _fake_sudo, _mock_print
     ):
         """Test install requirements function"""
-        installer = Installer()
-        installer.set_requirements("iasl")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("iasl")
+        ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(["apt", "install", "acpica-tools"])
         self.assertTrue(ret)
 
@@ -111,9 +108,8 @@ class TestInstaller(unittest.TestCase):
         _mock_print,
     ):
         """Test install requirements function"""
-        installer = Installer()
-        installer.set_requirements("iasl")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("iasl")
+        ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(
             ["dnf", "install", "-y", "acpica-tools"]
         )
@@ -128,9 +124,8 @@ class TestInstaller(unittest.TestCase):
         self, _mock_call, _mock_check_call, _mock_distro, _fake_sudo, _mock_print
     ):
         """Test install requirements function"""
-        installer = Installer()
-        installer.set_requirements("ethtool")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("ethtool")
+        ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(["apt", "install", "ethtool"])
         self.assertTrue(ret)
 
@@ -152,9 +147,8 @@ class TestInstaller(unittest.TestCase):
         _mock_print,
     ):
         """Test install requirements function"""
-        installer = Installer()
-        installer.set_requirements("ethtool")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("ethtool")
+        ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(["dnf", "install", "-y", "ethtool"])
         self.assertTrue(ret)
 
@@ -172,9 +166,8 @@ class TestInstaller(unittest.TestCase):
         _mock_print,
     ):
         """Test install requirements function"""
-        installer = Installer()
-        installer.set_requirements("ethtool")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("ethtool")
+        ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(["pacman", "-Sy", "ethtool"])
         self.assertTrue(ret)
 
@@ -187,7 +180,6 @@ class TestInstaller(unittest.TestCase):
         self, _mock_call, _mock_distro, _fake_sudo, _mock_exists, _mock_print
     ):
         """Test install requirements function"""
-        installer = Installer()
-        installer.set_requirements("iasl", "ethtool")
-        ret = installer.install_dependencies()
+        self.installer.set_requirements("iasl", "ethtool")
+        ret = self.installer.install_dependencies()
         self.assertFalse(ret)
