@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: MIT
 
-from amd_debug.common import read_file
 from datetime import datetime
 import sqlite3
 import os
+
+from amd_debug.common import read_file
 
 SCHEMA_VERSION = 1
 
@@ -19,12 +20,17 @@ def migrate(cur, user_version) -> None:
         cur.execute("ALTER TABLE debug ADD COLUMN priority INTEGER")
     # Update schema if necessary
     if val != user_version:
-        cur.execute("PRAGMA user_version = {}".format(user_version))
+        cur.execute(f"PRAGMA user_version = {user_version}")
 
 
 class SleepDatabase:
+    """Database class to store sleep cycle data"""
+
     def __init__(self, use_home=False) -> None:
         self.db = None
+        self.last_suspend = None
+        self.cycle_data_cnt = 0
+        self.debug_cnt = 0
         new = False
         if use_home:
             user = os.environ.get("SUDO_USER")
@@ -88,7 +94,7 @@ class SleepDatabase:
         self.prereq_data_cnt = 0
 
         if new:
-            cur.execute("PRAGMA user_version = {}".format(SCHEMA_VERSION))
+            cur.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         else:
             migrate(cur, SCHEMA_VERSION)
 
@@ -146,7 +152,7 @@ class SleepDatabase:
             contents = read_file(fn)
             self.record_debug(contents)
         except PermissionError:
-            self.record_debug("Unable to capture %s" % fn)
+            self.record_debug(f"Unable to capture {fn}")
 
     def record_battery_energy(self, name, energy, full, unit):
         """Helper function to record battery energy"""
@@ -287,7 +293,7 @@ class SleepDatabase:
         )
         data = ""
         for row in cur.fetchall():
-            data += "{symbol} {message}\n".format(message=row[0], symbol=row[1])
+            data += f"{row[1]} {row[0]}\n"
         return data
 
     def report_battery(self, t0=None) -> list:
@@ -316,7 +322,7 @@ class SleepDatabase:
 
     def report_summary_dataframe(self, since, until) -> object:
         """Helper function to report a dataframe from the database"""
-        import pandas as pd
+        import pandas as pd  # pylint: disable=import-outside-toplevel
 
         pd.set_option("display.precision", 2)
         return pd.read_sql_query(
