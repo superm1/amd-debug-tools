@@ -920,10 +920,7 @@ class SleepValidator(AmdTool):
         """Called after resume"""
         t0 = self.db.get_last_cycle()
         self.last_suspend = datetime.strptime(str(t0[0]), "%Y%m%d%H%M%S")
-        timestamp_usec = int(
-            self.last_suspend.replace(tzinfo=timezone.utc).timestamp() * 1_000_000
-        )
-        self.kernel_log.seek_tail(timestamp_usec)
+        self.kernel_log.seek_tail(self.last_suspend)
         self.db.start_cycle(self.last_suspend)
         self.post()
         self.db.sync()

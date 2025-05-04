@@ -206,7 +206,8 @@ class CySystemdLogger(KernelLogger):
     def seek_tail(self, tim=None):
         """Seek to the end of the log"""
         if tim:
-            self.journal.seek_realtime_usec(tim)
+            timestamp_usec = int(tim.timestamp() * 1_000_000)
+            self.journal.seek_realtime_usec(timestamp_usec)
         else:
             self.journal.seek_tail()
 
