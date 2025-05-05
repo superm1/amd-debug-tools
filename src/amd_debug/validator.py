@@ -676,17 +676,6 @@ class SleepValidator(AmdTool):
                 f"Notify devices {self.notify_devices} found during suspend", "💤"
             )
 
-    def analyze_masks(self):
-        """Analyze the idle masks for the CPU"""
-        try:
-            from amd_debug.common import add_model_checks
-
-            func = add_model_checks(self.cpu_model, self.cpu_family)
-            for mask in self.idle_masks:
-                func(mask)
-        except ImportError:
-            pass
-
     def analyze_duration(self, t0, t1, requested, kernel, hw):
         """Analyze the duration of the last cycle"""
         userspace_duration = t1 - t0
