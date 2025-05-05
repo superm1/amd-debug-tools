@@ -8,7 +8,7 @@ import re
 import random
 import subprocess
 import time
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime
 from packaging import version
 from pyudev import Context
 
