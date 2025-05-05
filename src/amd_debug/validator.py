@@ -56,13 +56,15 @@ def soc_needs_irq1_wa(family, model, smu_version):
     return False
 
 
+def toggle_pm_debug(enable):
+    """Enable or disable pm_debug_messages"""
+    pm_debug_messages = os.path.join("/", "sys", "power", "pm_debug_messages")
+    with open(pm_debug_messages, "w", encoding="utf-8") as w:
+        w.write("1" if enable else "0")
+
+
 def pm_debugging(func):
     """Decorator to enable pm_debug_messages"""
-
-    def toggle_pm_debug(enable):
-        pm_debug_messages = os.path.join("/", "sys", "power", "pm_debug_messages")
-        with open(pm_debug_messages, "w", encoding="utf-8") as w:
-            w.write("1" if enable else "0")
 
     def runner(*args, **kwargs):
         toggle_pm_debug(True)
@@ -915,9 +917,11 @@ class SleepValidator(AmdTool):
         """Called before suspend"""
         self.prep()
         self.db.sync()
+        toggle_pm_debug(True)
 
     def systemd_post_hook(self):
         """Called after resume"""
+        toggle_pm_debug(False)
         t0 = self.db.get_last_cycle()
         self.last_suspend = datetime.strptime(str(t0[0]), "%Y%m%d%H%M%S")
         self.kernel_log.seek_tail(self.last_suspend)
