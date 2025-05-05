@@ -15,7 +15,7 @@ from pyudev import Context
 from amd_debug.sleep_report import SleepReport
 from amd_debug.database import SleepDatabase
 from amd_debug.battery import Batteries
-from amd_debug.kernel_log import get_kernel_log, sscanf_bios_args
+from amd_debug.kernel import get_kernel_log, sscanf_bios_args
 from amd_debug.common import (
     print_color,
     read_file,

@@ -15,7 +15,7 @@ from amd_debug.common import (
     show_log_info,
     version,
 )
-from amd_debug.kernel_log import get_kernel_log, sscanf_bios_args
+from amd_debug.kernel import get_kernel_log, sscanf_bios_args
 from amd_debug.acpi import AcpicaTracer
 
 

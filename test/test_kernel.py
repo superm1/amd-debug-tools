@@ -11,7 +11,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from amd_debug.kernel_log import sscanf_bios_args
+from amd_debug.kernel import sscanf_bios_args
 
 
 class TestKernelLog(unittest.TestCase):

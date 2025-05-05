@@ -14,7 +14,7 @@ from datetime import datetime
 from packaging import version
 
 from amd_debug.wake import WakeIRQ
-from amd_debug.kernel_log import get_kernel_log, SystemdLogger, DmesgLogger
+from amd_debug.kernel import get_kernel_log, SystemdLogger, DmesgLogger
 from amd_debug.common import (
     BIT,
     clear_temporary_message,
