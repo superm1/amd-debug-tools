@@ -161,11 +161,11 @@ class KernelLogger:
     def process_callback(self, callback, priority):
         """Process the log"""
 
-    def match_line(self, matches) -> str:
+    def match_line(self, _matches) -> str:
         """Find lines that match all matches"""
         return ""
 
-    def match_pattern(self, pattern) -> str:
+    def match_pattern(self, _pattern) -> str:
         """Find lines that match a pattern"""
         return ""
 
