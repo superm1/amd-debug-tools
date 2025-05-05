@@ -103,3 +103,11 @@ class TestKernelLog(unittest.TestCase):
         expected_output = "APGE                  = 1"
         result = sscanf_bios_args(line)
         self.assertEqual(result, expected_output)
+
+        # test case for Dispatch notify
+        line = "evmisc-0132 ev_queue_notify_reques: Dispatching Notify on [UBTC] (Device) Value 0x80 (Status Change) Node 00000000851b15c1"
+        expected_output = (
+            "Dispatching Notify on [UBTC] (Device) Value 0x80 (Status Change)"
+        )
+        result = sscanf_bios_args(line)
+        self.assertEqual(result, expected_output)

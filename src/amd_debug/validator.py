@@ -524,15 +524,6 @@ class SleepValidator(AmdTool):
             )
         elif Headers.Irq1Workaround in line:
             self.irq1_workaround = True
-        # evmisc-0132 ev_queue_notify_reques: Dispatching Notify on [UBTC] (Device) Value 0x80 (Status Change) Node 0000000080144eee
-        elif "Dispatching Notify on" in line:
-            # add device without the [] to notify_devices if it's not already there
-            device = re.search(r"\[(.*?)\]", line)
-            if device:
-                device = device.group(1)
-                if device not in self.notify_devices:
-                    self.notify_devices += [device]
-            priority = 7
         # AMD-Vi: Event logged [IO_PAGE_FAULT device=0000:00:0c.0 domain=0x0000 address=0x7e800000 flags=0x0050]
         elif "Event logged [IO_PAGE_FAULT" in line:
             # get the device from string
@@ -541,6 +532,17 @@ class SleepValidator(AmdTool):
                 device = device.group(1)
                 if device not in self.page_faults:
                     self.page_faults += [device]
+
+        # evmisc-0132 ev_queue_notify_reques: Dispatching Notify on [UBTC] (Device) Value 0x80 (Status Change) Node 0000000080144eee
+        if "Dispatching Notify on" in line:
+            # add device without the [] to notify_devices if it's not already there
+            device = re.search(r"\[(.*?)\]", line)
+            if device:
+                device = device.group(1)
+                if device not in self.notify_devices:
+                    self.notify_devices += [device]
+            priority = 7
+
         self.db.record_debug(line, priority)
 
     def analyze_kernel_log(self):

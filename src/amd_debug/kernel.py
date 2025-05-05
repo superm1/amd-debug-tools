@@ -136,6 +136,13 @@ def sscanf_bios_args(line):
         else:
             # If no format string is found, assume no format modifiers and return True
             return True
+    # evmisc-0132 ev_queue_notify_reques: Dispatching Notify on [UBTC] (Device) Value 0x80 (Status Change) Node 00000000851b15c1
+    elif re.search(r"ev_queue_notify_reques", line):
+        parts = line.split(": ", 1)
+        if len(parts) < 2:
+            return None
+        return parts[1].split("Node")[0].strip()
+
     return None
 
 
