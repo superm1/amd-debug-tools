@@ -4,14 +4,15 @@
 """
 This module contains unit tests for the kernel log functions in the amd-debug-tools package.
 """
-import logging
+from unittest.mock import patch, mock_open
+
 import unittest
 import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from amd_debug.kernel import sscanf_bios_args
+from amd_debug.kernel import sscanf_bios_args, get_kernel_command_line
 
 
 class TestKernelLog(unittest.TestCase):
@@ -19,7 +20,46 @@ class TestKernelLog(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+        pass  # logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    def test_get_kernel_command_line(self):
+        """Test get_kernel_command_line function"""
+
+        # Test case with a valid kernel command line that is fully filtered
+        kernel_cmdline = "quiet splash"
+        expected_output = ""
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+        ) as _mock_file:
+            result = get_kernel_command_line()
+            self.assertEqual(result, expected_output)
+
+        # Test case with an empty kernel command line
+        kernel_cmdline = ""
+        expected_output = ""
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+        ) as _mock_file:
+            result = get_kernel_command_line()
+            self.assertEqual(result, expected_output)
+
+        # Test case with a kernel command line containing special characters
+        kernel_cmdline = "quiet splash --debug=1"
+        expected_output = "--debug=1"
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+        ) as _mock_file:
+            result = get_kernel_command_line()
+            self.assertEqual(result, expected_output)
+
+        # Test case with a kernel command line containing special characters
+        kernel_cmdline = "quiet splash initrd=foo modprobe.blacklist=foo"
+        expected_output = "modprobe.blacklist=foo"
+        with patch(
+            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+        ) as _mock_file:
+            result = get_kernel_command_line()
+            self.assertEqual(result, expected_output)
 
     def test_sscanf_bios_args(self):
         """Test sscanf_bios_args function"""

@@ -15,7 +15,7 @@ from pyudev import Context
 from amd_debug.sleep_report import SleepReport
 from amd_debug.database import SleepDatabase
 from amd_debug.battery import Batteries
-from amd_debug.kernel import get_kernel_log, sscanf_bios_args
+from amd_debug.kernel import get_kernel_log, get_kernel_command_line, sscanf_bios_args
 from amd_debug.common import (
     print_color,
     read_file,
@@ -477,81 +477,7 @@ class SleepValidator(AmdTool):
 
     def capture_command_line(self):
         """Capture the kernel command line to debug"""
-        cmdline = read_file(os.path.join("/proc", "cmdline"))
-        # borrowed from https://github.com/fwupd/fwupd/blob/1.9.5/libfwupdplugin/fu-common-linux.c#L95
-        filtered = [
-            "apparmor",
-            "audit",
-            "auto",
-            "boot",
-            "BOOT_IMAGE",
-            "console",
-            "crashkernel",
-            "cryptdevice",
-            "cryptkey",
-            "dm",
-            "earlycon",
-            "earlyprintk",
-            "ether",
-            "initrd",
-            "ip",
-            "LANG",
-            "loglevel",
-            "luks.key",
-            "luks.name",
-            "luks.options",
-            "luks.uuid",
-            "mitigations",
-            "mount.usr",
-            "mount.usrflags",
-            "mount.usrfstype",
-            "netdev",
-            "netroot",
-            "nfsaddrs",
-            "nfs.nfs4_unique_id",
-            "nfsroot",
-            "noplymouth",
-            "ostree",
-            "quiet",
-            "rd.dm.uuid",
-            "rd.luks.allow-discards",
-            "rd.luks.key",
-            "rd.luks.name",
-            "rd.luks.options",
-            "rd.luks.uuid",
-            "rd.lvm.lv",
-            "rd.lvm.vg",
-            "rd.md.uuid",
-            "rd.systemd.mask",
-            "rd.systemd.wants",
-            "resume",
-            "resumeflags",
-            "rhgb",
-            "ro",
-            "root",
-            "rootflags",
-            "roothash",
-            "rw",
-            "security",
-            "showopts",
-            "splash",
-            "swap",
-            "systemd.mask",
-            "systemd.show_status",
-            "systemd.unit",
-            "systemd.verity_root_data",
-            "systemd.verity_root_hash",
-            "systemd.wants",
-            "udev.log_priority",
-            "verbose",
-            "vt.handoff",
-            "zfs",
-        ]
-        # remove anything that starts with something in filtered from cmdline
-        cmdline = " ".join(
-            [x for x in cmdline.split() if not x.startswith(tuple(filtered))]
-        )
-        self.db.record_debug(f"/proc/cmdline: {cmdline}")
+        self.db.record_debug(f"/proc/cmdline: {get_kernel_command_line()}")
 
     def _analyze_kernel_log_line(self, line, priority):
         bios_args = sscanf_bios_args(line)
