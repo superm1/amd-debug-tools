@@ -137,14 +137,22 @@ class Installer:
     def install_dependencies(self) -> bool:
         """Install the dependencies"""
         if "iasl" in self.requirements:
-            iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
+            try:
+                iasl = subprocess.call(["iasl", "-v"], stdout=subprocess.DEVNULL) == 0
+            except FileNotFoundError:
+                iasl = False
             if not iasl:
                 self.show_install_message(Headers.MissingIasl)
                 package = IaslPackage()
                 if not package.install():
                     return False
         if "ethtool" in self.requirements:
-            ethtool = subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
+            try:
+                ethtool = (
+                    subprocess.call(["ethtool", "-h"], stdout=subprocess.DEVNULL) == 0
+                )
+            except FileNotFoundError:
+                ethtool = False
             if not ethtool:
                 self.show_install_message(Headers.MissingEthtool)
                 package = EthtoolPackage()
