@@ -291,7 +291,7 @@ def parse_args():
     test_cmd.add_argument(
         "--format",
         choices=Defaults.format_choices,
-        default=running_ssh(),
+        default=get_report_format(),
         help="Report format",
     )
     test_cmd.add_argument(
@@ -323,7 +323,7 @@ def parse_args():
     report_cmd.add_argument(
         "--format",
         choices=Defaults.format_choices,
-        default=running_ssh(),
+        default=get_report_format(),
         help="Report format",
     )
     report_cmd.add_argument(
