@@ -403,5 +403,4 @@ def main():
         return
     else:
         sys.exit("no action specified")
-    if not ret:
-        show_log_info()
+    show_log_info()
