@@ -23,6 +23,13 @@ def amd_pstate():
     return pstate.main()
 
 
+def install_dep_superset():
+    """Install all supserset dependencies."""
+    from . import installer  # pylint: disable=import-outside-toplevel
+
+    return installer.install_dep_superset()
+
+
 def launch_tool(tool_name):
     """Launch a tool with the given name and arguments."""
     tools = {

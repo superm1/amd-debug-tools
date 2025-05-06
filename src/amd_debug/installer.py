@@ -22,19 +22,26 @@ class Headers:  # pylint: disable=too-few-public-methods
     MissingEthtool = "Ethtool is missing"
     InstallAction = "Attempting to install"
     MissingFwupd = "Firmware update library `fwupd` is missing"
+    MissingPyudev = "Udev access library `pyudev` is missing"
+    MissingPackaging = "Python library `packaging` is missing"
+    MissingPandas = "Data library `pandas` is missing"
+    MissingTabulate = "Data library `tabulate` is missing"
+    MissingJinja2 = "Template library `jinja2` is missing"
 
 
 class DistroPackage:
     """Base class for distro packages"""
 
-    def __init__(self, deb, rpm, arch):
+    def __init__(self, deb, rpm, arch, message):
         self.deb = deb
         self.rpm = rpm
         self.arch = arch
+        self.message = message
 
     def install(self):
         """Install the package for a given distro"""
         relaunch_sudo()
+        show_install_message(self.message)
         dist = get_distro()
         if dist in ("ubuntu", "debian"):
             if not self.deb:
@@ -65,13 +72,76 @@ class DistroPackage:
         return True
 
 
+class PyUdevPackage(DistroPackage):
+    """Pyudev package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-pyudev",
+            rpm="python3-pyudev",
+            arch="python-pyudev",
+            message=Headers.MissingPyudev,
+        )
+
+
+class PackagingPackage(DistroPackage):
+    """Packaging package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-packaging",
+            rpm=None,
+            arch="python-packaging",
+            message=Headers.MissingPackaging,
+        )
+
+
+class PandasPackage(DistroPackage):
+    """Class for handling the pandas package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-pandas",
+            rpm="python3-pandas",
+            arch="python-pandas",
+            message=Headers.MissingPandas,
+        )
+
+
+class TabulatePackage(DistroPackage):
+    """Class for handling the tabulate package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-tabulate",
+            rpm="python3-tabulate",
+            arch="python-tabulate",
+            message=Headers.MissingTabulate,
+        )
+
+
+class Jinja2Package(DistroPackage):
+    """Class for handling the jinja2 package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-jinja2",
+            rpm="python3-jinja2",
+            arch="python-jinja",
+            message=Headers.MissingJinja2,
+        )
+
+
 class IaslPackage(DistroPackage):
     """Iasl package"""
 
-    def __init__(
-        self,
-    ):
-        super().__init__(deb="acpica-tools", rpm="acpica-tools", arch="acpica")
+    def __init__(self):
+        super().__init__(
+            deb="acpica-tools",
+            rpm="acpica-tools",
+            arch="acpica",
+            message=Headers.MissingIasl,
+        )
 
 
 class EthtoolPackage(DistroPackage):
@@ -82,6 +152,7 @@ class EthtoolPackage(DistroPackage):
             deb="ethtool",
             rpm="ethtool",
             arch="ethtool",
+            message=Headers.MissingEthtool,
         )
 
 
@@ -93,17 +164,19 @@ class FwupdPackage(DistroPackage):
             deb="gir1.2-fwupd-2.0",
             rpm=None,
             arch=None,
+            message=Headers.MissingFwupd,
         )
+
+
+def show_install_message(message):
+    """Show an install message"""
+    action = Headers.InstallAction
+    message = f"{message}. {action}."
+    print_color(message, "👀")
 
 
 class Installer(AmdTool):
     """Installer class"""
-
-    def show_install_message(self, message):
-        """Show an install message"""
-        action = Headers.InstallAction
-        message = f"{message}. {action}."
-        print_color(message, "👀")
 
     def __init__(self, tool_debug):
         log_prefix = "installer" if tool_debug else None
@@ -142,7 +215,6 @@ class Installer(AmdTool):
             except FileNotFoundError:
                 iasl = False
             if not iasl:
-                self.show_install_message(Headers.MissingIasl)
                 package = IaslPackage()
                 if not package.install():
                     return False
@@ -154,15 +226,48 @@ class Installer(AmdTool):
             except FileNotFoundError:
                 ethtool = False
             if not ethtool:
-                self.show_install_message(Headers.MissingEthtool)
                 package = EthtoolPackage()
                 if not package.install():
                     return False
         if "fwupd" in self.requirements and not self.fwupd:
-            self.show_install_message(Headers.MissingFwupd)
             package = FwupdPackage()
             if not package.install():
                 return False
+        if "pyudev" in self.requirements:
+            try:
+                import pyudev as _  # pylint: disable=import-outside-toplevel
+            except ModuleNotFoundError:
+                package = PyUdevPackage()
+                if not package.install():
+                    return False
+        if "packaging" in self.requirements:
+            try:
+                import packaging as _  # pylint: disable=import-outside-toplevel
+            except ModuleNotFoundError:
+                package = PackagingPackage()
+                if not package.install():
+                    return False
+        if "pandas" in self.requirements:
+            try:
+                import pandas as _  # pylint: disable=import-outside-toplevel
+            except ModuleNotFoundError:
+                package = PandasPackage()
+                if not package.install():
+                    return False
+        if "tabulate" in self.requirements:
+            try:
+                import tabulate as _  # pylint: disable=import-outside-toplevel
+            except ModuleNotFoundError:
+                package = TabulatePackage()
+                if not package.install():
+                    return False
+        if "jinja2" in self.requirements:
+            try:
+                import jinja2 as _  # pylint: disable=import-outside-toplevel
+            except ModuleNotFoundError:
+                package = Jinja2Package()
+                if not package.install():
+                    return False
 
         return True
 
@@ -241,3 +346,18 @@ class Installer(AmdTool):
         shutil.copy(s, t)
         print_color(f"Installed {f} to {t}", "✅")
         return True
+
+
+def install_dep_superset() -> bool:
+    """Install all python supserset dependencies"""
+    tool = Installer(tool_debug=True)
+    tool.set_requirements(
+        "iasl",
+        "ethtool",
+        "jinja2",
+        "pyudev",
+        "packaging",
+        "pandas",
+        "tabulate",
+    )
+    return tool.install_dependencies()
