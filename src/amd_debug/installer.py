@@ -27,6 +27,7 @@ class Headers:  # pylint: disable=too-few-public-methods
     MissingPandas = "Data library `pandas` is missing"
     MissingTabulate = "Data library `tabulate` is missing"
     MissingJinja2 = "Template library `jinja2` is missing"
+    MissingSeaborn = "Data visualization library `seaborn` is missing"
 
 
 class DistroPackage:
@@ -129,6 +130,18 @@ class Jinja2Package(DistroPackage):
             rpm="python3-jinja2",
             arch="python-jinja",
             message=Headers.MissingJinja2,
+        )
+
+
+class SeabornPackage(DistroPackage):
+    """Class for handling the seaborn package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="python3-seaborn",
+            rpm="python3-seaborn",
+            arch="python-seaborn",
+            message=Headers.MissingSeaborn,
         )
 
 
@@ -268,6 +281,13 @@ class Installer(AmdTool):
                 package = Jinja2Package()
                 if not package.install():
                     return False
+        if "seaborn" in self.requirements:
+            try:
+                import seaborn as _  # pylint: disable=import-outside-toplevel
+            except ModuleNotFoundError:
+                package = SeabornPackage()
+                if not package.install():
+                    return False
 
         return True
 
@@ -358,6 +378,7 @@ def install_dep_superset() -> bool:
         "pyudev",
         "packaging",
         "pandas",
+        "seaborn",
         "tabulate",
     )
     return tool.install_dependencies()
