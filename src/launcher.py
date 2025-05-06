@@ -3,12 +3,18 @@
 import sys
 import os
 
+URL = "git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git"
 try:
     import amd_debug
+    from amd_debug.common import fatal_error
 except ModuleNotFoundError:
     sys.exit(
-        f"\033[91m{sys.argv[0]} can not be run standalone.\n\033[0m\033[94mCheck out the full branch from git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git\033[0m"
+        f"\033[91m{sys.argv[0]} can not be run standalone.\n"
+        f"\033[0m\033[94mCheck out the full branch from {URL}\033[0m"
     )
 
 if __name__ == "__main__":
-    sys.exit(amd_debug.launch_tool(os.path.basename(sys.argv[0])))
+    try:
+        sys.exit(amd_debug.launch_tool(os.path.basename(sys.argv[0])))
+    except ModuleNotFoundError as e:
+        fatal_error(f"Missing dependency: {e}")
