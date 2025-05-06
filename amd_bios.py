@@ -90,8 +90,6 @@ class AmdBios(AmdTool):
                         continue
                     t = str(int(t) | value)
                 else:
-                    if actual[key].strip() == str(value):
-                        continue
                     t = value
                 with open(p, "w", encoding="utf-8") as w:
                     w.write(t)
