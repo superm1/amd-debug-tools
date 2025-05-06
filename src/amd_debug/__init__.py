@@ -36,6 +36,7 @@ def launch_tool(tool_name):
         "amd_s2idle.py": amd_s2idle,
         "amd_bios.py": amd_bios,
         "amd_pstate.py": amd_pstate,
+        "install_deps.py": install_dep_superset,
     }
     if tool_name in tools:
         return tools[tool_name]()

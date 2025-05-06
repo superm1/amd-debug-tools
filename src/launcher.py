@@ -14,8 +14,10 @@ except ModuleNotFoundError:
     )
 
 if __name__ == "__main__":
-    amd_debug.install_dep_superset()
     try:
         sys.exit(amd_debug.launch_tool(os.path.basename(sys.argv[0])))
     except ModuleNotFoundError as e:
-        fatal_error(f"Missing dependency: {e}")
+        fatal_error(
+            f"Missing dependency: {e}\n"
+            f"Run ./install_deps.py to install dependencies."
+        )

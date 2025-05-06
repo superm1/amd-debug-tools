@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: MIT
 
+import argparse
 import os
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ from amd_debug.common import (
     get_distro,
     read_file,
     systemd_in_use,
+    show_log_info,
     fatal_error,
     relaunch_sudo,
     AmdTool,
@@ -368,9 +370,23 @@ class Installer(AmdTool):
         return True
 
 
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Install dependencies for AMD debug tools",
+    )
+    parser.add_argument(
+        "--tool-debug",
+        action="store_true",
+        help="Enable tool debug logging",
+    )
+    return parser.parse_args()
+
+
 def install_dep_superset() -> bool:
     """Install all python supserset dependencies"""
-    tool = Installer(tool_debug=True)
+    args = parse_args()
+    tool = Installer(tool_debug=args.tool_debug)
     tool.set_requirements(
         "iasl",
         "ethtool",
@@ -381,4 +397,6 @@ def install_dep_superset() -> bool:
         "seaborn",
         "tabulate",
     )
-    return tool.install_dependencies()
+    if tool.install_dependencies():
+        print_color("All dependencies installed", "✅")
+    show_log_info()

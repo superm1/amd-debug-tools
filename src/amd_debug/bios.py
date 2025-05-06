@@ -4,7 +4,6 @@
 import argparse
 import re
 import sys
-
 from amd_debug.common import (
     AmdTool,
     fatal_error,

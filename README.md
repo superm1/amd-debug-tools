@@ -29,6 +29,18 @@ to set up the environment:
 
 This will add the `pipx` environment to your path.
 
+### Running in tree
+If you want to run the tools in tree, you need to make sure that distro dependencies
+that would normally install into a venv are installed. This can be done by running:
+
+    ./install_deps.py
+
+After dependencies are installed, you can run the tools by running:
+
+    ./amd_s2idle.py
+    ./amd_bios.py
+    ./amd_pstate.py
+
 ## amd-s2idle
 `amd-s2idle` is a tool used for analyzing the entry and exit of the s2idle
 state of a Linux system.
