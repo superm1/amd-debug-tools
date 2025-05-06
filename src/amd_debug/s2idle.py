@@ -179,7 +179,7 @@ def test(
     duration, wait, count, fmt, fname, force, debug, rand, logind, bios_debug
 ) -> bool:
     """Run a test"""
-    app = Installer()
+    app = Installer(tool_debug=debug)
     app.set_requirements("iasl", "ethtool")
     if not app.install_dependencies():
         print("Failed to install dependencies")
@@ -230,7 +230,7 @@ def test(
 
 def install(debug) -> None:
     """Install the tool"""
-    installer = Installer()
+    installer = Installer(tool_debug=debug)
     installer.set_requirements("iasl", "ethtool")
     if not installer.install_dependencies():
         sys.exit("Failed to install dependencies")
@@ -247,9 +247,9 @@ def install(debug) -> None:
         sys.exit("Failed to install")
 
 
-def uninstall() -> None:
+def uninstall(debug) -> None:
     """Uninstall the tool"""
-    app = Installer()
+    app = Installer(tool_debug=debug)
     if not app.remove():
         sys.exit("Failed to remove")
 
@@ -374,7 +374,7 @@ def main():
         install(args.tool_debug)
     elif args.action == "uninstall":
         relaunch_sudo()
-        uninstall()
+        uninstall(args.tool_debug)
     elif args.action == "report":
         ret = report(
             args.since,

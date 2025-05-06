@@ -24,7 +24,7 @@ class TestInstaller(unittest.TestCase):
         logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
     def setUp(self):
-        self.installer = Installer()
+        self.installer = Installer(tool_debug=False)
 
     @patch("builtins.print")
     @patch("shutil.copy", return_value=None)

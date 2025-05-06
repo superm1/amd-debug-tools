@@ -11,6 +11,7 @@ from amd_debug.common import (
     systemd_in_use,
     fatal_error,
     relaunch_sudo,
+    AmdTool,
 )
 
 
@@ -95,7 +96,7 @@ class FwupdPackage(DistroPackage):
         )
 
 
-class Installer:
+class Installer(AmdTool):
     """Installer class"""
 
     def show_install_message(self, message):
@@ -104,12 +105,11 @@ class Installer:
         message = f"{message}. {action}."
         print_color(message, "👀")
 
-    def __init__(self, base=""):
-        self.base = base
+    def __init__(self, tool_debug):
+        log_prefix = "installer" if tool_debug else None
+        super().__init__(log_prefix)
         self.systemd = systemd_in_use()
-        self.systemd_path = os.path.join(
-            self.base, "/", "lib", "systemd", "system-sleep"
-        )
+        self.systemd_path = os.path.join("/", "lib", "systemd", "system-sleep")
 
         # test if fwupd can report device firmware versions
         try:
