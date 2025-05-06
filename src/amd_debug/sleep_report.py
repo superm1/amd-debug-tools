@@ -11,6 +11,7 @@ from amd_debug.database import SleepDatabase
 from amd_debug.common import (
     AmdTool,
     Colors,
+    version,
     clear_temporary_message,
     get_group_color,
     get_log_priority,
@@ -327,6 +328,7 @@ class SleepReport(AmdTool):
             "prereq_debug_data": prereq_debug,
             "debug_data": debug,
             "date": datetime.now(),
+            "version": version(),
             "battery_svg": self.battery_svg,
             "hwsleep_svg": self.hwsleep_svg,
             "failures": failures,

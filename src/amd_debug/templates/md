@@ -1,4 +1,4 @@
-# s2idle report created on {{ date }}
+# s2idle report created on {{ date }} using amd-s2idle {{ version }}
 
 {% if prereq %}
 ## ⚓ Prerequisite checks

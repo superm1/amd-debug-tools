@@ -306,7 +306,7 @@
         window.addEventListener('load', populate_summary_selectors);
     </script>
     <h1>Linux s2idle Power Report</h1>
-    <p>Report Time: {{ date }}</p>
+    <p>s2idle report created {{ date }} using amd-s2idle {{version}}</p>
     {% if prereq %}
     <table class="hide-borders">
         {% for obj in prereq %}
