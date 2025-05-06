@@ -124,12 +124,14 @@ def parse_args():
 def main():
     """Main function"""
     args = parse_args()
+    ret = False
     if args.command == "trace":
         app = AmdBios(None, args.tool_debug)
-        app.set_tracing(True if args.enable else False)
+        ret = app.set_tracing(True if args.enable else False)
     elif args.command == "parse":
         app = AmdBios(args.input, args.tool_debug)
-        app.run()
+        ret = app.run()
     elif args.command == "version":
         print(version())
     show_log_info()
+    return ret

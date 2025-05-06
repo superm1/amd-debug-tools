@@ -397,6 +397,8 @@ def install_dep_superset() -> bool:
         "seaborn",
         "tabulate",
     )
-    if tool.install_dependencies():
+    ret = tool.install_dependencies()
+    if ret:
         print_color("All dependencies installed", "✅")
     show_log_info()
+    return ret

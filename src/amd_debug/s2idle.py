@@ -400,7 +400,8 @@ def main():
         )
     elif args.action == "version":
         print(version())
-        return
+        return True
     else:
         sys.exit("no action specified")
     show_log_info()
+    return ret
