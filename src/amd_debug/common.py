@@ -83,6 +83,7 @@ def print_color(message, group) -> None:
 
 def fatal_error(message):
     """Prints a fatal error message and exits"""
+    _configure_log(None)
     print_color(message, "👀")
     sys.exit(1)
 
