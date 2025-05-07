@@ -149,9 +149,12 @@ class SleepValidator(AmdTool):
                 output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(
                     "utf-8"
                 )
-                self.db.record_debug("Power Profiles:\n")
-                for line in output.split("\n"):
-                    self.db.record_debug(line)
+                self.db.record_debug("Power Profiles:")
+                lines = output.split("\n")
+                lines = [line for line in lines if line.strip()]
+                for line in lines:
+                    prefix = "│ " if line != lines[-1] else "└─"
+                    self.db.record_debug(f"{prefix}{line.strip()}")
             except subprocess.CalledProcessError as e:
                 self.db.record_debug("Failed to run powerprofilesctl: %s", e.output)
 
@@ -292,7 +295,7 @@ class SleepValidator(AmdTool):
         self.db.record_debug("Possible wakeup sources:")
         for dev in devices:
             # set prefix if last device
-            prefix = "| " if dev != devices[-1] else "└─"
+            prefix = "│ " if dev != devices[-1] else "└─"
             self.db.record_debug(f"{prefix}{dev}")
 
     def capture_lid(self) -> None:
@@ -332,7 +335,7 @@ class SleepValidator(AmdTool):
             )
             if not os.path.exists(p):
                 continue
-            self.db.record_debug("IPS status\n")
+            self.db.record_debug("IPS status")
             try:
                 lines = read_file(p).split("\n")
                 for line in lines:
@@ -354,7 +357,7 @@ class SleepValidator(AmdTool):
         if not devs:
             return
 
-        self.db.record_debug("Thermal zones\n")
+        self.db.record_debug("Thermal zones")
         for dev in devs:
             prefix = "├─ " if dev != devs[-1] else "└─"
             detail_prefix = "│ \t" if dev != devs[-1] else "  \t"
@@ -362,12 +365,12 @@ class SleepValidator(AmdTool):
             p = os.path.join(dev.sys_path, "thermal_zone")
             temp = int(read_file(os.path.join(p, "temp"))) / 1000
 
-            self.db.record_debug(f"{prefix}{name}\n")
+            self.db.record_debug(f"{prefix}{name}")
             if name not in self.thermal:
-                self.db.record_debug(f"{detail_prefix} temp: {temp}°C\n")
+                self.db.record_debug(f"{detail_prefix} temp: {temp}°C")
             else:
                 self.db.record_debug(
-                    f"{detail_prefix} {self.thermal[name]}°C -> {temp}°C\n"
+                    f"{detail_prefix} {self.thermal[name]}°C -> {temp}°C"
                 )
 
             # handle all trip points
@@ -386,9 +389,7 @@ class SleepValidator(AmdTool):
                 trip = int(read_file(f)) / 1000
 
                 if name not in self.thermal:
-                    self.db.record_debug(
-                        f"{detail_prefix} {trip_type} trip: {trip}°C\n"
-                    )
+                    self.db.record_debug(f"{detail_prefix} {trip_type} trip: {trip}°C")
 
                 if temp > trip:
                     self.db.record_prereq(
