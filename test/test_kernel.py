@@ -9,18 +9,19 @@ from unittest.mock import patch, mock_open
 import unittest
 import sys
 import os
+import logging
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from amd_debug.kernel import sscanf_bios_args, get_kernel_command_line
+from amd_debug.kernel import sscanf_bios_args, get_kernel_command_line, DmesgLogger
 
 
 class TestKernelLog(unittest.TestCase):
-    """Test common functions"""
+    """Test Common kernel scan functions"""
 
     @classmethod
     def setUpClass(cls):
-        pass  # logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
     def test_get_kernel_command_line(self):
         """Test get_kernel_command_line function"""
@@ -111,3 +112,98 @@ class TestKernelLog(unittest.TestCase):
         )
         result = sscanf_bios_args(line)
         self.assertEqual(result, expected_output)
+
+
+class TestDmesgLogger(unittest.TestCase):
+    """Test Dmesg logger functions"""
+
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    def test_dmesg_logger_initialization(self):
+        """Test initialization of DmesgLogger"""
+
+        with patch("subprocess.run") as mock_run:
+            # Mock the subprocess output for dmesg -h
+            mock_run.return_value.stdout = b"--since supported\n"
+            mock_run.return_value.returncode = 0
+
+            logger = DmesgLogger()
+            self.assertTrue(logger.since_support)
+            self.assertEqual(logger.command, ["dmesg", "-t", "-k"])
+
+    def test_dmesg_logger_refresh_head(self):
+        """Test _refresh_head method of DmesgLogger"""
+
+        with patch("subprocess.run") as mock_run:
+            # Mock the subprocess output for dmesg
+            mock_run.return_value.stdout = b"line1\nline2\n"
+            mock_run.return_value.returncode = 0
+
+            logger = DmesgLogger()
+            logger._refresh_head()  # pylint: disable=protected-access
+            self.assertEqual(logger.buffer, "line1\nline2\n")
+
+    def test_dmesg_logger_seek_tail(self):
+        """Test seek_tail method of DmesgLogger"""
+
+        with patch("subprocess.run") as mock_run:
+            # Mock the subprocess output for dmesg
+            mock_run.return_value.stdout = b"line1\nline2\n"
+            mock_run.return_value.returncode = 0
+
+            logger = DmesgLogger()
+            logger.seek_tail()
+            self.assertEqual(logger.buffer, "line1\nline2\n")
+
+    def test_dmesg_logger_process_callback(self):
+        """Test process_callback method of DmesgLogger"""
+
+        with patch("subprocess.run") as mock_run:
+            # Mock the subprocess output for dmesg
+            mock_run.return_value.stdout = b"line1\nline2\n"
+            mock_run.return_value.returncode = 0
+
+            logger = DmesgLogger()
+            logger._refresh_head()  # pylint: disable=protected-access
+
+            mock_callback = unittest.mock.Mock()
+            logger.process_callback(mock_callback)
+
+            mock_callback.assert_any_call("line1", None)
+            mock_callback.assert_any_call("line2", None)
+
+    def test_dmesg_logger_match_line(self):
+        """Test match_line method of DmesgLogger"""
+
+        with patch("subprocess.run") as mock_run:
+            # Mock the subprocess output for dmesg
+            mock_run.return_value.stdout = b"line1\nline2\n"
+            mock_run.return_value.returncode = 0
+
+            logger = DmesgLogger()
+            logger._refresh_head()  # pylint: disable=protected-access
+
+            result = logger.match_line(["line1"])
+            self.assertEqual(result, "line1")
+
+            result = logger.match_line(["nonexistent"])
+            self.assertEqual(result, "")
+
+    def test_dmesg_logger_match_pattern(self):
+        """Test match_pattern method of DmesgLogger"""
+
+        with patch("subprocess.run") as mock_run:
+            # Mock the subprocess output for dmesg
+            mock_run.return_value.stdout = b"line1\nline2\n"
+            mock_run.return_value.returncode = 0
+
+            logger = DmesgLogger()
+            logger._refresh_head()  # pylint: disable=protected-access
+
+            result = logger.match_pattern(r"line\d")
+            self.assertEqual(result, "line1")
+
+            result = logger.match_pattern(r"nonexistent")
+            self.assertEqual(result, "")
