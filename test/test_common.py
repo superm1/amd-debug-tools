@@ -171,7 +171,7 @@ class TestCommon(unittest.TestCase):
         )
         self.assertTrue(lockdown)
 
-    @patch("os.path.exists", return_value=True)
+    @patch("os.path.exists", return_value=False)
     def test_lockdown_missing(self, mock_exists):
         """Test lockdown function"""
         lockdown = check_lockdown()
