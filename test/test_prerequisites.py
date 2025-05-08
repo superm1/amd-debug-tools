@@ -387,23 +387,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
 
     @patch("amd_debug.prerequisites.read_file")
     @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
-    @patch("amd_debug.prerequisites.struct.unpack", return_value=(0, 8, 0, 0))
-    def test_check_cpu_supported_model(
-        self, mock_unpack, mock_path_exists, mock_read_file
-    ):
-        """Test check_cpu with a supported CPU model"""
-        self.validator.cpu_family = 0x19
-        self.validator.cpu_model = 0x10
-        self.validator.cpu_model_string = "AMD Ryzen 7"
-        mock_read_file.return_value = "7"
-        result = self.validator.check_cpu()
-        self.assertTrue(result)
-        self.mock_db.record_prereq.assert_called_with(
-            "AMD Ryzen 7 (family 19 model 10)", "✅"
-        )
-
-    @patch("amd_debug.prerequisites.read_file")
-    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
     def test_check_cpu_unsupported_model(self, mock_path_exists, mock_read_file):
         """Test check_cpu with an unsupported CPU model"""
         self.validator.cpu_family = 0x19

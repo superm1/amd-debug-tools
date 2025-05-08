@@ -457,8 +457,13 @@ class TestTestFunction(unittest.TestCase):
     @patch("amd_debug.s2idle.Installer")
     @patch("amd_debug.s2idle.PrerequisiteValidator")
     @patch("amd_debug.prerequisites.SleepDatabase")
+    @patch("amd_debug.validator.SleepDatabase")
     def test_test_prerequisite_failure(
-        self, _mock_sleep_db, mock_prerequisite_validator, mock_installer
+        self,
+        _mock_sleep_db,
+        _mock_sleep_db_prerequisite,
+        mock_prerequisite_validator,
+        mock_installer,
     ):
         """Test the test function when prerequisite check fails"""
         mock_installer_instance = mock_installer.return_value
@@ -494,9 +499,11 @@ class TestTestFunction(unittest.TestCase):
     @patch("amd_debug.s2idle.PrerequisiteValidator")
     @patch("amd_debug.s2idle.prompt_test_arguments", side_effect=KeyboardInterrupt)
     @patch("amd_debug.prerequisites.SleepDatabase")
+    @patch("amd_debug.validator.SleepDatabase")
     def test_test_keyboard_interrupt(
         self,
-        _mock_sleep_db,
+        _mock_sleep_db_validator,
+        _mock_sleep_db_prerequisite,
         mock_prompt_test_arguments,
         mock_prerequisite_validator,
         mock_installer,
