@@ -429,7 +429,8 @@ class TestTestFunction(unittest.TestCase):
         self.assertTrue(result)
 
     @patch("amd_debug.s2idle.Installer")
-    def test_test_install_dependencies_failure(self, mock_installer):
+    @patch("builtins.print")
+    def test_test_install_dependencies_failure(self, _mock_print, mock_installer):
         """Test the test function when dependency installation fails"""
         mock_installer_instance = mock_installer.return_value
         mock_installer_instance.install_dependencies.return_value = False
@@ -651,7 +652,10 @@ class TestReportFunction(unittest.TestCase):
     @patch(
         "amd_debug.s2idle.SleepReport", side_effect=sqlite3.OperationalError("DB error")
     )
-    def test_report_sqlite_error(self, mock_sleep_report, mock_prompt_report_arguments):
+    @patch("builtins.print")
+    def test_report_sqlite_error(
+        self, _mock_print, mock_sleep_report, mock_prompt_report_arguments
+    ):
         """Test the report function when a SQLite error occurs"""
         mock_prompt_report_arguments.return_value = (
             "2023-01-01",
@@ -684,8 +688,9 @@ class TestReportFunction(unittest.TestCase):
     @patch(
         "amd_debug.s2idle.SleepReport", side_effect=PermissionError("Permission denied")
     )
+    @patch("builtins.print")
     def test_report_permission_error(
-        self, mock_sleep_report, mock_prompt_report_arguments
+        self, _mock_print, mock_sleep_report, mock_prompt_report_arguments
     ):
         """Test the report function when a PermissionError occurs"""
         mock_prompt_report_arguments.return_value = (
@@ -717,7 +722,10 @@ class TestReportFunction(unittest.TestCase):
 
     @patch("amd_debug.s2idle.prompt_report_arguments")
     @patch("amd_debug.s2idle.SleepReport")
-    def test_report_run_error(self, mock_sleep_report, mock_prompt_report_arguments):
+    @patch("builtins.print")
+    def test_report_run_error(
+        self, _mock_print, mock_sleep_report, mock_prompt_report_arguments
+    ):
         """Test the report function when an error occurs during app.run()"""
         mock_prompt_report_arguments.return_value = (
             "2023-01-01",
