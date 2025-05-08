@@ -107,9 +107,9 @@ class PrerequisiteValidator(AmdTool):
         self.kernel_log = get_kernel_log()
         if not is_root():
             raise PermissionError("not root user")
-        self.cpu_family = ""
-        self.cpu_model = ""
-        self.cpu_model_string = ""
+        self.cpu_family = None
+        self.cpu_model = None
+        self.cpu_model_string = None
         self.pyudev = pyudev.Context()
         self.failures = []
         self.db = SleepDatabase()
@@ -140,7 +140,12 @@ class PrerequisiteValidator(AmdTool):
                 self.failures += [MissingAmdgpu()]
                 return False
             slot = device.properties.get("PCI_SLOT_NAME")
+
             self.db.record_prereq(f"GPU driver `amdgpu` bound to {slot}", "✅")
+        return True
+
+    def check_amdgpu_parameters(self):
+        """Check for AMDGPU parameters"""
         p = os.path.join("/", "sys", "module", "amdgpu", "parameters", "ppfeaturemask")
         if os.path.exists(p):
             v = read_file(p)
@@ -344,6 +349,7 @@ class PrerequisiteValidator(AmdTool):
             if not driver:
                 self.db.record_prereq(f"WLAN device in {slot} missing driver", "🚦")
                 self.failures += [MissingDriver(slot)]
+                return False
             self.db.record_prereq(f"WLAN driver `{driver}` bound to {slot}", "✅")
         return True
 
@@ -398,8 +404,9 @@ class PrerequisiteValidator(AmdTool):
         """Capture the SMBIOS (DMI) information"""
         p = os.path.join("/", "sys", "class", "dmi", "id")
         if not os.path.exists(p):
-            print_color("DMI data was not setup", "🚦")
+            self.db.record_prereq("DMI data was not setup", "🚦")
             self.failures += [DmiNotSetup()]
+            return False
         else:
             keys = {}
             filtered = [
@@ -421,6 +428,14 @@ class PrerequisiteValidator(AmdTool):
                         continue
                     contents = read_file(os.path.join(root, fname))
                     keys[fname] = contents
+            if (
+                "sys_vendor" not in keys
+                or "product_name" not in keys
+                or "product_family" not in keys
+            ):
+                self.db.record_prereq("DMI data not found", "❌")
+                self.failures += [DmiNotSetup()]
+                return False
             self.db.record_prereq(
                 f"{keys['sys_vendor']} {keys['product_name']} ({keys['product_family']})",
                 "💻",
@@ -435,6 +450,7 @@ class PrerequisiteValidator(AmdTool):
                     continue
                 debug_str += f"{key}: {value}\n"
             self.db.record_debug(debug_str)
+        return True
 
     def check_lps0(self):
         """Check if LPS0 is enabled"""
@@ -537,10 +553,10 @@ class PrerequisiteValidator(AmdTool):
             f = os.path.join(base, parameter)
             if not os.path.exists(f):
                 continue
-            with open(f, "r") as r:
+            with open(f, "r", encoding="utf-8") as r:
                 d = r.read().rstrip()
                 if d != "(null)":
-                    debug_str += "%s is configured to %s\n" % (f, d)
+                    debug_str += f"{f} is configured to {d}\n"
         if debug_str:
             debug_str = "Disabled pins:\n" + debug_str
             self.db.record_debug(debug_str)
@@ -1032,6 +1048,7 @@ class PrerequisiteValidator(AmdTool):
                 if not check_bits(val, expect_val):
                     self.failures += [MSRFailure()]
                     return False
+                self.db.record_prereq("PC6 and CC6 enabled", "✅")
         except FileNotFoundError:
             self.db.record_prereq(
                 "Unable to check MSRs: MSR kernel module not loaded", "❌"
@@ -1039,7 +1056,6 @@ class PrerequisiteValidator(AmdTool):
             return False
         except PermissionError:
             self.db.record_prereq("MSR checks unavailable", "🚦")
-        self.db.record_prereq("PC6 and CC6 enabled", "✅")
         return True
 
     def check_smt(self):
@@ -1135,7 +1151,7 @@ class PrerequisiteValidator(AmdTool):
         # ignore kernel warnings
         taint &= ~BIT(9)
         if taint != 0:
-            print_color(f"Kernel is tainted: {taint}", "❌")
+            self.db.record_prereq(f"Kernel is tainted: {taint}", "❌")
             self.failures += [TaintedKernel()]
             return False
         return True
@@ -1173,6 +1189,7 @@ class PrerequisiteValidator(AmdTool):
                 self.check_storage,
                 self.check_wcn6855_bug,
                 self.check_amdgpu,
+                self.check_amdgpu_parameters,
                 self.check_cpu,
                 self.check_msr,
                 self.check_smt,
