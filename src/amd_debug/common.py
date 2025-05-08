@@ -320,3 +320,5 @@ class AmdTool:
         self.log = _configure_log(prefix)
         logging.debug("command: %s (module: %s)", sys.argv, type(self).__name__)
         logging.debug("Version: %s", version())
+        if os.uname().sysname != "Linux":
+            raise RuntimeError("This tool only runs on Linux")

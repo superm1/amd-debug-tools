@@ -67,7 +67,10 @@ class TestAmdPstateTriage(unittest.TestCase):
         mock_print_color.assert_any_call("'status':\ttest_value", "○")
         mock_print_color.assert_any_call("'prefcore':\ttest_value", "○")
 
-    @patch("amd_debug.pstate.os.uname", return_value=MagicMock(release="5.15.0"))
+    @patch(
+        "amd_debug.pstate.os.uname",
+        return_value=MagicMock(sysname="Linux", release="5.15.0"),
+    )
     @patch("amd_debug.pstate.print_color")
     @patch("amd_debug.pstate.relaunch_sudo")
     def test_gather_kernel_info(
