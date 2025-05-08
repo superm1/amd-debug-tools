@@ -68,6 +68,7 @@ class AmdBios(AmdTool):
     def run(self):
         """Exfiltrate from the kernel log"""
         self.kernel_log.process_callback(self._analyze_kernel_log_line)
+        return True
 
 
 def parse_args():
