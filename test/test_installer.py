@@ -31,8 +31,15 @@ class TestInstaller(unittest.TestCase):
     @patch("os.chmod", return_value=None)
     @patch("builtins.open")
     @patch("subprocess.call", return_value=0)
+    @patch("os.makedirs", return_value=None)
     def test_install_hook(
-        self, _mock_call, _mock_open, _mock_chmod, _mock_shutil, _mock_print
+        self,
+        _mock_mkdir,
+        _mock_call,
+        _mock_open,
+        _mock_chmod,
+        _mock_shutil,
+        _mock_print,
     ):
         """Test install hook function"""
         self.installer.install()
@@ -42,8 +49,15 @@ class TestInstaller(unittest.TestCase):
     @patch("os.chmod", return_value=None)
     @patch("builtins.open")
     @patch("subprocess.call", return_value=0)
+    @patch("os.makedirs", return_value=None)
     def test_install_hook_missing_path(
-        self, _mock_call, _mock_open, _mock_chmod, _mock_shutil, _mock_print
+        self,
+        _mock_mkdir,
+        _mock_call,
+        _mock_open,
+        _mock_chmod,
+        _mock_shutil,
+        _mock_print,
     ):
         """Test install hook function, but some paths are missing"""
         with patch("os.path.exists", return_value=False):
