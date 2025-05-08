@@ -1,0 +1,30 @@
+{
+        "cSpell.words": [
+                "acpica",
+                "CPPC",
+                "ENDC",
+                "geteuid",
+                "Iasl",
+                "Iommu",
+                "kmajor",
+                "kminor",
+                "levelname",
+                "logf",
+                "powerprofilesctl",
+                "prefcore",
+                "prereq",
+                "rootflags",
+                "roothash",
+                "seeked",
+                "showopts"
+        ],
+        "python.testing.unittestArgs": [
+                "-v",
+                "-s",
+                "./test",
+                "-p",
+                "test_*.py"
+        ],
+        "python.testing.pytestEnabled": false,
+        "python.testing.unittestEnabled": true
+}

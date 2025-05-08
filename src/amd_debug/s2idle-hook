@@ -1,0 +1,72 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: MIT
+
+import argparse
+import logging
+import sys
+
+
+def main(action, debug):
+    """Main function to run the systemd hook"""
+    try:
+        from amd_debug.validator import (
+            SleepValidator,
+        )  # pylint: disable=import-outside-toplevel
+        from amd_debug.prerequisites import (
+            PrerequisiteValidator,
+        )  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:
+        return
+
+    app = SleepValidator(tool_debug=debug, bios_debug=False)
+    if action == "pre":
+        prereq = PrerequisiteValidator(tool_debug=debug)
+        prereq.capture_once()
+        app.systemd_pre_hook()
+    elif action == "post":
+        app.systemd_post_hook()
+
+
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="amd-s2idle systemd hook",
+    )
+
+    parser.add_argument(
+        "action",
+        choices=["pre", "post"],
+        help="Action to perform",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+    )
+    parser.add_argument(
+        "mode",
+        help="Mode to perform",
+    )
+
+    parser.add_argument("--log", default="/dev/null")
+    parser.add_argument("--path", default="")
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    if args.mode != "suspend":
+        sys.exit(0)
+
+    if args.path:
+        sys.path.append(args.path)
+
+    logging.basicConfig(
+        filename=args.log, level=logging.DEBUG if args.debug else logging.WARNING
+    )
+
+    main(args.action, args.debug)

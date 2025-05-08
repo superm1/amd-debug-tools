@@ -1,0 +1,23 @@
+s2idle report created on {{ date }} using amd-s2idle {{ version }}
+
+{% if prereq %}
+⚓ Prerequisite checks
+Measured {{ prereq_date }}.
+{% for obj in prereq %} {{ obj.symbol }} {{ obj.text }}
+{% endfor %}{% endif %}
+{% if cycle_data %}Cycle Data
+{{ cycle_data }}
+{% endif %}
+{% if prereq_debug_data %}🦟 Debug Data
+{% for obj in prereq_debug_data %}{{obj.data}}
+{% endfor %}{% endif %}
+{% if debug_data %}🦟 Debug Data
+{% for debug in debug_data %}Cycle {{ debug.cycle_num }}
+{% for message in debug.messages %}{{ message }}
+{% endfor %}{% endfor %}{% endif %}
+Summary
+{{ summary }}
+{% if failures %}
+Failures reported
+{{ failures }}
+{% endif %}

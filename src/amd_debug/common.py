@@ -5,11 +5,14 @@
 This module contains common utility functions and classes for various amd-debug-tools.
 """
 
+import importlib.metadata
 import logging
 import os
 import platform
 import time
+import struct
 import subprocess
+import re
 import sys
 from datetime import date, timedelta
 
@@ -49,7 +52,7 @@ def get_group_color(group) -> str:
         color = Colors.DEBUG
     elif any(mk in group for mk in ["❌", "👀"]):
         color = Colors.FAIL
-    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱", "🫆"]):
+    elif any(mk in group for mk in ["✅", "🔋", "🐧", "💻", "○", "💤", "🥱"]):
         color = Colors.OK
     else:
         color = group
@@ -80,13 +83,27 @@ def print_color(message, group) -> None:
 
 def fatal_error(message):
     """Prints a fatal error message and exits"""
+    _configure_log(None)
     print_color(message, "👀")
     sys.exit(1)
 
 
-def configure_log(prefix, log) -> str:
+def show_log_info():
+    """Show log information"""
+    logger = logging.getLogger()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            filename = handler.baseFilename
+            if filename != "/dev/null":
+                print(f"Debug logs are saved to: {filename}")
+
+
+def _configure_log(prefix) -> str:
     """Configure logging for the tool"""
-    if not log:
+    if len(logging.root.handlers) > 0:
+        return
+
+    if prefix:
         user = os.environ.get("SUDO_USER")
         home = os.path.expanduser(f"~{user if user else ''}")
         path = os.environ.get("XDG_DATA_HOME") or os.path.join(
@@ -101,12 +118,17 @@ def configure_log(prefix, log) -> str:
             with open(log, "w", encoding="utf-8") as f:
                 f.write("")
             if "SUDO_UID" in os.environ:
+                os.chown(path, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
                 os.chown(log, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+        level = logging.DEBUG
+    else:
+        log = "/dev/null"
+        level = logging.WARNING
     # for saving a log file for analysis
     logging.basicConfig(
         format="%(asctime)s %(levelname)s:\t%(message)s",
         filename=log,
-        level=logging.DEBUG,
+        level=level,
     )
     return log
 
@@ -116,10 +138,7 @@ def check_lockdown():
     fn = os.path.join("/", "sys", "kernel", "security", "lockdown")
     if not os.path.exists(fn):
         return False
-    try:
-        lockdown = read_file(fn)
-    except FileNotFoundError:
-        return True
+    lockdown = read_file(fn)
     if lockdown.split()[0] != "[none]":
         return lockdown
     return False
@@ -195,7 +214,10 @@ def BIT(num):  # pylint: disable=invalid-name
 def get_log_priority(num):
     """Maps an integer debug level to a priority type"""
     if num:
-        num = int(num)
+        try:
+            num = int(num)
+        except ValueError:
+            return num
         if num == 7:
             return "🦟"
         elif num == 4:
@@ -207,14 +229,14 @@ def get_log_priority(num):
 
 def minimum_kernel(major, minor) -> bool:
     """Checks if the kernel version is at least major.minor"""
-    version = platform.uname().release.split(".")
-    kmajor = int(version[0])
-    kminor = int(version[1])
-    if kmajor > major:
+    ver = platform.uname().release.split(".")
+    kmajor = int(ver[0])
+    kminor = int(ver[1])
+    if kmajor > int(major):
         return True
-    if kmajor < major:
+    if kmajor < int(major):
         return False
-    return kminor >= minor
+    return kminor >= int(minor)
 
 
 def systemd_in_use() -> bool:
@@ -232,6 +254,36 @@ def get_property_pyudev(properties, key, fallback=""):
         return ""
 
 
+def read_msr(msr, cpu):
+    """Read a Model-Specific Register (MSR) value from the CPU."""
+    p = f"/dev/cpu/{cpu}/msr"
+    if not os.path.exists(p) and is_root():
+        os.system("modprobe msr")
+    try:
+        f = os.open(p, os.O_RDONLY)
+    except OSError as exc:
+        raise PermissionError from exc
+    try:
+        os.lseek(f, msr, os.SEEK_SET)
+        val = struct.unpack("Q", os.read(f, 8))[0]
+    except OSError as exc:
+        raise PermissionError from exc
+    finally:
+        os.close(f)
+    return val
+
+
+def relaunch_sudo() -> None:
+    """Relaunch the script with sudo if not already running as root"""
+    if not is_root():
+        logging.debug("Relaunching with sudo")
+        os.execvp("sudo", ["sudo", "-E"] + sys.argv)
+
+
+def running_ssh():
+    return "SSH_CLIENT" in os.environ or "SSH_TTY" in os.environ
+
+
 def _git_describe() -> str:
     """Get the git description of the current commit"""
     try:
@@ -239,20 +291,34 @@ def _git_describe() -> str:
             ["git", "log", "-1", '--format=commit %h ("%s")'],
             cwd=os.path.dirname(__file__),
             text=True,
+            stderr=subprocess.DEVNULL,
         )
         return result.strip()
-    except subprocess.CalledProcessError as e:
-        logging.error("Git command failed: %s", e)
+    except subprocess.CalledProcessError:
         return None
+    except FileNotFoundError:
+        return None
+
+
+def version() -> str:
+    """Get version of the tool"""
+    ver = "unknown"
+    try:
+        ver = importlib.metadata.version("amd-debug-tools")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    describe = _git_describe()
+    if describe:
+        ver = f"{ver} [{describe}]"
+    return ver
 
 
 class AmdTool:
     """Base class for AMD tools"""
 
-    def __init__(self, log_prefix, log_file):
-        self.log = configure_log(log_prefix, log_file)
-        logging.debug("command: %s", sys.argv)
-        logging.debug(_git_describe())
-
-    def __del__(self):
-        print(f"Logs are saved to {self.log}")
+    def __init__(self, prefix):
+        self.log = _configure_log(prefix)
+        logging.debug("command: %s (module: %s)", sys.argv, type(self).__name__)
+        logging.debug("Version: %s", version())
+        if os.uname().sysname != "Linux":
+            raise RuntimeError("This tool only runs on Linux")

@@ -1,0 +1,89 @@
+_cmd_list=(
+	'install'
+	'uninstall'
+	'test'
+	'report'
+	'version'
+)
+
+_general_opts=(
+)
+
+_report_opts=(
+	'--since'
+	'--until'
+	'--report-file'
+	'--format'
+	'--report-debug'
+)
+
+_test_opts=(
+	'--wait'
+	'--count'
+	'--duration'
+	'--report-file'
+	'--format'
+	'--force'
+	'--logind'
+	'--tool-debug'
+	'--report-debug'
+)
+
+_format_opts=(
+	'md'
+	'html'
+	'txt'
+)
+
+_show_test_opts()
+{
+	COMPREPLY+=( $(compgen -W '${_test_opts[@]}' -- "$cur") )
+}
+
+_show_report_opts()
+{
+	COMPREPLY+=( $(compgen -W '${_report_opts[@]}' -- "$cur") )
+}
+
+_show_format_completion()
+{
+	COMPREPLY+=( $(compgen -W '${_format_opts[@]}' -- "$cur") )
+}
+
+_amd_s2idle()
+{
+	local cur prev command arg args
+	COMPREPLY=()
+	_get_comp_words_by_ref cur prev
+	_get_first_arg
+	_count_args
+
+	case $prev in
+	--log|--duration|--count|--wait|--since|--report-file)
+		return 0
+		;;
+	--format)
+		_show_format_completion
+		return 0
+		;;
+	esac
+	case $arg in
+	test)
+		_show_test_opts
+		;;
+	report)
+		_show_report_opts
+		;;
+
+	*)
+		#find first command
+		if [[ "$args" = "1" ]]; then
+			COMPREPLY=( $(compgen -W '${_cmd_list[@]}' -- "$cur") )
+		fi
+		;;
+	esac
+
+	return 0
+}
+
+complete -F _amd_s2idle amd-s2idle

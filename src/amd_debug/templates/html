@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Linux s2idle Power Report</title>
+    <style>
+        h1 {
+            color: #00b0f0;
+            font-family: sans-serif;
+            font-size: 42pt;
+        }
+
+        h2 {
+            font-size: 15pt;
+            font-family: sans-serif;
+            color: #00b0f0;
+            margin-top: 2em;
+            margin-bottom: 0em;
+            letter-spacing: 0.08em;
+        }
+
+        h3,
+        h4,
+        h5 {
+            font-family: sans-serif;
+            margin-top: 1em;
+            margin-bottom: 0em;
+            letter-spacing: 0.08em;
+        }
+
+        body {
+
+            font-family: sans-serif;
+            letter-spacing: 0.02em;
+            background-color: #ffffff;
+            color: #000000;
+            margin: 0em 5.5em 0em 5.5em;
+
+        }
+
+        table,
+        th,
+        td {
+            border-width: 0;
+            table-layout: fixed;
+            font-family: sans-serif;
+            letter-spacing: 0.02em;
+            color: #000000;
+            margin-bottom: 10px;
+        }
+
+        .○ {
+            font-family: "Fira Code", monospace;
+            color: #000000;
+        }
+
+        .❌ {
+            color: #ff0000;
+            font-family: "Fira Code", monospace;
+        }
+
+        .🚦 {
+            color: #a4a100;
+            font-family: "Fira Code", monospace;
+        }
+
+        .🦟 {
+            color: #848484;
+            font-family: "Fira Code", monospace;
+        }
+
+        .hidden-by-default {
+            display: none;
+            border: 0px;
+            border-spacing: 0px;
+            border-collapse: collapse;
+        }
+
+        .hide-borders {
+            border: 0px;
+            border-collapse: collapse;
+        }
+
+        .row-disabled {
+            display: none;
+            border: 0px;
+            border-collapse: collapse;
+        }
+
+        .arrow::before {
+            content: "\23f5";
+        }
+
+        .arrow-expanded::before {
+            content: "\23F7";
+
+        }
+
+        .row-low {
+            background-color: #ace3ac;
+            text-align: center;
+        }
+
+        .row-low:hover {
+            background-color: #caedca;
+            text-align: center;
+        }
+
+        .row-neutral {
+            background-color: #e0e0e0;
+            text-align: center;
+        }
+
+        .row-neutral:hover {
+            background-color: #f0f0f0;
+            text-align: center;
+        }
+
+        .row-high {
+            background-color: #ffb2aa;
+            text-align: center;
+        }
+
+        .row-high:hover {
+            background-color: #ffd5d1;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        function select_changed(selector, row) {
+            var x = document.getElementById(selector).value;
+            var y;
+            var rows = document.querySelectorAll(row + " tr.row-disabled");
+            for (var i = 0; i < rows.length; i++) {
+                rows[i].style.display = "none";
+            }
+            if (x != "0") {
+                document.querySelector(row + x).style.display = "table-row";
+                if (row == row + x)
+                    document.getElementById(selector).value = 0;
+            }
+        }
+        function cycle_data_changed() {
+            select_changed("cycles", "#cycledata")
+        }
+
+        function failure_data_changed() {
+            select_changed("failures", "#failuredata")
+        }
+
+        function debug_data_changed() {
+            select_changed("debug", "#debugdata")
+            if (document.getElementById("debug").value != "0") {
+                document.getElementById("debug_label").style.display = "";
+            } else {
+                document.getElementById("debug_label").style.display = "none";
+            }
+        }
+
+        function prereq_debug_data_changed() {
+            var table = document.getElementById("prereqdebugdata");
+            var arrow = document.getElementById("prereqdata-arrow")
+            if (table.classList.contains("hidden-by-default")) {
+                table.className = "hide-borders";
+                arrow.className = "arrow-expanded";
+            } else {
+                table.className = "hidden-by-default";
+                arrow.className = "arrow"
+            }
+        }
+
+        function parseTimeToSeconds(timeString) {
+            var timeParts = timeString.split(":");
+            var hours = parseInt(timeParts[0]);
+            var minutes = parseInt(timeParts[1]);
+            var seconds = parseInt(timeParts[2]);
+            return (hours * 3600) + (minutes * 60) + seconds;
+        }
+
+        function pick_data_for_cycle(num) {
+            //show cycles messages for this cycle
+            document.getElementById("cycles").selectedIndex = num + 1;
+            cycle_data_changed();
+            {% if failures %}
+            //show failures messages for this cycle
+            document.getElementById("failures").value = num + 1;
+            failure_data_changed();
+            {% endif %}
+            {% if debug_data %}
+            //show debug data for this cycle
+            document.getElementById("debug").selectedIndex = num + 1;
+            debug_data_changed();
+            {% endif %}
+        }
+
+        function summary_data_changed() {
+            var table = document.getElementById("summary");
+            const start_select = document.getElementById('start_select');
+            const end_select = document.getElementById('end_select');
+            var start = parseInt(start_select.value);
+            var end = parseInt(end_select.value);
+            var min_duration = 0;
+
+            // if duration filter activated, hide rows that don't match
+            if (document.getElementById('med_duration').checked)
+                min_duration = document.getElementById("med_duration").value;
+            else if (document.getElementById('min_duration').checked)
+                min_duration = document.getElementById("min_duration").value;
+
+            // reset end if start was picked bigger than end
+            if (start > end) {
+                end_select.selectedIndex = start;
+                end = start;
+            }
+
+            // show all rows between start and end
+            for (var i = 1; i < table.rows.length; i++) {
+                var row = table.rows[i];
+                var index = parseInt(row.cells[0].textContent);
+                var row_duration = parseTimeToSeconds(row.cells[2].textContent);
+
+                if (row_duration >= min_duration &&
+                    index >= start && index <= end) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            }
+
+            // reset other tables if we now show more than one cycle
+            if (end - start > 0) {
+                // reset cycle data selector
+                document.getElementById("cycles").selectedIndex = 0;
+                cycle_data_changed();
+                {% if failures %}
+                //reset failure data selector
+                document.getElementById("failures").value = 0;
+                failure_data_changed();
+                {% endif %}
+                {% if debug_data %}
+                //reset debug data selector
+                document.getElementById("debug").selectedIndex = 0;
+                debug_data_changed();
+                {% endif %}
+            } else if (start = end)
+                pick_data_for_cycle(start)
+        }
+
+        function populate_summary_selectors() {
+            const table = document.getElementById('summary');
+            const start_select = document.getElementById('start_select');
+            const end_select = document.getElementById('end_select');
+
+            for (let i = 0; i < table.rows.length; i++) {
+                const start_option = document.createElement('option');
+                const end_option = document.createElement('option');
+                var columns = table.rows[i].getElementsByTagName("td");
+
+                //Populate all start/end selector values
+                if (i != table.rows.length - 1) {
+                    start_option.text = `Cycle ${i}`;
+                    start_option.value = i
+                    end_option.text = `Cycle ${i}`;
+                    end_option.value = i
+                    start_select.add(start_option);
+                    end_select.add(end_option);
+                }
+
+                //apply coloring to hardware sleep
+                if (i != 0) {
+                    if (parseFloat(columns[2].innerHTML) < 85)
+                        table.rows[i].className = "row-high";
+                }
+            }
+
+            // Pick the end selector for last column
+            end_select.selectedIndex = table.rows.length - 2;
+
+            // if we only have one selector then pick it
+            if (start_select.selectedIndex == end_select.selectedIndex) {
+                pick_summary_cycle(start_select.selectedIndex)
+            }
+        }
+
+        function pick_summary_cycle(num) {
+            //narrow down filter to just the selected cycle
+            document.getElementById('start_select').selectedIndex = num;
+            document.getElementById('end_select').selectedIndex = num;
+            summary_data_changed();
+            pick_data_for_cycle(num);
+        }
+
+        function reset_clicked() {
+            const table = document.getElementById('summary');
+            document.getElementById('start_select').selectedIndex = 0;
+            console.log(table.rows.length);
+            document.getElementById('end_select').selectedIndex = table.rows.length - 2;
+            document.getElementById('all_time').checked = true;
+            summary_data_changed();
+        }
+
+        window.addEventListener('load', populate_summary_selectors);
+    </script>
+    <h1>Linux s2idle Power Report</h1>
+    <p>s2idle report created {{ date }} using amd-s2idle {{version}}</p>
+    {% if prereq %}
+    <table class="hide-borders">
+        {% for obj in prereq %}
+        <TR>
+            <TD>{{obj.symbol}}</TD>
+            <TD>{{obj.text}}</TD>
+        </TR>
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% if prereq_debug_data %}
+    <h3>
+        <label id="prereqdata-arrow" for="prereqdebugdata" onclick="prereq_debug_data_changed()"
+            class="arrow">Prerequisites</label>
+    </h3>
+    <table id="prereqdebugdata" class="hidden-by-default">
+        {% for obj in prereq_debug_data %}
+        <TR>
+            <TD>
+                <pre>{{obj.data}}</pre>
+            </TD>
+        </TR>
+        {% endfor %}
+    </table>
+    {% endif %}
+    <h2>Summary</h2>
+    {% if battery_svg %}
+    <h3>Battery</h3>
+    {{ battery_svg | safe }}
+    {% endif %}
+    {% if hwsleep_svg %}
+    <h3>Low power state residency</h3>
+    {{ hwsleep_svg | safe }}
+    {% endif %}
+    {% if cycle_data|length > 1 %}
+    <h3>Cycle data</h3>
+    <p>Choose a single cycle to see messages and data for that cycle.</p>
+    <button type="button" onclick="reset_clicked()">Reset</button>
+    <h4>Filter cycle range</h4>
+    <select id="start_select" onchange="summary_data_changed()"></select>
+    and
+    <select id="end_select" onchange="summary_data_changed()"></select>
+    <h4>Filter minimum session length</h4>
+    <input type="radio" name="session1" id="all_time" value="all_time" onchange="js:summary_data_changed()"
+        checked="" />
+    <label>All</label>
+    <input type="radio" name="session1" id="med_duration" value="600" onchange="js:summary_data_changed()" />
+    <label>&gt;10 min</label>
+    <input type="radio" name="session1" id="min_duration" value="60" onchange="js:summary_data_changed()" />
+    <label>&gt;1 min</label>
+    {% else %}
+    <select id="start_select" class="hidden-by-default"></select>
+    <select id="end_select" class="hidden-by-default"></select>
+    <input type="radio" name="session1" id="all_time" value="all_time" checked="" class="hidden-by-default" />
+    <input type="radio" name="session1" id="med_duration" value="600" class="hidden-by-default" />
+    <input type="radio" name="session1" id="min_duration" value="60" class="hidden-by-default" />
+    {% endif %}
+    {{ summary }}
+    {% if cycle_data %}
+    <p><label for="cycle" class="hidden-by-default">Choose a cycle:</label>
+        <select id="cycles" onchange="cycle_data_changed()" class="hidden-by-default">
+            <option value="0">Disabled</option>
+            {% for obj in cycle_data %}
+            <option value="{{obj.cycle_num + 1}}">Cycle {{obj.cycle_num}}</option>
+            {% endfor %}
+        </select>
+    </p>
+    <table id="cycledata" class="hide-borders">
+        {% for obj in cycle_data %}
+        <TR class="row-disabled" id="cycledata{{obj.cycle_num + 1}}">
+            <TD>{{obj.data}}</TD>
+        </TR>
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% if failures %}
+    <p><label for="failure" class="hidden-by-default">Choose a cycle:</label>
+        <select id="failures" onchange="failure_data_changed()" class="hidden-by-default">
+            <option value="0">Disabled</option>
+            {% for obj in failures %}
+            <option value="{{obj.cycle_num + 1}}">Cycle {{obj.cycle_num}}</option>
+            {% endfor %}
+        </select>
+    </p>
+    <table id="failuredata" class="hide-borders">
+        {% for obj in failures %}
+        <TR class="row-disabled" id="failuredata{{obj.cycle_num + 1}}">
+            <TD>{{obj.problem}}</TD>
+            <TD>{{obj.data}}</TD>
+        </TR>
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% if debug_data %}
+    <h3 id="debug_label" style="display:none;">Debugging 🦟</h3>
+    <p><label for="debug" class="hidden-by-default">Choose a cycle:</label>
+        <select id="debug" onchange="debug_data_changed()" class="hidden-by-default">
+            <option value="0">Disabled</option>
+            {% for obj in debug_data %}
+            <option value="{{obj.cycle_num + 1}}">Cycle {{obj.cycle_num}}</option>
+            {% endfor %}
+        </select>
+    </p>
+    <table id="debugdata" class="hide-borders">
+        {% for obj in debug_data %}
+        <TR class="row-disabled" id="debugdata{{obj.cycle_num + 1}}">
+            <TD>
+                {% for index in range(obj.messages | length) %}
+                <div class="{{obj.priorities[index]}}">{{obj.messages[index]}}</div>
+                {% endfor %}
+            </TD>
+        </TR>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+
+</html>

@@ -1,0 +1,39 @@
+# s2idle report created on {{ date }} using amd-s2idle {{ version }}
+
+{% if prereq %}
+## ⚓ Prerequisite checks
+Measured {{ prereq_date }}.
+{% filter indent(width=4) %}
+{% for obj in prereq %}{{ obj.symbol }} {{ obj.text }}
+{% endfor %}
+{% endfilter %}
+{% endif %}
+{% if prereq_debug_data %}🦟 Prereq Debug Data
+{% filter indent(width=4) %}
+{% for obj in prereq_debug_data %}
+{{obj.data}}{% endfor %}
+{% endfilter %}{% endif %}
+{% if cycle_data %}## 🚴 Cycle Data
+{{ cycle_data }}
+{% endif %}
+{% if debug_data %}
+## 🦟 Debug Data
+{% for debug in debug_data %}Cycle {{ debug.cycle_num }}
+{% filter indent(width=4) %}
+{% for message in debug.messages %}{{ message }}
+{% endfor %}
+{% endfilter %}
+{% endfor %}
+{% endif %}
+## Summary
+{{ summary }}
+
+{% if battery_svg %}
+{{ battery_svg | safe }}
+{% endif %}
+{% if hwsleep_svg %}
+{{ hwsleep_svg | safe }}
+{% endif %}
+
+## Failures reported
+{{ failures }}

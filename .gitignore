@@ -1,3 +1,11 @@
 /.vscode
 *.txt
 __pycache__
+amd*.egg-info
+build
+dist
+amd*.md
+*.html
+deb_dist/
+*.tar.gz
+.coverage
