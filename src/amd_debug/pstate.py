@@ -7,6 +7,10 @@ import argparse
 import re
 import sys
 
+import pandas as pd
+from tabulate import tabulate
+from pyudev import Context
+
 from amd_debug.common import (
     AmdTool,
     get_pretty_distro,
@@ -80,8 +84,6 @@ class AmdPstateTriage(AmdTool):
         pretty = get_pretty_distro()
         print_color(f"{pretty}", "🐧")
 
-        from pyudev import Context  # pylint: disable=import-outside-toplevel
-
         self.context = Context()
 
     def gather_amd_pstate_info(self):
@@ -108,8 +110,6 @@ class AmdPstateTriage(AmdTool):
 
     def gather_cpu_info(self):
         """Gather a dataframe of CPU information"""
-        import pandas as pd  # pylint: disable=import-outside-toplevel
-        from tabulate import tabulate  # pylint: disable=import-outside-toplevel
 
         df = pd.DataFrame(
             columns=[
@@ -157,9 +157,6 @@ class AmdPstateTriage(AmdTool):
 
     def gather_msrs(self):
         """Gather MSR information"""
-        import pandas as pd
-        from tabulate import tabulate
-
         cpus = []
         for device in self.context.list_devices(subsystem="cpu"):
             cpu = int(re.findall(r"\d+", f"{device.sys_name}")[0])
