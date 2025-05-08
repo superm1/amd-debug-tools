@@ -6,6 +6,8 @@ import re
 import math
 from datetime import datetime, timedelta
 from tabulate import tabulate
+from jinja2 import Environment, FileSystemLoader
+import pandas as pd
 
 from amd_debug.database import SleepDatabase
 from amd_debug.common import (
@@ -186,8 +188,6 @@ class SleepReport(AmdTool):
             )
 
     def convert_gpio_dataframe(self, content):
-        import pandas as pd
-
         header = False
         rows = []
         for line in content.split("\n"):
@@ -250,8 +250,7 @@ class SleepReport(AmdTool):
 
     def build_template(self, inc_prereq) -> str:
         """Build the template for the report using jinja2"""
-        from jinja2 import Environment, FileSystemLoader
-        import amd_debug
+        import amd_debug  # pylint: disable=import-outside-toplevel
 
         # Load the template
         p = os.path.dirname(amd_debug.__file__)
