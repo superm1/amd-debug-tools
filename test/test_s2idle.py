@@ -41,7 +41,8 @@ class TestParseArgs(unittest.TestCase):
     def tearDown(self):
         sys.argv = self.default_sys_argv
 
-    def test_no_arguments(self):
+    @patch("sys.stderr")
+    def test_no_arguments(self, _mock_print):
         """Test parse_args with no arguments"""
         sys.argv = ["s2idle.py"]
         with self.assertRaises(SystemExit):
@@ -110,7 +111,8 @@ class TestParseArgs(unittest.TestCase):
 
     @patch("sys.prefix", "amd_debug.s2idle")
     @patch("sys.base_prefix", "amd_debug.s2idle")
-    def test_hidden_install_command(self):
+    @patch("sys.stderr")
+    def test_hidden_install_command(self, _mock_print):
         """Test parse_args with install command"""
         sys.argv = ["s2idle.py", "install", "--tool-debug"]
         with self.assertRaises(SystemExit):
