@@ -26,21 +26,22 @@ def migrate(cur, user_version) -> None:
 class SleepDatabase:
     """Database class to store sleep cycle data"""
 
-    def __init__(self) -> None:
+    def __init__(self, dbf=None) -> None:
         self.db = None
         self.last_suspend = None
         self.cycle_data_cnt = 0
         self.debug_cnt = 0
 
-        # if we were packaged we would have a directory in /var/lib
-        path = os.path.join("/", "var", "lib", "amd-s2idle")
-        if not os.path.exists(path):
-            path = os.path.join("/", "var", "local", "lib", "amd-s2idle")
-        os.makedirs(path, exist_ok=True)
+        if not dbf:
+            # if we were packaged we would have a directory in /var/lib
+            path = os.path.join("/", "var", "lib", "amd-s2idle")
+            if not os.path.exists(path):
+                path = os.path.join("/", "var", "local", "lib", "amd-s2idle")
+            os.makedirs(path, exist_ok=True)
 
-        f = os.path.join(path, "data.db")
-        new = not os.path.exists(f)
-        self.db = sqlite3.connect(f)
+            dbf = os.path.join(path, "data.db")
+        new = not os.path.exists(dbf)
+        self.db = sqlite3.connect(dbf)
         cur = self.db.cursor()
         cur.execute(
             "CREATE TABLE IF NOT EXISTS prereq_data ("
@@ -268,6 +269,7 @@ class SleepDatabase:
     def report_cycle(self, t0=None) -> list:
         """Helper function to report a cycle from database"""
         if t0 is None:
+            assert self.last_suspend
             t0 = self.last_suspend
         cur = self.db.cursor()
         cur.execute(
