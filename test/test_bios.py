@@ -36,8 +36,9 @@ class TestAmdBios(unittest.TestCase):
     @patch("amd_debug.bios.relaunch_sudo")
     @patch("amd_debug.bios.minimum_kernel")
     @patch("amd_debug.bios.AcpicaTracer")
+    @patch("amd_debug.bios.print_color")
     def test_set_tracing_enable(
-        self, mock_acpica_tracer, mock_minimum_kernel, mock_relaunch_sudo
+        self, _mock_print, mock_acpica_tracer, mock_minimum_kernel, mock_relaunch_sudo
     ):
         """Test enabling tracing"""
         mock_minimum_kernel.return_value = True
@@ -55,8 +56,9 @@ class TestAmdBios(unittest.TestCase):
     @patch("amd_debug.bios.relaunch_sudo")
     @patch("amd_debug.bios.minimum_kernel")
     @patch("amd_debug.bios.AcpicaTracer")
+    @patch("amd_debug.bios.print_color")
     def test_set_tracing_disable(
-        self, mock_acpica_tracer, mock_minimum_kernel, mock_relaunch_sudo
+        self, _mock_print, mock_acpica_tracer, mock_minimum_kernel, mock_relaunch_sudo
     ):
         """Test disabling tracing"""
         mock_minimum_kernel.return_value = True
@@ -224,8 +226,9 @@ class TestAmdBios(unittest.TestCase):
     @patch("amd_debug.bios.parse_args")
     @patch("amd_debug.bios.version")
     @patch("amd_debug.bios.show_log_info")
+    @patch("amd_debug.bios.print")
     def test_main_version_command(
-        self, mock_show_log_info, mock_version, mock_parse_args
+        self, _mock_print, mock_show_log_info, mock_version, mock_parse_args
     ):
         """Test main function with version command"""
         mock_parse_args.return_value = argparse.Namespace(command="version")
