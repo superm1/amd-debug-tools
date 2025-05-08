@@ -78,15 +78,6 @@ except ImportError:
 except ValueError:
     FWUPD = False
 
-# used to capture linux firmware versions
-try:
-    import apt
-    import gzip
-
-    APT = True
-except ModuleNotFoundError:
-    APT = False
-
 
 class Headers:
     """Headers for the script"""
@@ -596,25 +587,6 @@ class PrerequisiteValidator(AmdTool):
 
     def capture_linux_firmware(self):
         """Capture the linux-firmware package version"""
-        if self.distro in ("ubuntu", "debian") and APT:
-            cache = apt.Cache()
-            packages = ["linux-firmware"]
-            for obj in cache.get_providing_packages("amdgpu-firmware-nda"):
-                packages += [obj.name]
-            for p in packages:
-                pkg = cache.get(p)
-                if not pkg:
-                    continue
-                changelog = ""
-                if "amdgpu" in p:
-                    for f in pkg.installed_files:
-                        if not "changelog" in f:
-                            continue
-                        changelog = gzip.GzipFile(f).read().decode("utf-8")
-                if changelog:
-                    self.db.record_debug(changelog)
-                else:
-                    self.db.record_debug(str(pkg.installed))
         for num in range(0, 2):
             p = os.path.join(
                 "/", "sys", "kernel", "debug", "dri", f"{num}", "amdgpu_firmware_info"

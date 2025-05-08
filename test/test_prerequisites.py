@@ -1512,46 +1512,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_prereq.assert_not_called()
 
     @patch("amd_debug.prerequisites.os.path.exists")
-    @patch("amd_debug.prerequisites.gzip.GzipFile")
-    @patch("amd_debug.prerequisites.apt.Cache")
-    def test_capture_linux_firmware_without_changelog(
-        self, mock_apt_cache, mock_gzip_file, mock_path_exists
-    ):
-        """Test capture_linux_firmware when changelog is not available"""
-        mock_path_exists.return_value = True
-        mock_cache = MagicMock()
-        mock_apt_cache.return_value = mock_cache
-        mock_package = MagicMock()
-        mock_package.installed_files = ["/usr/share/doc/amdgpu-firmware-nda/README"]
-        mock_cache.get.return_value = mock_package
-        mock_cache.get_providing_packages.return_value = [
-            MagicMock(name="amdgpu-firmware-nda")
-        ]
-
-        self.validator.distro = "ubuntu"
-        self.validator.capture_linux_firmware()
-
-        mock_cache.get_providing_packages.assert_called_with("amdgpu-firmware-nda")
-        mock_gzip_file.assert_not_called()
-        self.mock_db.record_debug.assert_called_with(str(mock_package.installed))
-
-    @patch("amd_debug.prerequisites.os.path.exists")
-    @patch("amd_debug.prerequisites.apt.Cache")
-    def test_capture_linux_firmware_no_packages(self, mock_apt_cache, mock_path_exists):
-        """Test capture_linux_firmware when no packages are found"""
-        mock_path_exists.return_value = True
-        mock_cache = MagicMock()
-        mock_apt_cache.return_value = mock_cache
-        mock_cache.get.return_value = None
-        mock_cache.get_providing_packages.return_value = []
-
-        self.validator.distro = "ubuntu"
-        self.validator.capture_linux_firmware()
-
-        mock_cache.get_providing_packages.assert_called_with("amdgpu-firmware-nda")
-        self.mock_db.record_debug.assert_not_called()
-
-    @patch("amd_debug.prerequisites.os.path.exists")
     def test_capture_linux_firmware_debug_files_exist(self, mock_path_exists):
         """Test capture_linux_firmware when debug files exist"""
         mock_path_exists.side_effect = lambda path: "amdgpu_firmware_info" in path
@@ -1575,15 +1535,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.validator.capture_linux_firmware()
 
         self.mock_db.record_debug_file.assert_not_called()
-
-    @patch("amd_debug.prerequisites.apt.Cache")
-    def test_capture_linux_firmware_non_debian_distro(self, mock_apt_cache):
-        """Test capture_linux_firmware on a non-Debian-based distro"""
-        self.validator.distro = "fedora"
-        self.validator.capture_linux_firmware()
-
-        mock_apt_cache.assert_not_called()
-        self.mock_db.record_debug.assert_not_called()
 
     def test_check_wlan_no_devices(self):
         """Test check_wlan when no WLAN devices are found"""
