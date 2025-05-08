@@ -1,4 +1,6 @@
 # Helpful tools for debugging AMD Zen systems
+[![codecov](https://codecov.io/github/superm1/amd-debug-tools/graph/badge.svg?token=Z9WTBZADGT)](https://codecov.io/github/superm1/amd-debug-tools)
+[![PyPI](https://img.shields.io/pypi/v/amd-debug-tools.svg)](https://pypi.org/project/amd-debug-tools/)
 
 This repository hosts open tools that are useful for debugging issues on AMD systems.
 
