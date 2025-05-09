@@ -9,11 +9,9 @@ from unittest.mock import patch, mock_open, call
 import logging
 import tempfile
 import unittest
-import sys
 import os
 from platform import uname_result
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.common import (
     Colors,

@@ -5,13 +5,9 @@
 This module contains unit tests for the wake GPIO and IRQ functions in the amd-debug-tools package.
 """
 
-import sys
-import os
 import logging
 import unittest
 from unittest.mock import patch, MagicMock
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.wake import WakeGPIO, WakeIRQ
 

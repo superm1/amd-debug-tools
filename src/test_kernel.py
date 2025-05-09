@@ -7,11 +7,7 @@ This module contains unit tests for the kernel log functions in the amd-debug-to
 from unittest.mock import patch, mock_open
 
 import unittest
-import sys
-import os
 import logging
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.kernel import sscanf_bios_args, get_kernel_command_line, DmesgLogger
 

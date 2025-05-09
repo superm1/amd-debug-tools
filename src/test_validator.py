@@ -9,12 +9,8 @@ from unittest.mock import patch, mock_open
 
 import logging
 import unittest
-import sys
-import os
 import math
 from datetime import datetime
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.validator import pm_debugging, soc_needs_irq1_wa, SleepValidator
 

@@ -5,15 +5,12 @@
 This module contains unit tests for the s2idle tool in the amd-debug-tools package.
 """
 import argparse
-import os
 import sys
 import unittest
 import logging
 import sqlite3
 from datetime import datetime
 from unittest.mock import patch
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.s2idle import (
     parse_args,

@@ -15,9 +15,7 @@ enabled = true
 
 [tool.coverage.run]
 branch = true
-source = [
-    "src", "test"
-]
+source = ["src"]
 omit = ["src/launcher.py"]
 
 [project]

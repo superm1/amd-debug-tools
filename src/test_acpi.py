@@ -8,10 +8,6 @@ from unittest.mock import patch, mock_open, call
 
 import logging
 import unittest
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.acpi import search_acpi_tables, AcpicaTracer, ACPI_METHOD
 
