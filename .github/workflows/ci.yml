@@ -101,8 +101,8 @@ jobs:
         pip install .
     - name: Generate Report
       run: |
-        pip install coverage
-        coverage run -m unittest
+        pip install pytest-cov
+        pytest --cov
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:

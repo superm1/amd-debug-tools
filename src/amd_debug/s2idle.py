@@ -176,7 +176,7 @@ def report(since, until, fname, fmt, tool_debug, report_debug) -> bool:
     return True
 
 
-def test(
+def run_test_cycle(
     duration, wait, count, fmt, fname, force, debug, rand, logind, bios_debug
 ) -> bool:
     """Run a test"""
@@ -385,7 +385,7 @@ def main():
         )
     elif args.action == "test":
         relaunch_sudo()
-        ret = test(
+        ret = run_test_cycle(
             args.duration,
             args.wait,
             args.count,
