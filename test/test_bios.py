@@ -13,7 +13,8 @@ from unittest.mock import patch, MagicMock
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from amd_debug.bios import AmdBios, parse_args, main
+from amd_debug.bios import AmdBios, main
+from amd_debug.args import parse_bios_args
 
 
 class TestAmdBios(unittest.TestCase):
@@ -117,138 +118,138 @@ class TestAmdBios(unittest.TestCase):
         )
 
     @patch("sys.argv", ["bios.py", "parse", "--input", "test.log", "--tool-debug"])
-    def test_parse_args_parse_command(self):
-        """Test parse_args with parse command"""
+    def test_parse_bios_args_parse_command(self):
+        """Test parse_bios_args with parse command"""
 
-        args = parse_args()
+        args = parse_bios_args()
         self.assertEqual(args.command, "parse")
         self.assertEqual(args.input, "test.log")
         self.assertTrue(args.tool_debug)
 
     @patch("sys.argv", ["bios.py", "trace", "--enable", "--tool-debug"])
-    def test_parse_args_trace_enable(self):
-        """Test parse_args with trace enable command"""
+    def test_parse_bios_args_trace_enable(self):
+        """Test parse_bios_args with trace enable command"""
 
-        args = parse_args()
+        args = parse_bios_args()
         self.assertEqual(args.command, "trace")
         self.assertTrue(args.enable)
         self.assertFalse(args.disable)
         self.assertTrue(args.tool_debug)
 
     @patch("sys.argv", ["bios.py", "trace", "--disable"])
-    def test_parse_args_trace_disable(self):
-        """Test parse_args with trace disable command"""
+    def test_parse_bios_args_trace_disable(self):
+        """Test parse_bios_args with trace disable command"""
 
-        args = parse_args()
+        args = parse_bios_args()
         self.assertEqual(args.command, "trace")
         self.assertFalse(args.enable)
         self.assertTrue(args.disable)
 
     @patch("sys.argv", ["bios.py", "version"])
-    def test_parse_args_version_command(self):
-        """Test parse_args with version command"""
+    def test_parse_bios_args_version_command(self):
+        """Test parse_bios_args with version command"""
 
-        args = parse_args()
+        args = parse_bios_args()
         self.assertEqual(args.command, "version")
 
     @patch("sys.argv", ["bios.py"])
     @patch("argparse.ArgumentParser.print_help")
     @patch("sys.exit")
-    def test_parse_args_no_arguments(self, mock_exit, mock_print_help):
-        """Test parse_args with no arguments"""
+    def test_parse_bios_args_no_arguments(self, mock_exit, mock_print_help):
+        """Test parse_bios_args with no arguments"""
 
-        parse_args()
+        parse_bios_args(help_on_empty=True)
         mock_print_help.assert_called_once()
         mock_exit.assert_called_once_with(1)
 
     @patch("sys.argv", ["bios.py", "trace", "--enable", "--disable"])
     @patch("sys.exit")
-    def test_parse_args_conflicting_trace_arguments(self, mock_exit):
-        """Test parse_args with conflicting trace arguments"""
+    def test_parse_bios_args_conflicting_trace_arguments(self, mock_exit):
+        """Test parse_bios_args with conflicting trace arguments"""
 
-        parse_args()
+        parse_bios_args()
         mock_exit.assert_called_once_with("can't set both enable and disable")
 
     @patch("sys.argv", ["bios.py", "trace"])
     @patch("sys.exit")
-    def test_parse_args_missing_trace_arguments(self, mock_exit):
-        """Test parse_args with missing trace arguments"""
+    def test_parse_bios_args_missing_trace_arguments(self, mock_exit):
+        """Test parse_bios_args with missing trace arguments"""
 
-        parse_args()
+        parse_bios_args()
         mock_exit.assert_called_once_with("must set either enable or disable")
 
     @patch("amd_debug.bios.AmdBios")
-    @patch("amd_debug.bios.parse_args")
+    @patch("amd_debug.bios.parse_bios_args")
     @patch("amd_debug.bios.version")
     @patch("amd_debug.bios.show_log_info")
     def test_main_trace_command(
-        self, mock_show_log_info, _mock_version, mock_parse_args, mock_amd_bios
+        self, mock_show_log_info, _mock_version, mock_parse_bios_args, mock_amd_bios
     ):
         """Test main function with trace command"""
         mock_app = MagicMock()
         mock_amd_bios.return_value = mock_app
-        mock_parse_args.return_value = argparse.Namespace(
+        mock_parse_bios_args.return_value = argparse.Namespace(
             command="trace", enable=True, disable=False, tool_debug=True
         )
         mock_app.set_tracing.return_value = True
 
         result = main()
 
-        mock_parse_args.assert_called_once()
+        mock_parse_bios_args.assert_called_once()
         mock_amd_bios.assert_called_once_with(None, True)
         mock_app.set_tracing.assert_called_once_with(True)
         mock_show_log_info.assert_called_once()
         self.assertTrue(result)
 
     @patch("amd_debug.bios.AmdBios")
-    @patch("amd_debug.bios.parse_args")
+    @patch("amd_debug.bios.parse_bios_args")
     @patch("amd_debug.bios.version")
     @patch("amd_debug.bios.show_log_info")
     def test_main_parse_command(
-        self, mock_show_log_info, _mock_version, mock_parse_args, mock_amd_bios
+        self, mock_show_log_info, _mock_version, mock_parse_bios_args, mock_amd_bios
     ):
         """Test main function with parse command"""
         mock_app = MagicMock()
         mock_amd_bios.return_value = mock_app
-        mock_parse_args.return_value = argparse.Namespace(
+        mock_parse_bios_args.return_value = argparse.Namespace(
             command="parse", input="test.log", tool_debug=True
         )
         mock_app.run.return_value = True
 
         result = main()
 
-        mock_parse_args.assert_called_once()
+        mock_parse_bios_args.assert_called_once()
         mock_amd_bios.assert_called_once_with("test.log", True)
         mock_app.run.assert_called_once()
         mock_show_log_info.assert_called_once()
         self.assertTrue(result)
 
-    @patch("amd_debug.bios.parse_args")
+    @patch("amd_debug.bios.parse_bios_args")
     @patch("amd_debug.bios.version")
     @patch("amd_debug.bios.show_log_info")
     @patch("amd_debug.bios.print")
     def test_main_version_command(
-        self, _mock_print, mock_show_log_info, mock_version, mock_parse_args
+        self, _mock_print, mock_show_log_info, mock_version, mock_parse_bios_args
     ):
         """Test main function with version command"""
-        mock_parse_args.return_value = argparse.Namespace(command="version")
+        mock_parse_bios_args.return_value = argparse.Namespace(command="version")
         mock_version.return_value = "1.0.0"
 
         result = main()
 
-        mock_parse_args.assert_called_once()
+        mock_parse_bios_args.assert_called_once()
         mock_version.assert_called_once()
         mock_show_log_info.assert_called_once()
         self.assertEqual(result, False)
 
-    @patch("amd_debug.bios.parse_args")
+    @patch("amd_debug.bios.parse_bios_args")
     @patch("amd_debug.bios.show_log_info")
-    def test_main_invalid_command(self, mock_show_log_info, mock_parse_args):
+    def test_main_invalid_command(self, mock_show_log_info, mock_parse_bios_args):
         """Test main function with an invalid command"""
-        mock_parse_args.return_value = argparse.Namespace(command="invalid")
+        mock_parse_bios_args.return_value = argparse.Namespace(command="invalid")
 
         result = main()
 
-        mock_parse_args.assert_called_once()
+        mock_parse_bios_args.assert_called_once()
         mock_show_log_info.assert_called_once()
         self.assertFalse(result)

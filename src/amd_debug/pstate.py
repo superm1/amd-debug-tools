@@ -22,6 +22,8 @@ from amd_debug.common import (
     version,
 )
 
+from amd_debug.args import parse_pstate_args
+
 
 class MSR:  # pylint: disable=too-few-public-methods
     """MSR addresses for CPPC"""
@@ -280,29 +282,9 @@ class AmdPstateTriage(AmdTool):
         return True
 
 
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Collect useful information for debugging amd-pstate issues.",
-        epilog="Arguments are optional",
-    )
-    subparsers = parser.add_subparsers(help="Possible commands", dest="command")
-    triage_cmd = subparsers.add_parser("triage", help="Run amd-pstate triage")
-    triage_cmd.add_argument(
-        "--tool-debug",
-        action="store_true",
-        help="Enable tool debug logging",
-    )
-    subparsers.add_parser("version", help="Show version information")
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-    return parser.parse_args()
-
-
 def main():
     """Main function"""
-    args = parse_args()
+    args = parse_pstate_args()
     ret = False
     if args.command == "version":
         print(version())

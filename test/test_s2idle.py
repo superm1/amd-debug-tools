@@ -16,7 +16,6 @@ from unittest.mock import patch
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.s2idle import (
-    parse_args,
     main,
     install,
     uninstall,
@@ -26,10 +25,12 @@ from amd_debug.s2idle import (
     prompt_report_arguments,
     Defaults,
 )
+from amd_debug.args import parse_s2idle_args
+from amd_debug.common import is_root, relaunch_sudo
 
 
 class TestParseArgs(unittest.TestCase):
-    """Test parse_args function"""
+    """Test parse_s2idle_args function"""
 
     @classmethod
     def setUpClass(cls):
@@ -43,13 +44,13 @@ class TestParseArgs(unittest.TestCase):
 
     @patch("sys.stderr")
     def test_no_arguments(self, _mock_print):
-        """Test parse_args with no arguments"""
+        """Test parse_s2idle_args with no arguments"""
         sys.argv = ["s2idle.py"]
         with self.assertRaises(SystemExit):
-            parse_args()
+            parse_s2idle_args(help_on_empty=True)
 
     def test_test_command_with_arguments(self):
-        """Test parse_args with test command and arguments"""
+        """Test parse_s2idle_args with test command and arguments"""
         sys.argv = [
             "s2idle.py",
             "test",
@@ -63,7 +64,7 @@ class TestParseArgs(unittest.TestCase):
             "txt",
             "--tool-debug",
         ]
-        args = parse_args()
+        args = parse_s2idle_args()
         self.assertEqual(args.action, "test")
         self.assertEqual(args.count, "5")
         self.assertEqual(args.duration, "10")
@@ -72,7 +73,7 @@ class TestParseArgs(unittest.TestCase):
         self.assertTrue(args.tool_debug)
 
     def test_report_command_with_arguments(self):
-        """Test parse_args with report command and arguments"""
+        """Test parse_s2idle_args with report command and arguments"""
         sys.argv = [
             "s2idle.py",
             "report",
@@ -84,7 +85,7 @@ class TestParseArgs(unittest.TestCase):
             "html",
             "--report-debug",
         ]
-        args = parse_args()
+        args = parse_s2idle_args()
         self.assertEqual(args.action, "report")
         self.assertEqual(args.since, "2023-01-01")
         self.assertEqual(args.until, "2023-02-01")
@@ -94,18 +95,18 @@ class TestParseArgs(unittest.TestCase):
     @patch("sys.prefix", "amd_debug.s2idle")
     @patch("sys.base_prefix", "foo")
     def test_install_command(self):
-        """Test parse_args with install command"""
+        """Test parse_s2idle_args with install command"""
         sys.argv = ["s2idle.py", "install", "--tool-debug"]
-        args = parse_args()
+        args = parse_s2idle_args()
         self.assertEqual(args.action, "install")
         self.assertTrue(args.tool_debug)
 
     @patch("sys.prefix", "amd_debug.s2idle")
     @patch("sys.base_prefix", "foo")
     def test_uninstall_command(self):
-        """Test parse_args with uninstall command"""
+        """Test parse_s2idle_args with uninstall command"""
         sys.argv = ["s2idle.py", "uninstall", "--tool-debug"]
-        args = parse_args()
+        args = parse_s2idle_args()
         self.assertEqual(args.action, "uninstall")
         self.assertTrue(args.tool_debug)
 
@@ -113,15 +114,15 @@ class TestParseArgs(unittest.TestCase):
     @patch("sys.base_prefix", "amd_debug.s2idle")
     @patch("sys.stderr")
     def test_hidden_install_command(self, _mock_print):
-        """Test parse_args with install command"""
+        """Test parse_s2idle_args with install command"""
         sys.argv = ["s2idle.py", "install", "--tool-debug"]
         with self.assertRaises(SystemExit):
-            parse_args()
+            parse_s2idle_args()
 
     def test_version_command(self):
-        """Test parse_args with version command"""
+        """Test parse_s2idle_args with version command"""
         sys.argv = ["s2idle.py", "version"]
-        args = parse_args()
+        args = parse_s2idle_args()
         self.assertEqual(args.action, "version")
 
 
@@ -143,8 +144,8 @@ class TestMainFunction(unittest.TestCase):
     def test_main_install(self, mock_install, mock_relaunch_sudo):
         """Test main function with install action"""
         sys.argv = ["s2idle.py", "install", "--tool-debug"]
-        with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(
+        with patch("amd_debug.s2idle.parse_s2idle_args") as mock_parse_s2idle_args:
+            mock_parse_s2idle_args.return_value = argparse.Namespace(
                 action="install", tool_debug=True
             )
             main()
@@ -156,8 +157,8 @@ class TestMainFunction(unittest.TestCase):
     def test_main_uninstall(self, mock_uninstall, mock_relaunch_sudo):
         """Test main function with uninstall action"""
         sys.argv = ["s2idle.py", "uninstall", "--tool-debug"]
-        with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(
+        with patch("amd_debug.s2idle.parse_s2idle_args") as mock_parse_s2idle_args:
+            mock_parse_s2idle_args.return_value = argparse.Namespace(
                 action="uninstall", tool_debug=True
             )
             main()
@@ -168,8 +169,8 @@ class TestMainFunction(unittest.TestCase):
     def test_main_report(self, mock_report):
         """Test main function with report action"""
         sys.argv = ["s2idle.py", "report", "--since", "2023-01-01"]
-        with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(
+        with patch("amd_debug.s2idle.parse_s2idle_args") as mock_parse_s2idle_args:
+            mock_parse_s2idle_args.return_value = argparse.Namespace(
                 action="report",
                 since="2023-01-01",
                 until="2023-02-01",
@@ -190,8 +191,8 @@ class TestMainFunction(unittest.TestCase):
     def test_main_run_test_cycle(self, mock_test, mock_relaunch_sudo):
         """Test main function with test action"""
         sys.argv = ["s2idle.py", "test", "--count", "5"]
-        with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(
+        with patch("amd_debug.s2idle.parse_s2idle_args") as mock_parse_s2idle_args:
+            mock_parse_s2idle_args.return_value = argparse.Namespace(
                 action="test",
                 duration=None,
                 wait=None,
@@ -216,8 +217,8 @@ class TestMainFunction(unittest.TestCase):
     def test_main_version(self, mock_version):
         """Test main function with version action"""
         sys.argv = ["s2idle.py", "version"]
-        with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(action="version")
+        with patch("amd_debug.s2idle.parse_s2idle_args") as mock_parse_s2idle_args:
+            mock_parse_s2idle_args.return_value = argparse.Namespace(action="version")
             mock_version.return_value = "1.0.0"
             with patch("builtins.print") as mock_print:
                 result = main()
@@ -228,8 +229,8 @@ class TestMainFunction(unittest.TestCase):
     def test_main_no_action(self):
         """Test main function with no action specified"""
         sys.argv = ["s2idle.py"]
-        with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(action=None)
+        with patch("amd_debug.s2idle.parse_s2idle_args") as mock_parse_s2idle_args:
+            mock_parse_s2idle_args.return_value = argparse.Namespace(action=None)
             with self.assertRaises(SystemExit) as cm:
                 main()
             self.assertEqual(cm.exception.code, "no action specified")

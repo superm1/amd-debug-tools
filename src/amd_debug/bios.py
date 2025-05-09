@@ -16,6 +16,7 @@ from amd_debug.common import (
 )
 from amd_debug.kernel import get_kernel_log, sscanf_bios_args
 from amd_debug.acpi import AcpicaTracer
+from amd_debug.args import parse_bios_args
 
 
 class AmdBios(AmdTool):
@@ -71,60 +72,9 @@ class AmdBios(AmdTool):
         return True
 
 
-def parse_args():
-    """Parse command line arguments"""
-    parser = argparse.ArgumentParser(
-        description="Parse a combined kernel/BIOS log.",
-    )
-    subparsers = parser.add_subparsers(help="Possible commands", dest="command")
-    parse_cmd = subparsers.add_parser(
-        "parse", help="Parse log for kernel and BIOS messages"
-    )
-    parse_cmd.add_argument(
-        "--input",
-        help="Optional input file to parse",
-    )
-    parse_cmd.add_argument(
-        "--tool-debug",
-        action="store_true",
-        help="Enable tool debug logging",
-    )
-    trace_cmd = subparsers.add_parser("trace", help="Enable or disable tracing")
-    trace_cmd.add_argument(
-        "--enable",
-        action="store_true",
-        help="Enable BIOS AML tracing",
-    )
-    trace_cmd.add_argument(
-        "--disable",
-        action="store_true",
-        help="Disable BIOS AML tracing",
-    )
-    trace_cmd.add_argument(
-        "--tool-debug",
-        action="store_true",
-        help="Enable tool debug logging",
-    )
-    subparsers.add_parser("version", help="Show version information")
-
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-
-    args = parser.parse_args()
-
-    if args.command == "trace":
-        if args.enable and args.disable:
-            sys.exit("can't set both enable and disable")
-        if not args.enable and not args.disable:
-            sys.exit("must set either enable or disable")
-
-    return args
-
-
 def main():
     """Main function"""
-    args = parse_args()
+    args = parse_bios_args()
     ret = False
     if args.command == "trace":
         app = AmdBios(None, args.tool_debug)
