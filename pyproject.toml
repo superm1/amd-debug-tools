@@ -13,6 +13,13 @@ amd_debug = ["s2idle-hook"]
 [tool.setuptools-git-versioning]
 enabled = true
 
+[tool.coverage.run]
+branch = true
+source = [
+    "src", "test"
+]
+omit = ["src/launcher.py"]
+
 [project]
 name = "amd-debug-tools"
 authors = [{ name = "Mario Limonciello", email = "superm1@kernel.org" }]
