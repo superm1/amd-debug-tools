@@ -2,6 +2,14 @@
 requires = ["setuptools>=59.8.0", "setuptools-git-versioning>=2.0,<3"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+amd_debug = ["s2idle-hook"]
+"amd_debug.templates" = ["*"]
+"amd_debug.bash" = ["amd-s2idle"]
+
 [tool.setuptools-git-versioning]
 enabled = true
 
@@ -27,8 +35,13 @@ dependencies = [
     "matplotlib",
     "seaborn",
 ]
-dynamic = ["version", "scripts"]
+dynamic = ["version"]
 license = "MIT"
 
 [project.urls]
 "Homepage" = "https://web.git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git/"
+
+[project.scripts]
+amd-s2idle = "amd_debug:amd_s2idle"
+amd-bios = "amd_debug:amd_bios"
+amd-pstate = "amd_debug:amd_pstate"
