@@ -6,12 +6,8 @@ This module contains unit tests for the bios tool in the amd-debug-tools package
 """
 import argparse
 import logging
-import os
-import sys
 import unittest
 from unittest.mock import patch, MagicMock
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.bios import AmdBios, parse_args, main
 

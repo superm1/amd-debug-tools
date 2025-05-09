@@ -5,14 +5,10 @@
 This module contains unit tests for the s2idle tool in the amd-debug-tools package.
 """
 
-import sys
-import os
 import unittest
 from datetime import datetime
 from unittest.mock import patch
 import pandas as pd
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.sleep_report import (
     remove_duplicates,

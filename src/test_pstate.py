@@ -6,16 +6,11 @@ This module contains unit tests for the pstate tool in the amd-debug-tools packa
 """
 
 import logging
-import os
-import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-
 from amd_debug.pstate import (
     AmdPstateTriage,
-    MSR,
     amd_cppc_cap_lowest_perf,
     amd_cppc_cap_lownonlin_perf,
     amd_cppc_cap_nominal_perf,

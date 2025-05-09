@@ -5,14 +5,8 @@
 This module contains unit tests for the datbase functions in the amd-debug-tools package.
 """
 import unittest
-import sqlite3
-import sys
-import os
 
 from datetime import datetime
-from unittest.mock import patch, MagicMock
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.database import SleepDatabase
 

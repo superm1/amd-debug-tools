@@ -7,10 +7,7 @@ This module contains unit tests for the battery functions in the amd-debug-tools
 import unittest
 import logging
 from unittest.mock import MagicMock, patch
-import sys
-import os
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.battery import Batteries
 

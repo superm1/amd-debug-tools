@@ -5,14 +5,10 @@
 This module contains unit tests for the prerequisite functions in the amd-debug-tools package.
 """
 
-import sys
-import os
 import logging
 import unittest
 import subprocess
 from unittest.mock import patch, MagicMock
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from amd_debug.prerequisites import PrerequisiteValidator
 from amd_debug.failures import *
