@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=59.8.0", "setuptools-git-versioning>=2.0,<3"]
+requires = ["setuptools>=59.8.0", "setuptools-git-versioning>=2.0,<3", "argparse-manpage[setuptools]"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -19,6 +19,19 @@ source = [
     "src", "test"
 ]
 omit = ["src/launcher.py"]
+
+[tool.setuptools.cmdclass]
+build_py = "build_manpages.build_py"
+install = "build_manpages.install"
+build_manpages = "build_manpages.build_manpages"
+
+[tool.build_manpages]
+pythonpath = ["src"]
+manpages = [
+    "man/amd-s2idle.1:function=parse_args:pyfile=src/amd_debug/s2idle.py:prog=amd-s2idle",
+    "man/amd-bios.1:function=parse_args:pyfile=src/amd_debug/bios.py:prog=amd-bios",
+    "man/amd-pstate.1:function=parse_args:pyfile=src/amd_debug/pstate.py:prog=amd-pstate",
+]
 
 [project]
 name = "amd-debug-tools"
