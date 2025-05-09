@@ -20,7 +20,7 @@ from amd_debug.s2idle import (
     main,
     install,
     uninstall,
-    test,
+    run_test_cycle,
     display_report_file,
     report,
     prompt_report_arguments,
@@ -186,8 +186,8 @@ class TestMainFunction(unittest.TestCase):
             self.assertTrue(result)
 
     @patch("amd_debug.s2idle.relaunch_sudo")
-    @patch("amd_debug.s2idle.test")
-    def test_main_test(self, mock_test, mock_relaunch_sudo):
+    @patch("amd_debug.s2idle.run_test_cycle")
+    def test_main_run_test_cycle(self, mock_test, mock_relaunch_sudo):
         """Test main function with test action"""
         sys.argv = ["s2idle.py", "test", "--count", "5"]
         with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
@@ -389,7 +389,7 @@ class TestTestFunction(unittest.TestCase):
         mock_sleep_validator_instance = mock_sleep_validator.return_value
         mock_sleep_report_instance = mock_sleep_report.return_value
 
-        result = test(
+        result = run_test_cycle(
             duration=None,
             wait=None,
             count=None,
@@ -435,7 +435,7 @@ class TestTestFunction(unittest.TestCase):
         mock_installer_instance = mock_installer.return_value
         mock_installer_instance.install_dependencies.return_value = False
 
-        result = test(
+        result = run_test_cycle(
             duration=None,
             wait=None,
             count=None,
@@ -473,7 +473,7 @@ class TestTestFunction(unittest.TestCase):
         mock_prerequisite_instance = mock_prerequisite_validator.return_value
         mock_prerequisite_instance.run.return_value = False
 
-        result = test(
+        result = run_test_cycle(
             duration=None,
             wait=None,
             count=None,
@@ -517,7 +517,7 @@ class TestTestFunction(unittest.TestCase):
         mock_prerequisite_instance.run.return_value = True
 
         with self.assertRaises(SystemExit):
-            test(
+            run_test_cycle(
                 duration=None,
                 wait=None,
                 count=None,
