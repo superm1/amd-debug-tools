@@ -8,7 +8,14 @@ import subprocess
 import sqlite3
 
 from datetime import date, timedelta, datetime
-from amd_debug.common import is_root, relaunch_sudo, show_log_info, version, running_ssh
+from amd_debug.common import (
+    colorize_choices,
+    is_root,
+    relaunch_sudo,
+    show_log_info,
+    version,
+    running_ssh,
+)
 
 from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
@@ -100,7 +107,9 @@ def prompt_report_arguments(since, until, fname, fmt) -> str:
         sys.exit(f"Invalid date, use YYYY-MM-DD: {e}")
 
     if not fmt:
-        fmt = input(f"{Headers.FormatDescription} (default {get_report_format()})? ")
+        fmt = input(
+            f"{Headers.FormatDescription} ({colorize_choices(Defaults.format_choices, get_report_format())})? "
+        )
         if not fmt:
             fmt = get_report_format()
         if fmt not in Defaults.format_choices:
