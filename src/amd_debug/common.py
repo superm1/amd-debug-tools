@@ -88,6 +88,21 @@ def fatal_error(message):
     sys.exit(1)
 
 
+def apply_prefix_wrapper(header, message):
+    """Apply a prefix to wrap a newline delimitted message"""
+    s = f"{header.strip()}\n"
+    lines = message.strip().split("\n")
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if not line:
+            continue
+        if i == len(lines) - 1:
+            s += f"└─ {line}\n"
+            continue
+        s += f"│ {line}\n"
+    return s
+
+
 def show_log_info():
     """Show log information"""
     logger = logging.getLogger()

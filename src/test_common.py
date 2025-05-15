@@ -14,6 +14,7 @@ from platform import uname_result
 
 
 from amd_debug.common import (
+    apply_prefix_wrapper,
     Colors,
     check_lockdown,
     compare_file,
@@ -272,3 +273,25 @@ class TestCommon(unittest.TestCase):
             self.assertTrue(running_ssh())
         with patch("os.environ", {}):
             self.assertFalse(running_ssh())
+
+    def test_apply_prefix_wrapper(self):
+        """Test apply_prefix_wrapper function"""
+        header = "Header:"
+        message = "Line 1\nLine 2\nLine 3"
+        expected_output = "Header:\n" "│ Line 1\n" "│ Line 2\n" "└─ Line 3\n"
+        self.assertEqual(apply_prefix_wrapper(header, message), expected_output)
+
+        # Test with a single line message
+        message = "Single Line"
+        expected_output = "Header:\n└─ Single Line\n"
+        self.assertEqual(apply_prefix_wrapper(header, message), expected_output)
+
+        # Test with an empty message
+        message = ""
+        expected_output = "Header:\n"
+        self.assertEqual(apply_prefix_wrapper(header, message), expected_output)
+
+        # Test with leading/trailing whitespace in the message
+        message = "  Line 1\nLine 2  \n  Line 3  "
+        expected_output = "Header:\n" "│ Line 1\n" "│ Line 2\n" "└─ Line 3\n"
+        self.assertEqual(apply_prefix_wrapper(header, message), expected_output)
