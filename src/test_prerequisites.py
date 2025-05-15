@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 
 from amd_debug.prerequisites import PrerequisiteValidator
 from amd_debug.failures import *
-from amd_debug.common import BIT
+from amd_debug.common import apply_prefix_wrapper, BIT
 
 
 class TestPrerequisiteValidator(unittest.TestCase):
@@ -1719,4 +1719,54 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with(
             "Unable to test storage from kernel log", "🚦"
+        )
+
+    @patch("amd_debug.prerequisites.subprocess.check_output")
+    def test_capture_edid_no_edid_data(self, mock_check_output):
+        """Test capture_edid when no EDID data is found"""
+        self.validator.display.get_edid = MagicMock(return_value={})
+        result = self.validator.capture_edid()
+        self.assertTrue(result)
+        self.mock_db.record_debug.assert_called_with("No EDID data found")
+        mock_check_output.assert_not_called()
+
+    @patch("amd_debug.prerequisites.subprocess.check_output")
+    def test_capture_edid_file_not_found(self, mock_check_output):
+        """Test capture_edid when edid-decode is not installed"""
+        self.validator.display.get_edid = MagicMock(
+            return_value={"Monitor1": "/path/to/edid"}
+        )
+        mock_check_output.side_effect = FileNotFoundError
+        result = self.validator.capture_edid()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "edid-decode not installed, unable to decode EDID", "👀"
+        )
+
+    @patch("amd_debug.prerequisites.subprocess.check_output")
+    def test_capture_edid_subprocess_error(self, mock_check_output):
+        """Test capture_edid when subprocess.check_output raises an error"""
+        self.validator.display.get_edid = MagicMock(
+            return_value={"Monitor1": "/path/to/edid"}
+        )
+        mock_check_output.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="edid-decode", output=b"Error decoding EDID"
+        )
+        result = self.validator.capture_edid()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "Failed to capture EDID table: b'Error decoding EDID'", "👀"
+        )
+
+    @patch("amd_debug.prerequisites.subprocess.check_output")
+    def test_capture_edid_success(self, mock_check_output):
+        """Test capture_edid when EDID data is successfully decoded"""
+        self.validator.display.get_edid = MagicMock(
+            return_value={"Monitor1": "/path/to/edid"}
+        )
+        mock_check_output.return_value = b"Decoded EDID data"
+        result = self.validator.capture_edid()
+        self.assertTrue(result)
+        self.mock_db.record_debug.assert_called_with(
+            apply_prefix_wrapper("EDID for Monitor1:", "Decoded EDID data")
         )

@@ -20,8 +20,10 @@ from packaging import version
 import pyudev
 
 from amd_debug.wake import WakeIRQ
+from amd_debug.display import Display
 from amd_debug.kernel import get_kernel_log, SystemdLogger, DmesgLogger
 from amd_debug.common import (
+    apply_prefix_wrapper,
     BIT,
     clear_temporary_message,
     get_distro,
@@ -117,11 +119,36 @@ class PrerequisiteValidator(AmdTool):
         self.irqs = []
         self.smu_version = ""
         self.smu_program = ""
+        self.display = Display()
 
     def capture_once(self):
         """Capture the prerequisites once"""
         if not self.db.get_last_prereq_ts():
             self.run()
+
+    def capture_edid(self):
+        """Capture and decode the EDID data"""
+        edids = self.display.get_edid()
+        if len(edids) == 0:
+            self.db.record_debug("No EDID data found")
+            return True
+
+        for name, p in edids.items():
+            try:
+                cmd = ["edid-decode", p]
+                output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(
+                    "utf-8"
+                )
+            except FileNotFoundError:
+                self.db.record_prereq(
+                    "edid-decode not installed, unable to decode EDID", "👀"
+                )
+                return True
+            except subprocess.CalledProcessError as e:
+                self.db.record_prereq(f"Failed to capture EDID table: {e.output}", "👀")
+                return False
+            self.db.record_debug(apply_prefix_wrapper(f"EDID for {name}:", output))
+        return True
 
     def check_amdgpu(self):
         """Check for the AMDGPU driver"""
@@ -1145,6 +1172,7 @@ class PrerequisiteValidator(AmdTool):
             self.capture_linux_firmware,
             self.capture_logind,
             self.capture_pci_acpi,
+            self.capture_edid,
         ]
         checks = []
 
