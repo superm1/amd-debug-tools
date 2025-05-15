@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: MIT
 
+import configparser
 import logging
 import os
 import platform
@@ -9,9 +10,10 @@ import shutil
 import subprocess
 import tempfile
 import struct
-import pyudev
 from datetime import datetime
 from packaging import version
+
+import pyudev
 
 from amd_debug.wake import WakeIRQ
 from amd_debug.kernel import get_kernel_log, SystemdLogger, DmesgLogger
@@ -167,10 +169,10 @@ class PrerequisiteValidator(AmdTool):
         if self.kernel_log.match_pattern("ath11k_pci.*wcn6855"):
             match = self.kernel_log.match_pattern("ath11k_pci.*fw_version")
             if match:
-                self.db.record_debug("WCN6855 version string: %s" % match)
+                self.db.record_debug(f"WCN6855 version string: {match}")
                 objects = match.split()
-                for i in range(0, len(objects)):
-                    if objects[i] == "fw_build_id":
+                for i, obj in enumerate(objects):
+                    if obj == "fw_build_id":
                         wcn6855 = objects[i + 1]
 
         if wcn6855:
@@ -478,8 +480,8 @@ class PrerequisiteValidator(AmdTool):
                 continue
             if self.cpu_family and self.cpu_model and self.cpu_model_string:
                 self.db.record_prereq(
-                    "%s (family %x model %x)"
-                    % (self.cpu_model_string, self.cpu_family, self.cpu_model),
+                    f"{self.cpu_model_string} "
+                    f"(family {self.cpu_family:x} model {self.cpu_model:x})",
                     "💻",
                 )
                 break
@@ -487,7 +489,7 @@ class PrerequisiteValidator(AmdTool):
 
     # See https://github.com/torvalds/linux/commit/ec6c0503190417abf8b8f8e3e955ae583a4e50d4
     def check_fadt(self):
-        """Check the kernel emitted a message specific to 6.0 or later indicating FADT had a bit set."""
+        """Check the kernel emitted a message indicating FADT had a bit set."""
         found = False
         if not self.kernel_log:
             message = "Unable to test FADT from kernel log"
@@ -575,10 +577,10 @@ class PrerequisiteValidator(AmdTool):
         """Check if the user has permissions to write to /sys/power/state"""
         p = os.path.join("/", "sys", "power", "state")
         try:
-            with open(p, "w") as w:
+            with open(p, "w", encoding="utf-8") as w:
                 pass
         except PermissionError:
-            self.db.record_prereq("%s" % Headers.RootError, "👀")
+            self.db.record_prereq(f"{Headers.RootError}", "👀")
             return False
         except FileNotFoundError:
             self.db.record_prereq("Kernel doesn't support power management", "❌")
@@ -631,7 +633,7 @@ class PrerequisiteValidator(AmdTool):
                 for line in contents.split("\n"):
                     if "WAKE_INT_MASTER_REG:" in line:
                         val = "en" if int(line.split()[1], 16) & BIT(15) else "dis"
-                        self.db.record_debug("Windows GPIO 0 debounce: %sabled" % val)
+                        self.db.record_debug(f"Windows GPIO 0 debounce: {val}abled")
                         continue
                     if not header and re.search("trigger", line):
                         debug_str += line + "\n"
@@ -671,7 +673,9 @@ class PrerequisiteValidator(AmdTool):
                         self.db.record_prereq(f"{interface} has WoL enabled", "✅")
                     else:
                         self.db.record_prereq(
-                            f"Platform may have low hardware sleep residency with Wake-on-lan disabled. Run `ethtool -s {interface} wol g` to enable it if necessary.",
+                            "Platform may have low hardware sleep residency "
+                            "with Wake-on-lan disabled. Run `ethtool -s "
+                            f"{interface} wol g` to enable it if necessary.",
                             "🚦",
                         )
         return True
@@ -726,7 +730,8 @@ class PrerequisiteValidator(AmdTool):
             # Dictionary of instance id to firmware version mappings that
             # have been "reported" to be problematic
             device_map = {
-                "8c36f7ee-cc11-4a36-b090-6363f54ecac2": "0.1.26",  # https://gitlab.freedesktop.org/drm/amd/-/issues/3443
+                # https://gitlab.freedesktop.org/drm/amd/-/issues/3443
+                "8c36f7ee-cc11-4a36-b090-6363f54ecac2": "0.1.26",
             }
             interesting_plugins = ["nvme", "tpm", "uefi_capsule"]
             if device.get_plugin() in interesting_plugins:
@@ -908,7 +913,7 @@ class PrerequisiteValidator(AmdTool):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
-                    self.db.record_debug_file("%s.dsl" % prefix)
+                    self.db.record_debug_file(f"{prefix}.dsl")
                 except subprocess.CalledProcessError as e:
                     self.db.record_prereq(
                         f"Failed to capture ACPI table: {e.output}", "👀"
@@ -925,10 +930,10 @@ class PrerequisiteValidator(AmdTool):
             self.db.record_prereq(desc, "🔋")
 
     def capture_logind(self):
+        """Capture logind.conf settings"""
         base = os.path.join("/", "etc", "systemd", "logind.conf")
         if not os.path.exists(base):
             return True
-        import configparser
 
         config = configparser.ConfigParser()
         config.read(base)
@@ -982,7 +987,8 @@ class PrerequisiteValidator(AmdTool):
             _, cpu_count, _, _ = read_cpuid(0, 0x80000026, 1)
             if cpu_count > max_cpus:
                 self.db.record_prereq(
-                    f"The kernel has been limited to {max_cpus} CPU cores, but the system has {cpu_count} cores",
+                    f"The kernel has been limited to {max_cpus} CPU cores, "
+                    f"but the system has {cpu_count} cores",
                     "❌",
                 )
                 self.failures += [LimitedCores(cpu_count, max_cpus)]
@@ -1111,7 +1117,9 @@ class PrerequisiteValidator(AmdTool):
         if "pcie_port_pm=off" in cmdline:
             return True
         self.db.record_prereq(
-            "Platform may hang resuming.  Upgrade your firmware or add pcie_port_pm=off to kernel command line if you have problems.",
+            "Platform may hang resuming.  "
+            "Upgrade your firmware or add pcie_port_pm=off to kernel command "
+            "line if you have problems.",
             "🚦",
         )
         return False
