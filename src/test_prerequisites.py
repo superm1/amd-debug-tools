@@ -709,7 +709,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(result)
         self.mock_db.record_debug.assert_called_with(
             "I2C HID devices:\n"
-            "| I2C Device 1 [mocked_hid] : mocked_path\n"
+            "│ I2C Device 1 [mocked_hid] : mocked_path\n"
             "└─I2C Device 2 [mocked_hid] : mocked_path\n"
         )
 

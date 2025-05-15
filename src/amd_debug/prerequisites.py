@@ -803,7 +803,7 @@ class PrerequisiteValidator(AmdTool):
             else:
                 acpi_hid = ""
             # set prefix if last device
-            prefix = "| " if dev != devices[-1] else "└─"
+            prefix = "│ " if dev != devices[-1] else "└─"
             debug_str += f"{prefix}{name} [{acpi_hid}] : {acpi_path}\n"
             if "IDEA5002" in name:
                 remediation = (
