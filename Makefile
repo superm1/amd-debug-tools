@@ -1,7 +1,7 @@
 build:
 	python3 -m build
 check:
-	python3 -m unittest
+	pytest
 coverage:
 	coverage run -m unittest
 	coverage report
