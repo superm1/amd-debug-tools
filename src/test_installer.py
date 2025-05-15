@@ -193,3 +193,87 @@ class TestInstaller(unittest.TestCase):
         self.installer.set_requirements("iasl", "ethtool")
         ret = self.installer.install_dependencies()
         self.assertFalse(ret)
+
+    @patch("builtins.print")
+    @patch("amd_debug.installer.get_distro", return_value="ubuntu")
+    @patch("os.execvp", return_value=None)
+    @patch("subprocess.check_call", return_value=0)
+    @patch("subprocess.call", return_value=1)
+    def test_install_edid_decode_ubuntu(
+        self, _mock_call, _mock_check_call, _mock_distro, _fake_sudo, _mock_print
+    ):
+        """Test install requirements function for edid-decode on Ubuntu"""
+        self.installer.set_requirements("edid-decode")
+        ret = self.installer.install_dependencies()
+        _mock_check_call.assert_called_once_with(["apt", "install", "edid-decode"])
+        self.assertTrue(ret)
+
+    @patch("builtins.print")
+    @patch("amd_debug.installer.get_distro", return_value="fedora")
+    @patch(
+        "builtins.open", new_callable=mock_open, read_data="VARIANT_ID=workstation\n"
+    )
+    @patch("os.execvp", return_value=None)
+    @patch("subprocess.check_call", return_value=0)
+    @patch("subprocess.call", return_value=1)
+    def test_install_edid_decode_fedora(
+        self,
+        _mock_call,
+        _mock_check_call,
+        _mock_variant,
+        _mock_distro,
+        _fake_sudo,
+        _mock_print,
+    ):
+        """Test install requirements function for edid-decode on Fedora"""
+        self.installer.set_requirements("edid-decode")
+        ret = self.installer.install_dependencies()
+        _mock_check_call.assert_called_once_with(
+            ["dnf", "install", "-y", "edid-decode"]
+        )
+        self.assertTrue(ret)
+
+    @patch("builtins.print")
+    @patch("amd_debug.installer.get_distro", return_value="arch")
+    @patch("os.execvp", return_value=None)
+    @patch("subprocess.check_call", return_value=0)
+    @patch("subprocess.call", return_value=1)
+    def test_install_edid_decode_arch(
+        self,
+        _mock_call,
+        _mock_check_call,
+        _mock_distro,
+        _fake_sudo,
+        _mock_print,
+    ):
+        """Test install requirements function for edid-decode on Arch"""
+        self.installer.set_requirements("edid-decode")
+        ret = self.installer.install_dependencies()
+        _mock_check_call.assert_not_called()  # edid-decode is not supported on Arch
+        self.assertFalse(ret)
+
+    @patch("builtins.print")
+    @patch("os.path.exists", return_value=False)
+    @patch("os.execvp", return_value=None)
+    @patch("amd_debug.installer.get_distro", return_value="gentoo")
+    @patch("subprocess.call", return_value=1)
+    def test_install_edid_decode_gentoo(
+        self, _mock_call, _mock_distro, _fake_sudo, _mock_exists, _mock_print
+    ):
+        """Test install requirements function for edid-decode on unsupported distro"""
+        self.installer.set_requirements("edid-decode")
+        ret = self.installer.install_dependencies()
+        self.assertFalse(ret)
+
+    @patch("builtins.print")
+    @patch("os.path.exists", return_value=False)
+    @patch("os.execvp", return_value=None)
+    @patch("amd_debug.installer.get_distro", return_value="gentoo")
+    @patch("subprocess.call", return_value=255)
+    def test_install_edid_decode_present(
+        self, _mock_call, _mock_distro, _fake_sudo, _mock_exists, _mock_print
+    ):
+        """Test install requirements function for edid-decode on unsupported distro"""
+        self.installer.set_requirements("edid-decode")
+        ret = self.installer.install_dependencies()
+        self.assertTrue(ret)

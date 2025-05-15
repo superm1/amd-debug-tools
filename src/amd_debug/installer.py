@@ -25,6 +25,7 @@ class Headers:  # pylint: disable=too-few-public-methods
     """Headers for the script"""
 
     MissingIasl = "ACPI extraction tool `iasl` is missing"
+    MissingEdidDecode = "EDID decoding tool `edid-decode` is missing"
     MissingEthtool = "Ethtool is missing"
     InstallAction = "Attempting to install"
     MissingFwupd = "Firmware update library `fwupd` is missing"
@@ -175,6 +176,18 @@ class EthtoolPackage(DistroPackage):
         )
 
 
+class EdidDecodePackage(DistroPackage):
+    """Edid-Decode package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="edid-decode",
+            rpm="edid-decode",
+            arch=None,
+            message=Headers.MissingEdidDecode,
+        )
+
+
 class FwupdPackage(DistroPackage):
     """Fwupd package"""
 
@@ -246,6 +259,20 @@ class Installer(AmdTool):
                 ethtool = False
             if not ethtool:
                 package = EthtoolPackage()
+                if not package.install():
+                    return False
+        if "edid-decode" in self.requirements:
+            try:
+                edid = (
+                    subprocess.call(
+                        ["edid-decode", "--help"], stdout=subprocess.DEVNULL
+                    )
+                    == 255
+                )
+            except FileNotFoundError:
+                edid = False
+            if not edid:
+                package = EdidDecodePackage()
                 if not package.install():
                     return False
         if "fwupd" in self.requirements and not self.fwupd:
@@ -400,6 +427,7 @@ def install_dep_superset() -> bool:
         "pandas",
         "seaborn",
         "tabulate",
+        "edid-decode",
     )
     ret = tool.install_dependencies()
     if ret:
