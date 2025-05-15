@@ -81,6 +81,15 @@ def print_color(message, group) -> None:
     print(f"{prefix}{color}{message}{suffix}")
 
 
+def colorize_choices(choices, default) -> str:
+    """Output a list of choices with colors, where the default is highlighted"""
+    if default not in choices:
+        raise ValueError(f"Default choice '{default}' not in choices")
+    choices = [c for c in choices if c != default]
+    choices = [f"{Colors.OK}{default}{Colors.ENDC}"] + choices
+    return ", ".join(choices)
+
+
 def fatal_error(message):
     """Prints a fatal error message and exits"""
     _configure_log(None)

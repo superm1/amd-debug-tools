@@ -16,6 +16,7 @@ from platform import uname_result
 from amd_debug.common import (
     apply_prefix_wrapper,
     Colors,
+    colorize_choices,
     check_lockdown,
     compare_file,
     fatal_error,
@@ -295,3 +296,37 @@ class TestCommon(unittest.TestCase):
         message = "  Line 1\nLine 2  \n  Line 3  "
         expected_output = "Header:\n" "│ Line 1\n" "│ Line 2\n" "└─ Line 3\n"
         self.assertEqual(apply_prefix_wrapper(header, message), expected_output)
+
+    def test_colorize_choices_with_default(self):
+        """Test colorize_choices function with a default value"""
+        choices = ["option1", "option2", "option3"]
+        default = "option2"
+        expected_output = f"{Colors.OK}{default}{Colors.ENDC}, option1, option3"
+        self.assertEqual(colorize_choices(choices, default), expected_output)
+
+    def test_colorize_choices_without_default(self):
+        """Test colorize_choices function when default is not in choices"""
+        choices = ["option1", "option2", "option3"]
+        default = "option4"
+        with self.assertRaises(ValueError) as context:
+            colorize_choices(choices, default)
+        self.assertEqual(
+            str(context.exception), "Default choice 'option4' not in choices"
+        )
+
+    def test_colorize_choices_empty_list(self):
+        """Test colorize_choices function with an empty list"""
+        choices = []
+        default = "option1"
+        with self.assertRaises(ValueError) as context:
+            colorize_choices(choices, default)
+        self.assertEqual(
+            str(context.exception), "Default choice 'option1' not in choices"
+        )
+
+    def test_colorize_choices_single_choice(self):
+        """Test colorize_choices function with a single choice"""
+        choices = ["option1"]
+        default = "option1"
+        expected_output = f"{Colors.OK}{default}{Colors.ENDC}"
+        self.assertEqual(colorize_choices(choices, default), expected_output)
