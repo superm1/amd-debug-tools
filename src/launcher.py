@@ -1,5 +1,10 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: MIT
+"""
+This module is a launcher for the AMD Debug Tools package. It is meant for
+launching various tools within the package without installation.
+"""
+
 import sys
 import os
 

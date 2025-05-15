@@ -51,12 +51,14 @@ def display_report_file(fname, fmt) -> None:
         return
     user = os.environ.get("SUDO_USER")
     if user:
-        # ensure that xdg tools will know how to display the file (user may need to call tool with sudo -E)
+        # ensure that xdg tools will know how to display the file
+        # (user may need to call tool with sudo -E)
         if os.environ.get("XDG_SESSION_TYPE"):
             subprocess.call(["sudo", "-E", "-u", user, "xdg-open", fname])
         else:
             print(
-                f"To display report automatically in browser launch tool with '-E' argument (Example: sudo -E {sys.argv[0]})"
+                "To display report automatically in browser launch tool "
+                f"with '-E' argument (Example: sudo -E {sys.argv[0]})"
             )
 
 
@@ -259,7 +261,8 @@ def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
         description="Swiss army knife for analyzing Linux s2idle problems",
-        epilog="The tool can run an immediate test with the 'test' command or can be used to hook into systemd for building reports later.\n"
+        epilog="The tool can run an immediate test with the 'test' command "
+        "or can be used to hook into systemd for building reports later.\n"
         "All optional arguments will be prompted if needed.\n"
         "To use non-interactively, please populate all optional arguments.",
     )
@@ -282,7 +285,10 @@ def parse_args():
     test_cmd.add_argument(
         "--random",
         action="store_true",
-        help="Run sleep cycles for random durations and wait, using the --duration and --wait arguments as an upper bound",
+        help=(
+            "Run sleep cycles for random durations and wait, using the "
+            "--duration and --wait arguments as an upper bound",
+        ),
     )
     test_cmd.add_argument(
         "--force",

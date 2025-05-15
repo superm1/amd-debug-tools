@@ -1,6 +1,10 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: MIT
 
+"""
+This module contains the s0i3 prerequisite validator for amd-debug-tools.
+"""
+
 import configparser
 import logging
 import os
@@ -577,7 +581,7 @@ class PrerequisiteValidator(AmdTool):
         """Check if the user has permissions to write to /sys/power/state"""
         p = os.path.join("/", "sys", "power", "state")
         try:
-            with open(p, "w", encoding="utf-8") as w:
+            with open(p, "w", encoding="utf-8") as _w:
                 pass
         except PermissionError:
             self.db.record_prereq(f"{Headers.RootError}", "👀")
@@ -610,7 +614,8 @@ class PrerequisiteValidator(AmdTool):
                     )
         if show_warning:
             self.db.record_prereq(
-                "Timer based wakeup doesn't work properly for your ASIC/firmware, please manually wake the system",
+                "Timer based wakeup doesn't work properly for your "
+                "ASIC/firmware, please manually wake the system",
                 "🚦",
             )
         return True
@@ -748,7 +753,8 @@ class PrerequisiteValidator(AmdTool):
                     item in device.get_guids() or item in device.get_instance_ids()
                 ) and ver in device.get_version():
                     self.db.record_prereq(
-                        f"Platform may have problems resuming.  Upgrade the firmware for '{device.get_name()}' if you have problems.",
+                        "Platform may have problems resuming.  Upgrade the "
+                        f"firmware for '{device.get_name()}' if you have problems.",
                         "🚦",
                     )
         return True
@@ -798,11 +804,12 @@ class PrerequisiteValidator(AmdTool):
                 acpi_hid = ""
             # set prefix if last device
             prefix = "| " if dev != devices[-1] else "└─"
-            debug_str += "{prefix}{name} [{acpi_hid}] : {acpi_path}\n".format(
-                prefix=prefix, name=name, acpi_hid=acpi_hid, acpi_path=acpi_path
-            )
+            debug_str += f"{prefix}{name} [{acpi_hid}] : {acpi_path}\n"
             if "IDEA5002" in name:
-                remediation = f"echo {parent.sys_path.split('/')[-1]} | sudo tee /sys/bus/i2c/drivers/{parent.driver}/unbind"
+                remediation = (
+                    f"echo {parent.sys_path.split('/')[-1]} | "
+                    f"sudo tee /sys/bus/i2c/drivers/{parent.driver}/unbind"
+                )
 
                 self.db.record_prereq(f"{name} may cause spurious wakeups", "❌")
                 self.failures += [I2CHidBug(name, remediation)]
@@ -839,22 +846,13 @@ class PrerequisiteValidator(AmdTool):
             if os.path.exists(p):
                 acpi = read_file(p)
                 debug_str += (
-                    "{prefix}{pci_slot_name} : {vendor} {cls} [{id}] : {acpi}\n".format(
-                        prefix=prefix,
-                        pci_slot_name=pci_slot_name,
-                        vendor=database_vendor,
-                        cls=database_class,
-                        id=pci_id,
-                        acpi=acpi,
-                    )
+                    f"{prefix}{pci_slot_name} : "
+                    f"{database_vendor} {database_class} [{pci_id}] : {acpi}\n"
                 )
             else:
-                debug_str += "{prefix}{pci_slot_name} : {vendor} {cls} [{id}]\n".format(
-                    prefix=prefix,
-                    vendor=database_vendor,
-                    pci_slot_name=pci_slot_name,
-                    cls=database_class,
-                    id=pci_id,
+                debug_str += (
+                    f"{prefix}{pci_slot_name} : "
+                    f"{database_vendor} {database_class} [{pci_id}]\n"
                 )
         if debug_str:
             self.db.record_debug(debug_str)

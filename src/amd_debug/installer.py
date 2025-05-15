@@ -1,6 +1,10 @@
 #!/usr/bin/python3
 # SPDX-License-Identifier: MIT
 
+"""
+This module contains installer support for amd-debug-tools.
+"""
+
 import argparse
 import os
 import shutil
@@ -202,14 +206,14 @@ class Installer(AmdTool):
         # test if fwupd can report device firmware versions
         try:
             import gi  # pylint: disable=import-outside-toplevel
-            from gi.repository import (
+            from gi.repository import (  # pylint: disable=import-outside-toplevel
                 GLib as _,
-            )  # pylint: disable=import-outside-toplevel
+            )
 
             gi.require_version("Fwupd", "2.0")
-            from gi.repository import (
+            from gi.repository import (  # pylint: disable=import-outside-toplevel
                 Fwupd as _,
-            )  # pylint: disable=import-outside-toplevel
+            )
 
             self.fwupd = True
         except ImportError:
