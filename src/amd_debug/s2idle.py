@@ -192,7 +192,7 @@ def run_test_cycle(
 ) -> bool:
     """Run a test"""
     app = Installer(tool_debug=debug)
-    app.set_requirements("iasl", "ethtool")
+    app.set_requirements("iasl", "ethtool", "edid-decode")
     if not app.install_dependencies():
         print("Failed to install dependencies")
         return False
@@ -243,7 +243,7 @@ def run_test_cycle(
 def install(debug) -> None:
     """Install the tool"""
     installer = Installer(tool_debug=debug)
-    installer.set_requirements("iasl", "ethtool")
+    installer.set_requirements("iasl", "ethtool", "edid-decode")
     if not installer.install_dependencies():
         sys.exit("Failed to install dependencies")
     try:

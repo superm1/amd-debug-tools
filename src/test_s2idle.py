@@ -275,7 +275,7 @@ class TestInstallFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         mock_prerequisite_validator.assert_called_once_with(True)
@@ -309,7 +309,7 @@ class TestInstallFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         mock_prerequisite_validator.assert_called_once_with(True)
@@ -335,7 +335,7 @@ class TestInstallFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         mock_prerequisite_validator.assert_called_once_with(True)
@@ -401,7 +401,7 @@ class TestTestFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         mock_prerequisite_validator.assert_called_once_with(True)
@@ -447,7 +447,7 @@ class TestTestFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         self.assertFalse(result)
@@ -485,7 +485,7 @@ class TestTestFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         mock_prerequisite_validator.assert_called_once_with(True)
@@ -529,7 +529,7 @@ class TestTestFunction(unittest.TestCase):
 
         mock_installer.assert_called_once_with(tool_debug=True)
         mock_installer_instance.set_requirements.assert_called_once_with(
-            "iasl", "ethtool"
+            "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
         mock_prerequisite_validator.assert_called_once_with(True)
