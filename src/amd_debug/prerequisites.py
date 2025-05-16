@@ -1045,7 +1045,7 @@ class PrerequisiteValidator(AmdTool):
                 if not check_bits(val, expect_val):
                     self.failures += [MSRFailure()]
                     return False
-                self.db.record_prereq("PC6 and CC6 enabled", "✅")
+            self.db.record_prereq("PC6 and CC6 enabled", "✅")
         except FileNotFoundError:
             self.db.record_prereq(
                 "Unable to check MSRs: MSR kernel module not loaded", "❌"
