@@ -1027,12 +1027,6 @@ class PrerequisiteValidator(AmdTool):
         except PermissionError:
             self.db.record_prereq("CPUID checks unavailable", "🚦")
 
-        if valid:
-            self.db.record_prereq(
-                f"{self.cpu_model_string} (family {self.cpu_family:x} model {self.cpu_model:x})",
-                "✅",
-            )
-
         return True
 
     def check_msr(self):
