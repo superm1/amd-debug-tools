@@ -379,6 +379,7 @@ class PrerequisiteValidator(AmdTool):
 
     def check_usb3(self):
         """Check for the USB4 controller"""
+        slots = []
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0330"):
             slot = device.properties["PCI_SLOT_NAME"]
             if device.properties.get("DRIVER") != "xhci_hcd":
@@ -387,18 +388,27 @@ class PrerequisiteValidator(AmdTool):
                 )
                 self.failures += [MissingXhciHcd()]
                 return False
-            self.db.record_prereq(f"USB3 driver `xhci_hcd` bound to {slot}", "✅")
+            slots += [slot]
+        if slots:
+            self.db.record_prereq(
+                f"USB3 driver `xhci_hcd` bound to {', '.join(slots)}", "✅"
+            )
         return True
 
     def check_usb4(self):
         """Check if the thunderbolt driver is loaded"""
+        slots = []
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
             slot = device.properties["PCI_SLOT_NAME"]
             if device.properties.get("DRIVER") != "thunderbolt":
                 self.db.record_prereq("USB4 driver `thunderbolt` missing", "❌")
                 self.failures += [MissingThunderbolt()]
                 return False
-            self.db.record_prereq(f"USB4 driver `thunderbolt` bound to {slot}", "✅")
+            slots += [slot]
+        if slots:
+            self.db.record_prereq(
+                f"USB4 driver `thunderbolt` bound to {', '.join(slots)}", "✅"
+            )
         return True
 
     def check_sleep_mode(self):

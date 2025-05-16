@@ -1628,9 +1628,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
         result = self.validator.check_usb3()
         self.assertFalse(result)
         self.mock_db.record_prereq.assert_any_call(
-            "USB3 driver `xhci_hcd` bound to 0000:00:1d.0", "✅"
-        )
-        self.mock_db.record_prereq.assert_any_call(
             "USB3 controller for 0000:00:1d.1 not using `xhci_hcd` driver", "❌"
         )
         self.assertTrue(
