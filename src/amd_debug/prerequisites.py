@@ -1099,13 +1099,16 @@ class PrerequisiteValidator(AmdTool):
                 self.db.record_prereq("IOMMU disabled", "✅")
                 return True
             debug_str += "DMA protection:\n"
-            for dev in self.pyudev.list_devices(
-                subsystem="thunderbolt", DEVTYPE="thunderbolt_domain"
-            ):
-                p = os.path.join(dev.sys_path, "iommu_dma_protection")
-                v = int(read_file(p))
-                debug_str += f"\t{p}: {v}\n"
-                found_dmar = v == 1
+            p = os.path.join("/", "sys", "firmware", "acpi", "tables", "IVRS")
+            with open(p, "rb") as f:
+                data = f.read()
+            if len(data) < 40:
+                raise ValueError(
+                    "IVRS table appears too small to contain virtualization info."
+                )
+            virt_info = struct.unpack_from("I", data, 36)[0]
+            debug_str += f"Virtualization info: 0x{virt_info:x}"
+            found_dmar = (virt_info & 0x2) != 0
             self.db.record_debug(debug_str)
             if not found_dmar:
                 self.db.record_prereq(

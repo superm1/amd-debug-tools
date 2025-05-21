@@ -180,20 +180,22 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with("IOMMU disabled", "✅")
 
-    def test_check_iommu_no_dma_protection(self):
+    @patch(
+        "amd_debug.prerequisites.open",
+        new_callable=unittest.mock.mock_open,
+        read_data=b"\x00" * 45,
+    )
+    def test_check_iommu_no_dma_protection(self, _mock_open):
         """Test check_iommu when DMA protection is not enabled"""
         self.validator.cpu_family = 0x1A
         self.validator.cpu_model = 0x20
         iommu_device = MagicMock(sys_path="/sys/devices/iommu")
-        thunderbolt_device = MagicMock(sys_path="/sys/devices/thunderbolt")
         self.mock_pyudev.list_devices.side_effect = [
             [iommu_device],
-            [thunderbolt_device],
             [],
             [],
         ]
-        with patch("amd_debug.prerequisites.read_file", return_value="0"):
-            result = self.validator.check_iommu()
+        result = self.validator.check_iommu()
         self.assertFalse(result)
         self.assertTrue(
             any(isinstance(f, DMArNotEnabled) for f in self.validator.failures)
@@ -202,20 +204,22 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "IOMMU is misconfigured: Pre-boot DMA protection not enabled", "❌"
         )
 
-    def test_check_iommu_missing_acpi_device(self):
+    @patch(
+        "amd_debug.prerequisites.open",
+        new_callable=unittest.mock.mock_open,
+        read_data=b"\x00" * 36 + b"\xff" * 4,
+    )
+    def test_check_iommu_missing_acpi_device(self, _mock_open):
         """Test check_iommu when MSFT0201 ACPI device is missing"""
         self.validator.cpu_family = 0x1A
         self.validator.cpu_model = 0x20
         iommu_device = MagicMock(sys_path="/sys/devices/iommu")
-        thunderbolt_device = MagicMock(sys_path="/sys/devices/thunderbolt")
         self.mock_pyudev.list_devices.side_effect = [
             [iommu_device],
-            [thunderbolt_device],
             [],
             [],
         ]
-        with patch("amd_debug.prerequisites.read_file", return_value="1"):
-            result = self.validator.check_iommu()
+        result = self.validator.check_iommu()
         self.assertFalse(result)
         self.assertTrue(
             any(isinstance(f, MissingIommuACPI) for f in self.validator.failures)
@@ -224,47 +228,48 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "IOMMU is misconfigured: missing MSFT0201 ACPI device", "❌"
         )
 
-    def test_check_iommu_missing_policy(self):
+    @patch(
+        "amd_debug.prerequisites.open",
+        new_callable=unittest.mock.mock_open,
+        read_data=b"\x00" * 36 + b"\xff" * 4,
+    )
+    def test_check_iommu_missing_policy(self, _mock_open):
         """Test check_iommu when policy is not bound to MSFT0201"""
         self.validator.cpu_family = 0x1A
         self.validator.cpu_model = 0x20
         iommu_device = MagicMock(sys_path="/sys/devices/iommu")
-        thunderbolt_device = MagicMock(sys_path="/sys/devices/thunderbolt")
         acpi_device = MagicMock(sys_path="/sys/devices/acpi/MSFT0201")
         platform_device = MagicMock(sys_path="/sys/devices/platform/MSFT0201")
         self.mock_pyudev.list_devices.side_effect = [
             [iommu_device],
-            [thunderbolt_device],
             [acpi_device],
             [platform_device],
         ]
-        with patch("amd_debug.prerequisites.read_file", return_value="1"), patch(
-            "os.path.exists", return_value=False
-        ):
-            result = self.validator.check_iommu()
+        result = self.validator.check_iommu()
         self.assertFalse(result)
         self.assertTrue(
             any(isinstance(f, MissingIommuPolicy) for f in self.validator.failures)
         )
 
-    def test_check_iommu_properly_configured(self):
+    @patch(
+        "amd_debug.prerequisites.open",
+        new_callable=unittest.mock.mock_open,
+        read_data=b"\x00" * 36 + b"\xff" * 4,
+    )
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
+    def test_check_iommu_properly_configured(self, _mock_open, _mock_exists):
         """Test check_iommu when IOMMU is properly configured"""
         self.validator.cpu_family = 0x1A
         self.validator.cpu_model = 0x20
         iommu_device = MagicMock(sys_path="/sys/devices/iommu")
-        thunderbolt_device = MagicMock(sys_path="/sys/devices/thunderbolt")
         acpi_device = MagicMock(sys_path="/sys/devices/acpi/MSFT0201")
         platform_device = MagicMock(sys_path="/sys/devices/platform/MSFT0201")
         self.mock_pyudev.list_devices.side_effect = [
             [iommu_device],
-            [thunderbolt_device],
             [acpi_device],
             [platform_device],
         ]
-        with patch("amd_debug.prerequisites.read_file", return_value="1"), patch(
-            "os.path.exists", return_value=True
-        ):
-            result = self.validator.check_iommu()
+        result = self.validator.check_iommu()
         self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with("IOMMU properly configured", "✅")
 
