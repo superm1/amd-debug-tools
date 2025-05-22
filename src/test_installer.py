@@ -192,7 +192,7 @@ class TestInstaller(unittest.TestCase):
         """Test install requirements function"""
         self.installer.set_requirements("iasl", "ethtool")
         ret = self.installer.install_dependencies()
-        self.assertFalse(ret)
+        self.assertTrue(ret)
 
     @patch("builtins.print")
     @patch("amd_debug.installer.get_distro", return_value="ubuntu")
@@ -263,7 +263,7 @@ class TestInstaller(unittest.TestCase):
         """Test install requirements function for edid-decode on unsupported distro"""
         self.installer.set_requirements("edid-decode")
         ret = self.installer.install_dependencies()
-        self.assertFalse(ret)
+        self.assertTrue(ret)
 
     @patch("builtins.print")
     @patch("os.path.exists", return_value=False)

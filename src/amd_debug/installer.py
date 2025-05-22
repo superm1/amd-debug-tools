@@ -35,6 +35,7 @@ class Headers:  # pylint: disable=too-few-public-methods
     MissingTabulate = "Data library `tabulate` is missing"
     MissingJinja2 = "Template library `jinja2` is missing"
     MissingSeaborn = "Data visualization library `seaborn` is missing"
+    UnknownDistro = "No distro installation support available, install manually"
 
 
 class DistroPackage:
@@ -71,7 +72,8 @@ class DistroPackage:
                 return False
             installer = ["pacman", "-Sy", self.arch]
         else:
-            return False
+            print_color(Headers.UnknownDistro, "👀")
+            return True
 
         try:
             subprocess.check_call(installer)
