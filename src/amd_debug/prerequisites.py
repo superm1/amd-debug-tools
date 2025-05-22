@@ -698,9 +698,13 @@ class PrerequisiteValidator(AmdTool):
             interface = device.properties.get("INTERFACE")
             cmd = ["ethtool", interface]
             wol_supported = False
-            output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(
-                "utf-8"
-            )
+            try:
+                output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(
+                    "utf-8"
+                )
+            except FileNotFoundError:
+                self.db.record_prereq(f"ethtool is missing", "👀")
+                return True
             for line in output.split("\n"):
                 if "Supports Wake-on" in line:
                     val = line.split(":")[1].strip()
@@ -949,6 +953,8 @@ class PrerequisiteValidator(AmdTool):
                         stderr=subprocess.DEVNULL,
                     )
                     self.db.record_debug_file(f"{prefix}.dsl")
+                except FileNotFoundError as e:
+                    self.db.record_prereq(f"Failed to capture ACPI table: {e}", "👀")
                 except subprocess.CalledProcessError as e:
                     self.db.record_prereq(
                         f"Failed to capture ACPI table: {e.output}", "👀"
