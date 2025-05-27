@@ -205,7 +205,9 @@ class TestInstaller(unittest.TestCase):
         """Test install requirements function for edid-decode on Ubuntu"""
         self.installer.set_requirements("edid-decode")
         ret = self.installer.install_dependencies()
-        _mock_check_call.assert_called_once_with(["apt", "install", "edid-decode"])
+        _mock_check_call.assert_called_once_with(
+            ["apt", "install", "libdisplay-info-bin"]
+        )
         self.assertTrue(ret)
 
     @patch("builtins.print")
@@ -229,7 +231,7 @@ class TestInstaller(unittest.TestCase):
         self.installer.set_requirements("edid-decode")
         ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(
-            ["dnf", "install", "-y", "edid-decode"]
+            ["dnf", "install", "-y", "libdisplay-info"]
         )
         self.assertTrue(ret)
 
@@ -249,8 +251,8 @@ class TestInstaller(unittest.TestCase):
         """Test install requirements function for edid-decode on Arch"""
         self.installer.set_requirements("edid-decode")
         ret = self.installer.install_dependencies()
-        _mock_check_call.assert_not_called()  # edid-decode is not supported on Arch
-        self.assertFalse(ret)
+        _mock_check_call.assert_called_once_with(["pacman", "-Sy", "libdisplay-info"])
+        self.assertTrue(ret)
 
     @patch("builtins.print")
     @patch("os.path.exists", return_value=False)

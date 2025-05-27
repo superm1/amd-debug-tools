@@ -1742,7 +1742,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         result = self.validator.capture_edid()
         self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with(
-            "edid-decode not installed, unable to decode EDID", "👀"
+            "Failed to capture EDID table", "👀"
         )
 
     @patch("amd_debug.prerequisites.subprocess.check_output")
@@ -1755,9 +1755,9 @@ class TestPrerequisiteValidator(unittest.TestCase):
             returncode=1, cmd="edid-decode", output=b"Error decoding EDID"
         )
         result = self.validator.capture_edid()
-        self.assertFalse(result)
+        self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with(
-            "Failed to capture EDID table: b'Error decoding EDID'", "👀"
+            "Failed to capture EDID table", "👀"
         )
 
     @patch("amd_debug.prerequisites.subprocess.check_output")

@@ -136,20 +136,24 @@ class PrerequisiteValidator(AmdTool):
             return True
 
         for name, p in edids.items():
-            try:
-                cmd = ["edid-decode", p]
-                output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(
-                    "utf-8"
-                )
-            except FileNotFoundError:
-                self.db.record_prereq(
-                    "edid-decode not installed, unable to decode EDID", "👀"
-                )
-                return True
-            except subprocess.CalledProcessError as e:
-                self.db.record_prereq(f"Failed to capture EDID table: {e.output}", "👀")
-                return False
-            self.db.record_debug(apply_prefix_wrapper(f"EDID for {name}:", output))
+            output = None
+            for cmd in ["di-edid-decode", "edid-decode"]:
+                try:
+                    cmd = ["edid-decode", p]
+                    output = subprocess.check_output(
+                        cmd, stderr=subprocess.DEVNULL
+                    ).decode("utf-8")
+                    break
+                except FileNotFoundError:
+                    self.db.record_debug(f"{cmd} not installed")
+                except subprocess.CalledProcessError as e:
+                    self.db.record_debug(
+                        f"failed to capture edid with {cmd}: {e.output}"
+                    )
+            if not output:
+                self.db.record_prereq("Failed to capture EDID table", "👀")
+            else:
+                self.db.record_debug(apply_prefix_wrapper(f"EDID for {name}:", output))
         return True
 
     def check_amdgpu(self):

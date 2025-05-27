@@ -26,6 +26,7 @@ class Headers:  # pylint: disable=too-few-public-methods
 
     MissingIasl = "ACPI extraction tool `iasl` is missing"
     MissingEdidDecode = "EDID decoding tool `edid-decode` is missing"
+    MissingDiEdidDecode = "EDID decoding tool `di-edid-decode` is missing"
     MissingEthtool = "Ethtool is missing"
     InstallAction = "Attempting to install"
     MissingFwupd = "Firmware update library `fwupd` is missing"
@@ -190,6 +191,18 @@ class EdidDecodePackage(DistroPackage):
         )
 
 
+class DisplayInfoPackage(DistroPackage):
+    """display info package"""
+
+    def __init__(self):
+        super().__init__(
+            deb="libdisplay-info-bin",
+            rpm="libdisplay-info",
+            arch="libdisplay-info",
+            message=Headers.MissingDiEdidDecode,
+        )
+
+
 class FwupdPackage(DistroPackage):
     """Fwupd package"""
 
@@ -263,7 +276,17 @@ class Installer(AmdTool):
                 package = EthtoolPackage()
                 if not package.install():
                     return False
+        # can be satisified by either edid-decode or di-edid-decode
         if "edid-decode" in self.requirements:
+            try:
+                di_edid = (
+                    subprocess.call(
+                        ["di-edid-decode", "--help"], stdout=subprocess.DEVNULL
+                    )
+                    == 255
+                )
+            except FileNotFoundError:
+                di_edid = False
             try:
                 edid = (
                     subprocess.call(
@@ -273,7 +296,12 @@ class Installer(AmdTool):
                 )
             except FileNotFoundError:
                 edid = False
-            if not edid:
+            if not di_edid and not edid:
+                # try to install di-edid-decode first
+                package = DisplayInfoPackage()
+                if package.install():
+                    return True
+                # fall back to edid-decode instead
                 package = EdidDecodePackage()
                 if not package.install():
                     return False
