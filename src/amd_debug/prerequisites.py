@@ -26,6 +26,7 @@ from amd_debug.common import (
     apply_prefix_wrapper,
     BIT,
     clear_temporary_message,
+    find_ip_version,
     get_distro,
     get_pretty_distro,
     get_property_pyudev,
@@ -48,6 +49,7 @@ from amd_debug.failures import (
     DevSlpDiskIssue,
     DevSlpHostIssue,
     DMArNotEnabled,
+    DmcubTooOld,
     DmiNotSetup,
     FadtWrong,
     I2CHidBug,
@@ -393,6 +395,53 @@ class PrerequisiteValidator(AmdTool):
             self.db.record_prereq(
                 f"USB3 driver `xhci_hcd` bound to {', '.join(slots)}", "✅"
             )
+        return True
+
+    def check_dpia_pg_dmcub(self):
+        """Check if DMUB is new enough to PG DPIA when no USB4 present"""
+        usb4_found = False
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="C0340"):
+            usb4_found = True
+            break
+        if usb4_found:
+            self.db.record_debug("USB4 routers found, no need to check DMCUB version")
+            return True
+        # Check if matching DCN present
+        for device in self.pyudev.list_devices(subsystem="pci"):
+            current = None
+            klass = device.properties.get("PCI_CLASS")
+            if klass not in ["30000", "38000"]:
+                continue
+            pci_id = device.properties.get("PCI_ID")
+            if not pci_id.startswith("1002"):
+                continue
+            hw_ver = {"major": 3, "minor": 5, "revision": 0}
+            if not find_ip_version(device.sys_path, "DMU", hw_ver):
+                continue
+
+            # DCN was found, lookup version from sysfs
+            p = os.path.join(device.sys_path, "fw_version", "dmcub_fw_version")
+            if os.path.exists(p):
+                current = int(read_file(p), 16)
+
+            # no sysfs, try to look for version from debugfs
+            if not current:
+                slot = device.properties["PCI_SLOT_NAME"]
+                p = os.path.join(
+                    "/", "sys", "kernel", "debug", "dri", slot, "amdgpu_firmware_info"
+                )
+                contents = read_file(p)
+                for line in contents.split("\n"):
+                    if not line.startswith("DMCUB"):
+                        continue
+                    current = int(line.split()[-1], 16)
+            if current:
+                expected = 0x09001B00
+                if current >= expected:
+                    return True
+                self.db.record_prereq("DMCUB Firmware is outdated", "❌")
+                self.failures += [DmcubTooOld(current, expected)]
+                return False
         return True
 
     def check_usb4(self):
@@ -1214,6 +1263,7 @@ class PrerequisiteValidator(AmdTool):
                 self.check_smt,
                 self.check_iommu,
                 self.check_asus_rog_ally,
+                self.check_dpia_pg_dmcub,
             ]
 
         checks += [

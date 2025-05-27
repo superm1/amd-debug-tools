@@ -586,3 +586,15 @@ class RogAllyMcuPowerSave(S0i3Failure):
             "The MCU powersave feature is disabled which will cause problems "
             "with the controller after suspend/resume."
         )
+
+
+class DmcubTooOld(S0i3Failure):
+    """DMCUB microcode is too old"""
+
+    def __init__(self, current, expected):
+        super().__init__()
+        self.description = "DMCUB microcode is too old"
+        self.explanation = (
+            f"The DMCUB microcode version {hex(current)} is older than the"
+            f"minimum suggested version {hex(expected)}."
+        )
