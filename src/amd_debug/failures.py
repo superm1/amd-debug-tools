@@ -416,7 +416,7 @@ class LowHardwareSleepResidency(S0i3Failure):
         super().__init__()
         self.description = "System had low hardware sleep residency"
         self.explanation = (
-            f"The system was asleep for {timedelta(seconds=duration)}, but only spent {percent:.2%} "
+            f"The system was asleep for {timedelta(seconds=duration)}, but only spent {percent/100:.2%} "
             "of this time in a hardware sleep state.  In sleep cycles that are at least "
             "60 seconds long it's expected you spend above 90 percent of the cycle in "
             "hardware sleep."
