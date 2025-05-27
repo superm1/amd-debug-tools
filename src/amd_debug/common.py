@@ -278,6 +278,20 @@ def get_property_pyudev(properties, key, fallback=""):
         return ""
 
 
+def find_ip_version(base_path, kind, hw_ver) -> bool:
+    """Determine if an IP version is present on the system"""
+    b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
+    for key, expected_value in hw_ver.items():
+        p = os.path.join(b, key)
+        if not os.path.exists(p):
+            continue
+        v = int(read_file(p))
+        if v != expected_value:
+            continue
+        return True
+    return False
+
+
 def read_msr(msr, cpu):
     """Read a Model-Specific Register (MSR) value from the CPU."""
     p = f"/dev/cpu/{cpu}/msr"
