@@ -8,7 +8,7 @@ This module contains unit tests for the prerequisite functions in the amd-debug-
 import logging
 import unittest
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 from amd_debug.prerequisites import PrerequisiteValidator
 from amd_debug.failures import *
@@ -1772,3 +1772,164 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_debug.assert_called_with(
             apply_prefix_wrapper("EDID for Monitor1:", "Decoded EDID data")
         )
+
+    @patch("amd_debug.prerequisites.find_ip_version", return_value=True)
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch("amd_debug.prerequisites.read_file")
+    def test_check_dpia_pg_dmcub_usb4_found(
+        self, mock_read_file, mock_path_exists, mock_find_ip_version
+    ):
+        """Test check_dpia_pg_dmcub when USB4 routers are found"""
+        usb4_device = MagicMock()
+        self.mock_pyudev.list_devices.side_effect = [
+            [usb4_device],  # First call: USB4 present
+        ]
+        result = self.validator.check_dpia_pg_dmcub()
+        self.assertTrue(result)
+        self.mock_db.record_debug.assert_called_with(
+            "USB4 routers found, no need to check DMCUB version"
+        )
+
+    @patch("amd_debug.prerequisites.find_ip_version", return_value=True)
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
+    @patch("amd_debug.prerequisites.read_file", return_value="0x90001B01")
+    def test_check_dpia_pg_dmcub_dmcub_fw_version_new_enough(
+        self, mock_read_file, mock_path_exists, mock_find_ip_version
+    ):
+        """Test check_dpia_pg_dmcub when DMCUB firmware version is new enough"""
+        self.mock_pyudev.list_devices.side_effect = [
+            [],  # First call: no USB4
+            [
+                MagicMock(
+                    properties={
+                        "PCI_CLASS": "30000",
+                        "PCI_ID": "1002abcd",
+                        "PCI_SLOT_NAME": "0000:01:00.0",
+                    },
+                    sys_path="/sys/devices/pci0000:01/0000:01:00.0",
+                )
+            ],
+        ]
+        with patch("builtins.open", new_callable=mock_open, read_data="3") as mock_file:
+            handlers = (
+                mock_file.return_value,
+                mock_open(read_data="5").return_value,
+                mock_open(read_data="0").return_value,
+            )
+            mock_open.side_effect = handlers
+            result = self.validator.check_dpia_pg_dmcub()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.find_ip_version", return_value=True)
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
+    @patch("amd_debug.prerequisites.read_file", return_value="0x8001B00")
+    def test_check_dpia_pg_dmcub_dmcub_fw_version_too_old(
+        self, mock_read_file, mock_path_exists, mock_find_ip_version
+    ):
+        """Test check_dpia_pg_dmcub when DMCUB firmware version is too old"""
+        self.mock_pyudev.list_devices.side_effect = [
+            [],  # First call: no USB4
+            [
+                MagicMock(
+                    properties={
+                        "PCI_CLASS": "30000",
+                        "PCI_ID": "1002abcd",
+                        "PCI_SLOT_NAME": "0000:01:00.0",
+                    },
+                    sys_path="/sys/devices/pci0000:01/0000:01:00.0",
+                )
+            ],
+        ]
+        result = self.validator.check_dpia_pg_dmcub()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "DMCUB Firmware is outdated", "❌"
+        )
+        self.assertTrue(
+            any(isinstance(f, DmcubTooOld) for f in self.validator.failures)
+        )
+
+    @patch("amd_debug.prerequisites.find_ip_version", return_value=True)
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=False)
+    @patch(
+        "amd_debug.prerequisites.read_file",
+        side_effect=[
+            "",  # sysfs read returns empty, so fallback to debugfs
+            "DMCUB fw: 09001B00\nOther line\n",  # debugfs read
+        ],
+    )
+    def test_check_dpia_pg_dmcub_debugfs_version_new_enough(
+        self, mock_read_file, mock_path_exists, mock_find_ip_version
+    ):
+        """Test check_dpia_pg_dmcub when DMCUB version is found in debugfs and is new enough"""
+        self.mock_pyudev.list_devices.side_effect = [
+            [],  # First call: no USB4
+            [
+                MagicMock(
+                    properties={
+                        "PCI_CLASS": "30000",
+                        "PCI_ID": "1002abcd",
+                        "PCI_SLOT_NAME": "0",
+                    },
+                    sys_path="/sys/devices/pci0000:01/0000:01:00.0",
+                )
+            ],
+        ]
+        result = self.validator.check_dpia_pg_dmcub()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.find_ip_version", return_value=True)
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=False)
+    @patch(
+        "amd_debug.prerequisites.read_file",
+        side_effect=[
+            "DMCUB fw: 0x08001B00\nOther line\n",  # debugfs read
+        ],
+    )
+    def test_check_dpia_pg_dmcub_debugfs_version_too_old(
+        self, mock_read_file, mock_path_exists, mock_find_ip_version
+    ):
+        """Test check_dpia_pg_dmcub when DMCUB version is found in debugfs and is too old"""
+        self.mock_pyudev.list_devices.side_effect = [
+            [],  # First call: no USB4
+            [
+                MagicMock(
+                    properties={
+                        "PCI_CLASS": "30000",
+                        "PCI_ID": "1002abcd",
+                        "PCI_SLOT_NAME": "0",
+                    },
+                    sys_path="/sys/devices/pci0000:01/0000:01:00.0",
+                )
+            ],
+        ]
+        result = self.validator.check_dpia_pg_dmcub()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "DMCUB Firmware is outdated", "❌"
+        )
+        self.assertTrue(
+            any(isinstance(f, DmcubTooOld) for f in self.validator.failures)
+        )
+
+    @patch("amd_debug.prerequisites.find_ip_version", return_value=False)
+    def test_check_dpia_pg_dmcub_no_matching_dcn(self, mock_find_ip_version):
+        """Test check_dpia_pg_dmcub when no matching DCN is found"""
+        self.mock_pyudev.list_devices.side_effect = [
+            [],  # First call: no USB4
+            [
+                MagicMock(
+                    properties={
+                        "PCI_CLASS": "30000",
+                        "PCI_ID": "1002abcd",
+                        "PCI_SLOT_NAME": "0",
+                    },
+                    sys_path="/sys/devices/pci0000:01/0000:01:00.0",
+                )
+            ],
+        ]
+        result = self.validator.check_dpia_pg_dmcub()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()

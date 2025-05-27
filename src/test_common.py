@@ -330,3 +330,94 @@ class TestCommon(unittest.TestCase):
         default = "option1"
         expected_output = f"{Colors.OK}{default}{Colors.ENDC}"
         self.assertEqual(colorize_choices(choices, default), expected_output)
+
+    @patch("amd_debug.common.read_file")
+    @patch("os.path.exists")
+    def test_find_ip_version_found(self, mock_exists, mock_read_file):
+        """Test find_ip_version returns True when expected value is found"""
+        base_path = "/foo"
+        kind = "bar"
+        hw_ver = {"baz": 42}
+
+        # Simulate file exists and value matches
+        def exists_side_effect(path):
+            return True
+
+        mock_exists.side_effect = exists_side_effect
+        mock_read_file.return_value = "42"
+        result = __import__("amd_debug.common").common.find_ip_version(
+            base_path, kind, hw_ver
+        )
+        self.assertTrue(result)
+        b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
+        expected_path = os.path.join(b, "baz")
+        mock_exists.assert_any_call(expected_path)
+        mock_read_file.assert_any_call(expected_path)
+
+    @patch("amd_debug.common.read_file")
+    @patch("os.path.exists")
+    def test_find_ip_version_not_found_due_to_missing_file(
+        self, mock_exists, mock_read_file
+    ):
+        """Test find_ip_version returns False if file does not exist"""
+        base_path = "/foo"
+        kind = "bar"
+        hw_ver = {"baz": 42}
+        # Simulate file does not exist
+        mock_exists.return_value = False
+        result = __import__("amd_debug.common").common.find_ip_version(
+            base_path, kind, hw_ver
+        )
+        self.assertFalse(result)
+        b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
+        expected_path = os.path.join(b, "baz")
+        mock_exists.assert_any_call(expected_path)
+        mock_read_file.assert_not_called()
+
+    @patch("amd_debug.common.read_file")
+    @patch("os.path.exists")
+    def test_find_ip_version_not_found_due_to_value_mismatch(
+        self, mock_exists, mock_read_file
+    ):
+        """Test find_ip_version returns False if value does not match"""
+        base_path = "/foo"
+        kind = "bar"
+        hw_ver = {"baz": 42}
+        # Simulate file exists but value does not match
+        mock_exists.return_value = True
+        mock_read_file.return_value = "99"
+        result = __import__("amd_debug.common").common.find_ip_version(
+            base_path, kind, hw_ver
+        )
+        self.assertFalse(result)
+        b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
+        expected_path = os.path.join(b, "baz")
+        mock_exists.assert_any_call(expected_path)
+        mock_read_file.assert_any_call(expected_path)
+
+    @patch("amd_debug.common.read_file")
+    @patch("os.path.exists")
+    def test_find_ip_version_multiple_keys(self, mock_exists, mock_read_file):
+        """Test find_ip_version with multiple keys in hw_ver"""
+        base_path = "/foo"
+        kind = "bar"
+        hw_ver = {"baz": 42, "qux": 99}
+
+        # First key: file exists, value does not match
+        # Second key: file exists, value matches
+        def exists_side_effect(path):
+            return True
+
+        def read_file_side_effect(path):
+            if path.endswith("baz"):
+                return "0"
+            if path.endswith("qux"):
+                return "99"
+            return "0"
+
+        mock_exists.side_effect = exists_side_effect
+        mock_read_file.side_effect = read_file_side_effect
+        result = __import__("amd_debug.common").common.find_ip_version(
+            base_path, kind, hw_ver
+        )
+        self.assertTrue(result)
