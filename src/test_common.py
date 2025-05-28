@@ -19,6 +19,7 @@ from amd_debug.common import (
     colorize_choices,
     check_lockdown,
     compare_file,
+    find_ip_version,
     fatal_error,
     get_distro,
     get_log_priority,
@@ -345,9 +346,7 @@ class TestCommon(unittest.TestCase):
 
         mock_exists.side_effect = exists_side_effect
         mock_read_file.return_value = "42"
-        result = __import__("amd_debug.common").common.find_ip_version(
-            base_path, kind, hw_ver
-        )
+        result = find_ip_version(base_path, kind, hw_ver)
         self.assertTrue(result)
         b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
         expected_path = os.path.join(b, "baz")
@@ -365,9 +364,7 @@ class TestCommon(unittest.TestCase):
         hw_ver = {"baz": 42}
         # Simulate file does not exist
         mock_exists.return_value = False
-        result = __import__("amd_debug.common").common.find_ip_version(
-            base_path, kind, hw_ver
-        )
+        result = find_ip_version(base_path, kind, hw_ver)
         self.assertFalse(result)
         b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
         expected_path = os.path.join(b, "baz")
@@ -386,9 +383,7 @@ class TestCommon(unittest.TestCase):
         # Simulate file exists but value does not match
         mock_exists.return_value = True
         mock_read_file.return_value = "99"
-        result = __import__("amd_debug.common").common.find_ip_version(
-            base_path, kind, hw_ver
-        )
+        result = find_ip_version(base_path, kind, hw_ver)
         self.assertFalse(result)
         b = os.path.join(base_path, "ip_discovery", "die", "0", kind, "0")
         expected_path = os.path.join(b, "baz")
@@ -417,7 +412,5 @@ class TestCommon(unittest.TestCase):
 
         mock_exists.side_effect = exists_side_effect
         mock_read_file.side_effect = read_file_side_effect
-        result = __import__("amd_debug.common").common.find_ip_version(
-            base_path, kind, hw_ver
-        )
-        self.assertTrue(result)
+        result = find_ip_version(base_path, kind, hw_ver)
+        self.assertFalse(result)

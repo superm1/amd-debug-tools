@@ -284,12 +284,11 @@ def find_ip_version(base_path, kind, hw_ver) -> bool:
     for key, expected_value in hw_ver.items():
         p = os.path.join(b, key)
         if not os.path.exists(p):
-            continue
+            return False
         v = int(read_file(p))
         if v != expected_value:
-            continue
-        return True
-    return False
+            return False
+    return True
 
 
 def read_msr(msr, cpu):
