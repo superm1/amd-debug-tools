@@ -432,8 +432,8 @@ class SleepReport(AmdTool):
 
         characters = print_temporary_message("Building report, please wait...")
 
-        # Build charts in the page for html and markdown formats
-        if len(self.df.index) > 1 and (self.format == "html" or self.format == "md"):
+        # Build charts in the page for html format
+        if len(self.df.index) > 1 and self.format == "html":
             self.build_battery_chart()
             self.build_hw_sleep_chart()
 

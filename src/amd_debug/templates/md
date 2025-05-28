@@ -28,12 +28,5 @@ Measured {{ prereq_date }}.
 ## Summary
 {{ summary }}
 
-{% if battery_svg %}
-{{ battery_svg | safe }}
-{% endif %}
-{% if hwsleep_svg %}
-{{ hwsleep_svg | safe }}
-{% endif %}
-
 ## Failures reported
 {{ failures }}
