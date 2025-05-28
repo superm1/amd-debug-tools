@@ -321,13 +321,11 @@ class TestValidator(unittest.TestCase):
         self.validator.lockdown = False
         with patch("os.path.exists", return_value=False), patch(
             "amd_debug.validator.read_file", side_effect=FileNotFoundError
-        ), patch.object(
-            self.validator.db, "record_cycle_data"
-        ) as mock_record_cycle_data:
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
             result = self.validator.capture_hw_sleep()
             self.assertFalse(result)
-            mock_record_cycle_data.assert_called_once_with(
-                "HW sleep statistics file missing", "❌"
+            mock_record.assert_called_once_with(
+                "HW sleep statistics file /sys/kernel/debug/amd_pmc/smu_fw_info is missing"
             )
 
     def test_capture_amdgpu_ips_status(self):
