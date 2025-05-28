@@ -281,7 +281,9 @@ class Installer(AmdTool):
             try:
                 di_edid = (
                     subprocess.call(
-                        ["di-edid-decode", "--help"], stdout=subprocess.DEVNULL
+                        ["di-edid-decode", "--help"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                     )
                     == 255
                 )
