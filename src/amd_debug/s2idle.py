@@ -9,6 +9,7 @@ import sqlite3
 
 from datetime import date, timedelta, datetime
 from amd_debug.common import (
+    convert_string_to_bool,
     colorize_choices,
     is_root,
     relaunch_sudo,
@@ -32,6 +33,7 @@ class Defaults:
     since = date.today() - timedelta(days=60)
     until = date.today() + timedelta(days=1)
     format_choices = ["txt", "md", "html", "stdout"]
+    boolean_choices = ["true", "false"]
 
 
 class Headers:
@@ -47,6 +49,7 @@ class Headers:
     FormatDescription = "What format to output the report in"
     MaxDurationDescription = "What is the maximum suspend cycle length (seconds)"
     MaxWaitDescription = "What is the maximum time between suspend cycles (seconds)"
+    ReportDebugDescription = "Enable debug output in report (increased size)"
 
 
 def display_report_file(fname, fmt) -> None:
@@ -85,7 +88,7 @@ def get_report_format() -> str:
     return "html"
 
 
-def prompt_report_arguments(since, until, fname, fmt) -> str:
+def prompt_report_arguments(since, until, fname, fmt, report_debug) -> str:
     """Prompt user for report configuration"""
     if not since:
         default = Defaults.since
@@ -114,7 +117,16 @@ def prompt_report_arguments(since, until, fname, fmt) -> str:
             fmt = get_report_format()
         if fmt not in Defaults.format_choices:
             sys.exit(f"Invalid format: {fmt}")
-    return [since, until, get_report_file(fname, fmt), fmt]
+    if report_debug is None:
+        inp = (
+            input(
+                f"{Headers.ReportDebugDescription} ({colorize_choices(Defaults.boolean_choices, "true")})? "
+            )
+            .lower()
+            .capitalize()
+        )
+        report_debug = True if not inp else convert_string_to_bool(inp)
+    return [since, until, get_report_file(fname, fmt), fmt, report_debug]
 
 
 def prompt_test_arguments(duration, wait, count, rand) -> list:
@@ -157,7 +169,9 @@ def prompt_test_arguments(duration, wait, count, rand) -> list:
 def report(since, until, fname, fmt, tool_debug, report_debug) -> bool:
     """Generate a report from previous sleep cycles"""
     try:
-        since, until, fname, fmt = prompt_report_arguments(since, until, fname, fmt)
+        since, until, fname, fmt, report_debug = prompt_report_arguments(
+            since, until, fname, fmt, report_debug
+        )
     except KeyboardInterrupt:
         sys.exit("\nReport generation cancelled")
     try:
@@ -209,8 +223,8 @@ def run_test_cycle(
         app = SleepValidator(tool_debug=debug, bios_debug=bios_debug)
         try:
             duration, wait, count = prompt_test_arguments(duration, wait, count, rand)
-            since, until, fname, fmt = prompt_report_arguments(
-                datetime.now().isoformat(), Defaults.until.isoformat(), fname, fmt
+            since, until, fname, fmt, report_debug = prompt_report_arguments(
+                datetime.now().isoformat(), Defaults.until.isoformat(), fname, fmt, True
             )
         except KeyboardInterrupt:
             sys.exit("\nTest cancelled")
@@ -229,7 +243,7 @@ def run_test_cycle(
             fname=fname,
             fmt=fmt,
             tool_debug=debug,
-            report_debug=True,
+            report_debug=report_debug,
         )
         app.run()
 
@@ -347,7 +361,7 @@ def parse_args():
     )
     report_cmd.add_argument(
         "--report-debug",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         help="Include debug messages in report (WARNING: can significantly increase report size)",
     )
 

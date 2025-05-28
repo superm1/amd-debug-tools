@@ -14,6 +14,7 @@ import struct
 import subprocess
 import re
 import sys
+from ast import literal_eval
 from datetime import date, timedelta
 
 
@@ -319,6 +320,16 @@ def relaunch_sudo() -> None:
 
 def running_ssh():
     return "SSH_CLIENT" in os.environ or "SSH_TTY" in os.environ
+
+
+def convert_string_to_bool(str_value) -> bool:
+    """convert a string to a boolean value"""
+    try:
+        value = literal_eval(str_value)
+    except (SyntaxError, ValueError):
+        value = None
+        sys.exit(f"Invalid entry: {str_value}")
+    return bool(value)
 
 
 def _git_describe() -> str:

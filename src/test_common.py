@@ -16,6 +16,7 @@ from platform import uname_result
 from amd_debug.common import (
     apply_prefix_wrapper,
     Colors,
+    convert_string_to_bool,
     colorize_choices,
     check_lockdown,
     compare_file,
@@ -414,3 +415,30 @@ class TestCommon(unittest.TestCase):
         mock_read_file.side_effect = read_file_side_effect
         result = find_ip_version(base_path, kind, hw_ver)
         self.assertFalse(result)
+
+    def test_convert_string_to_bool_true_values(self):
+        """Test convert_string_to_bool returns True for truthy string values"""
+        self.assertTrue(convert_string_to_bool("True"))
+        self.assertTrue(convert_string_to_bool("1"))
+        self.assertTrue(convert_string_to_bool("'nonempty'"))
+        self.assertTrue(convert_string_to_bool('"nonempty"'))
+
+    def test_convert_string_to_bool_false_values(self):
+        """Test convert_string_to_bool returns False for falsy string values"""
+        self.assertFalse(convert_string_to_bool("False"))
+        self.assertFalse(convert_string_to_bool("0"))
+        self.assertFalse(convert_string_to_bool("''"))
+        self.assertFalse(convert_string_to_bool('""'))
+        self.assertFalse(convert_string_to_bool("None"))
+
+    def test_convert_string_to_bool_invalid_syntax(self):
+        """Test convert_string_to_bool exits on invalid syntax"""
+        with patch("sys.exit") as mock_exit:
+            convert_string_to_bool("not_a_bool")
+            mock_exit.assert_called_once_with("Invalid entry: not_a_bool")
+
+    def test_convert_string_to_bool_invalid_value(self):
+        """Test convert_string_to_bool exits on invalid value"""
+        with patch("sys.exit") as mock_exit:
+            convert_string_to_bool("[unclosed_list")
+            mock_exit.assert_called_once_with("Invalid entry: [unclosed_list")

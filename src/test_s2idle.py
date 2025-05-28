@@ -381,6 +381,7 @@ class TestTestFunction(unittest.TestCase):
             "2023-02-01",
             "report.html",
             "html",
+            True,
         )
 
         mock_sleep_validator_instance = mock_sleep_validator.return_value
@@ -605,6 +606,7 @@ class TestReportFunction(unittest.TestCase):
             "2023-02-01",
             "report.html",
             "html",
+            True,
         )
         mock_sleep_report_instance = mock_sleep_report.return_value
 
@@ -614,10 +616,12 @@ class TestReportFunction(unittest.TestCase):
             fname=None,
             fmt=None,
             tool_debug=True,
-            report_debug=True,
+            report_debug=None,
         )
 
-        mock_prompt_report_arguments.assert_called_once_with(None, None, None, None)
+        mock_prompt_report_arguments.assert_called_once_with(
+            None, None, None, None, None
+        )
         mock_sleep_report.assert_called_once_with(
             since="2023-01-01",
             until="2023-02-01",
@@ -640,10 +644,12 @@ class TestReportFunction(unittest.TestCase):
                 fname=None,
                 fmt=None,
                 tool_debug=True,
-                report_debug=True,
+                report_debug=None,
             )
 
-        mock_prompt_report_arguments.assert_called_once_with(None, None, None, None)
+        mock_prompt_report_arguments.assert_called_once_with(
+            None, None, None, None, None
+        )
 
     @patch("amd_debug.s2idle.prompt_report_arguments")
     @patch(
@@ -659,6 +665,7 @@ class TestReportFunction(unittest.TestCase):
             "2023-02-01",
             "report.html",
             "html",
+            True,
         )
 
         result = report(
@@ -667,10 +674,12 @@ class TestReportFunction(unittest.TestCase):
             fname=None,
             fmt=None,
             tool_debug=True,
-            report_debug=True,
+            report_debug=None,
         )
 
-        mock_prompt_report_arguments.assert_called_once_with(None, None, None, None)
+        mock_prompt_report_arguments.assert_called_once_with(
+            None, None, None, None, None
+        )
         mock_sleep_report.assert_called_once_with(
             since="2023-01-01",
             until="2023-02-01",
@@ -695,6 +704,7 @@ class TestReportFunction(unittest.TestCase):
             "2023-02-01",
             "report.html",
             "html",
+            True,
         )
 
         result = report(
@@ -703,10 +713,12 @@ class TestReportFunction(unittest.TestCase):
             fname=None,
             fmt=None,
             tool_debug=True,
-            report_debug=True,
+            report_debug=None,
         )
 
-        mock_prompt_report_arguments.assert_called_once_with(None, None, None, None)
+        mock_prompt_report_arguments.assert_called_once_with(
+            None, None, None, None, None
+        )
         mock_sleep_report.assert_called_once_with(
             since="2023-01-01",
             until="2023-02-01",
@@ -729,6 +741,7 @@ class TestReportFunction(unittest.TestCase):
             "2023-02-01",
             "report.html",
             "html",
+            True,
         )
         mock_sleep_report_instance = mock_sleep_report.return_value
         mock_sleep_report_instance.run.side_effect = ValueError("Invalid value")
@@ -739,10 +752,12 @@ class TestReportFunction(unittest.TestCase):
             fname=None,
             fmt=None,
             tool_debug=True,
-            report_debug=True,
+            report_debug=None,
         )
 
-        mock_prompt_report_arguments.assert_called_once_with(None, None, None, None)
+        mock_prompt_report_arguments.assert_called_once_with(
+            None, None, None, None, None
+        )
         mock_sleep_report.assert_called_once_with(
             since="2023-01-01",
             until="2023-02-01",
@@ -758,14 +773,14 @@ class TestReportFunction(unittest.TestCase):
 class TestPromptReportArguments(unittest.TestCase):
     """Test prompt_report_arguments function"""
 
-    @patch("builtins.input", side_effect=["2023-01-01", "2023-02-01", "html"])
+    @patch("builtins.input", side_effect=["2023-01-01", "2023-02-01", "html", "true"])
     @patch("amd_debug.s2idle.get_report_file", return_value="report.html")
     @patch("amd_debug.s2idle.get_report_format", return_value="html")
     def test_prompt_report_arguments_success(
         self, mock_get_report_format, mock_get_report_file, _mock_input
     ):
         """Test prompt_report_arguments with valid inputs"""
-        result = prompt_report_arguments(None, None, None, None)
+        result = prompt_report_arguments(None, None, None, None, None)
         self.assertEqual(result[0], datetime(2023, 1, 1))
         self.assertEqual(result[1], datetime(2023, 2, 1))
         self.assertEqual(result[2], "report.html")
@@ -775,33 +790,36 @@ class TestPromptReportArguments(unittest.TestCase):
 
     @patch(
         "builtins.input",
-        side_effect=["invalid-date", "2023-01-01", "2023-02-01", "html"],
+        side_effect=["invalid-date", "2023-01-01", "2023-02-01", "html", "true"],
     )
     @patch("sys.exit")
     def test_prompt_report_arguments_invalid_since_date(self, mock_exit, mock_input):
         """Test prompt_report_arguments with invalid 'since' date"""
         mock_exit.side_effect = SystemExit
         with self.assertRaises(SystemExit):
-            prompt_report_arguments(None, None, None, None)
+            prompt_report_arguments(None, None, None, None, None)
         mock_exit.assert_called_once_with(
             "Invalid date, use YYYY-MM-DD: Invalid isoformat string: 'invalid-date'"
         )
 
     @patch(
         "builtins.input",
-        side_effect=["2023-01-01", "invalid-date", "2023-02-01", "html"],
+        side_effect=["2023-01-01", "invalid-date", "2023-02-01", "html", "true"],
     )
     @patch("sys.exit")
     def test_prompt_report_arguments_invalid_until_date(self, mock_exit, mock_input):
         """Test prompt_report_arguments with invalid 'until' date"""
         mock_exit.side_effect = SystemExit
         with self.assertRaises(SystemExit):
-            prompt_report_arguments(None, None, None, None)
+            prompt_report_arguments(None, None, None, None, None)
         mock_exit.assert_called_once_with(
             "Invalid date, use YYYY-MM-DD: Invalid isoformat string: 'invalid-date'"
         )
 
-    @patch("builtins.input", side_effect=["2023-01-01", "2023-02-01", "invalid-format"])
+    @patch(
+        "builtins.input",
+        side_effect=["2023-01-01", "2023-02-01", "invalid-format", "true"],
+    )
     @patch("amd_debug.s2idle.get_report_format", return_value="html")
     @patch("sys.exit")
     def test_prompt_report_arguments_invalid_format(
@@ -810,11 +828,27 @@ class TestPromptReportArguments(unittest.TestCase):
         """Test prompt_report_arguments with invalid format"""
         mock_exit.side_effect = SystemExit
         with self.assertRaises(SystemExit):
-            prompt_report_arguments(None, None, None, None)
+            prompt_report_arguments(None, None, None, None, None)
         mock_exit.assert_called_once_with("Invalid format: invalid-format")
         mock_get_report_format.assert_called_once()
 
-    @patch("builtins.input", side_effect=["", "", ""])
+    @patch(
+        "builtins.input",
+        side_effect=["2023-01-01", "2023-02-01", "html", "foo_the_bar"],
+    )
+    @patch("amd_debug.s2idle.get_report_format", return_value="html")
+    @patch("sys.exit")
+    def test_prompt_report_arguments_invalid_report(
+        self, mock_exit, mock_get_report_format, mock_input
+    ):
+        """Test prompt_report_arguments with invalid format"""
+        mock_exit.side_effect = SystemExit
+        with self.assertRaises(SystemExit):
+            prompt_report_arguments(None, None, None, None, None)
+        mock_exit.assert_called_once_with("Invalid entry: Foo_the_bar")
+        mock_get_report_format.assert_called_once()
+
+    @patch("builtins.input", side_effect=["", "", "", ""])
     @patch(
         "amd_debug.s2idle.get_report_file",
         return_value="amd-s2idle-report-2023-01-01.html",
@@ -824,10 +858,11 @@ class TestPromptReportArguments(unittest.TestCase):
         self, mock_get_report_format, mock_get_report_file, mock_input
     ):
         """Test prompt_report_arguments with default values"""
-        result = prompt_report_arguments(None, None, None, None)
+        result = prompt_report_arguments(None, None, None, None, None)
         self.assertEqual(datetime.date(result[0]), Defaults.since)
         self.assertEqual(datetime.date(result[1]), Defaults.until)
         self.assertEqual(result[2], "amd-s2idle-report-2023-01-01.html")
         self.assertEqual(result[3], "html")
+        self.assertEqual(result[4], True)
         mock_get_report_file.assert_called_once_with(None, "html")
         mock_get_report_format.assert_called()

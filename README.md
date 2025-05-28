@@ -101,8 +101,9 @@ The following optional arguments are supported for this command:
         --format FORMAT       Format of the report to produce (html, txt or md)
         --report-file         File to write the report to
         --tool-debug          Enable tool debug logging
-        --report-debug        Include debug messages in the report
-
+        --report-debug
+        --no-report-debug
+                              Include debug messages in report (WARNING: can significantly increase report size)
 If the tool is launched with an environment that can call `xdg-open`, the report
 will be opened in a browser.
 
