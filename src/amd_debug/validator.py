@@ -674,7 +674,7 @@ class SleepValidator(AmdTool):
     def prep(self):
         """Prepare the system for suspend testing"""
         self.last_suspend = datetime.now()
-        self.kernel_log.seek_tail()
+        self.kernel_log.seek_tail(self.last_suspend)
         self.db.start_cycle(self.last_suspend)
         self.kernel_duration = 0
         self.hw_sleep_duration = 0
