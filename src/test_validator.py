@@ -5,8 +5,9 @@
 This module contains unit tests for the validator functions in the amd-debug-tools package.
 """
 
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, Mock
 
+import os
 import logging
 import unittest
 import math
@@ -721,3 +722,105 @@ class TestValidator(unittest.TestCase):
         )
         self.assertFalse(result)
         mock_report_cycle.assert_called()
+
+    @patch("os.path.exists")
+    @patch("builtins.open", new_callable=mock_open, read_data="3")
+    @patch("os.write")
+    @patch("os.open")
+    @patch("os.close")
+    def test_suspend_system_sysfs_success(
+        self,
+        mock_os_close,
+        mock_os_open,
+        mock_os_write,
+        _mock_open_file,
+        mock_path_exists,
+    ):
+        """Test suspend_system method using sysfs interface with success"""
+        # Mock wakeup_count file existence
+        mock_path_exists.side_effect = lambda path: "wakeup_count" in path
+
+        # Mock os.open and os.write
+        mock_os_open.return_value = 3
+        mock_os_write.return_value = None
+
+        # Call the method
+        result = self.validator.suspend_system()
+
+        # Assert the method returned True
+        self.assertTrue(result)
+
+        # Assert os.open and os.write were called
+        mock_os_open.assert_called_once_with(
+            "/sys/power/state", os.O_WRONLY | os.O_SYNC
+        )
+        mock_os_write.assert_called_once_with(3, b"mem")
+        mock_os_close.assert_called_once_with(3)
+
+    @patch("os.path.exists")
+    @patch("builtins.open", new_callable=mock_open, read_data="3")
+    @patch("os.write")
+    @patch("os.open")
+    @patch("os.close")
+    def test_suspend_system_sysfs_failure(
+        self,
+        mock_os_close,
+        mock_os_open,
+        mock_os_write,
+        _mock_open_file,
+        mock_path_exists,
+    ):
+        """Test suspend_system method using sysfs interface with failure"""
+        # Mock wakeup_count file existence
+        mock_path_exists.side_effect = lambda path: "wakeup_count" in path
+
+        # Mock os.open to raise OSError
+        mock_os_open.return_value = 3
+        mock_os_write.side_effect = OSError("Failed to write to state")
+
+        # Call the method
+        result = self.validator.suspend_system()
+
+        # Assert the method returned False
+        self.assertFalse(result)
+
+        # Assert os.open and os.write were called
+        mock_os_open.assert_called_once_with(
+            "/sys/power/state", os.O_WRONLY | os.O_SYNC
+        )
+        mock_os_write.assert_called_once_with(3, b"mem")
+        mock_os_close.assert_called_once_with(3)
+
+    @patch("os.path.exists")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("os.write")
+    @patch("os.open")
+    @patch("os.close")
+    def test_suspend_system_sysfs_no_wakeup_count(
+        self,
+        mock_os_close,
+        mock_os_open,
+        mock_os_write,
+        _mock_open_file,
+        mock_path_exists,
+    ):
+        """Test suspend_system method using sysfs interface with no wakeup_count file"""
+        # Mock wakeup_count file does not exist
+        mock_path_exists.return_value = False
+
+        # Mock os.open and os.write
+        mock_os_open.return_value = 3
+        mock_os_write.return_value = None
+
+        # Call the method
+        result = self.validator.suspend_system()
+
+        # Assert the method returned True
+        self.assertTrue(result)
+
+        # Assert os.open and os.write were called
+        mock_os_open.assert_called_once_with(
+            "/sys/power/state", os.O_WRONLY | os.O_SYNC
+        )
+        mock_os_write.assert_called_once_with(3, b"mem")
+        mock_os_close.assert_called_once_with(3)
