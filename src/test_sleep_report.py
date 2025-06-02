@@ -5,6 +5,7 @@
 This module contains unit tests for the s2idle tool in the amd-debug-tools package.
 """
 
+import math
 import unittest
 from datetime import datetime
 from unittest.mock import patch
@@ -165,3 +166,31 @@ class TestSleepReport(unittest.TestCase):
         self.report.build_hw_sleep_chart()
         self.assertIsNotNone(self.report.hwsleep_svg)
         mock_savefig.assert_called_once()
+
+    def test_pre_process_dataframe_zero_duration(self):
+        """Test the pre_process_dataframe method when t0 and t1 are the same."""
+        # Mock the dataframe with t0 and t1 being the same
+        self.report.df = pd.DataFrame(
+            {
+                "t0": [datetime(2023, 10, 10, 12, 0, 0).strftime("%Y%m%d%H%M%S")],
+                "t1": [datetime(2023, 10, 10, 12, 0, 0).strftime("%Y%m%d%H%M%S")],
+                "hw": [50],
+                "requested": [1],
+                "gpio": ["1, 2"],
+                "wake_irq": ["1"],
+                "b0": [90],
+                "b1": [85],
+                "full": [100],
+            }
+        )
+
+        # Call the method
+        self.report.pre_process_dataframe()
+
+        # Verify the dataframe was processed correctly
+        self.assertTrue(
+            self.report.df["Duration"].isna().iloc[0]
+        )  # Duration should be NaN
+        self.assertTrue(
+            math.isnan(self.report.df["Hardware Sleep"].iloc[0])
+        )  # Hardware Sleep should be NaN

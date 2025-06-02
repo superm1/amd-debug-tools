@@ -4,6 +4,7 @@
 import os
 import re
 import math
+import numpy as np
 from datetime import datetime, timedelta
 from tabulate import tabulate
 from jinja2 import Environment, FileSystemLoader
@@ -136,6 +137,7 @@ class SleepReport(AmdTool):
         self.df["Duration"] = self.df["t1"].apply(format_as_seconds) - self.df[
             "t0"
         ].apply(format_as_seconds)
+        self.df["Duration"] = self.df["Duration"].replace(0, np.nan)
         self.df["Hardware Sleep"] = (self.df["hw"] / self.df["Duration"]).apply(
             parse_hw_sleep
         )
@@ -178,7 +180,8 @@ class SleepReport(AmdTool):
 
     def post_process_dataframe(self):
         """Display pandas dataframe in a more user friendly format"""
-        self.df["Duration"] = self.df["Duration"].apply(format_timedelta)
+        if self.df["Duration"].notna().all():
+            self.df["Duration"] = self.df["Duration"].apply(format_timedelta)
         self.df["Hardware Sleep"] = self.df["Hardware Sleep"].apply(format_percent)
         if "Battery Start" in self.df.columns:
             self.df["Battery Start"] = self.df["Battery Start"].apply(format_percent)
