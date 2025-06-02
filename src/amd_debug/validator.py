@@ -747,16 +747,18 @@ class SleepValidator(AmdTool):
                 return False
         else:
             old = get_wakeup_count()
+            p = os.path.join("/", "sys", "power", "state")
+            fd = os.open(p, os.O_WRONLY | os.O_SYNC)
             try:
-                p = os.path.join("/", "sys", "power", "state")
-                with open(p, "w", encoding="utf-8") as w:
-                    w.write("mem")
+                os.write(fd, b"mem")
             except OSError as e:
                 new = get_wakeup_count()
                 self.db.record_cycle_data(
                     f"Failed to set suspend state ({old} -> {new}): {e}", "❌"
                 )
                 return False
+            finally:
+                os.close(fd)
             return True
 
     def unlock_session(self):
