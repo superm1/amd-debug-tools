@@ -137,9 +137,9 @@ class PrerequisiteValidator(AmdTool):
 
         for name, p in edids.items():
             output = None
-            for cmd in ["di-edid-decode", "edid-decode"]:
+            for tool in ["di-edid-decode", "edid-decode"]:
                 try:
-                    cmd = ["edid-decode", p]
+                    cmd = [tool, p]
                     output = subprocess.check_output(
                         cmd, stderr=subprocess.DEVNULL
                     ).decode("utf-8")
