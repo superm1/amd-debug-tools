@@ -695,7 +695,7 @@ class TestValidator(unittest.TestCase):
         # Test case 3: Randomized test
         mock_randint.side_effect = [7, 3]  # Random duration and wait
         self.validator.run(duration=10, count=1, wait=5, rand=True, logind=False)
-        mock_randint.assert_any_call(1, 10)
+        mock_randint.assert_any_call(4, 10)
         mock_randint.assert_any_call(1, 5)
         mock_run_countdown.assert_any_call("Suspending system", math.ceil(3 / 2))
         mock_run_countdown.assert_any_call("Collecting data", math.ceil(3 / 2))
@@ -706,16 +706,23 @@ class TestValidator(unittest.TestCase):
         mock_report_cycle.assert_called()
         mock_unlock_session.assert_called()
 
-        # Test case 4: Multiple cycles
+        # Test case 4: Randomized test, but too short of a duration
+        result = self.validator.run(
+            duration=4, count=1, wait=5, rand=True, logind=False
+        )
+        self.assertFalse(result)
+        mock_report_cycle.assert_called()
+
+        # Test case 5: Multiple cycles
         self.validator.run(duration=10, count=2, wait=5, rand=False, logind=False)
         self.assertEqual(mock_prep.call_count, 4)  # Includes previous calls
         self.assertEqual(mock_program_wakealarm.call_count, 4)
         self.assertEqual(mock_suspend_system.call_count, 4)
         self.assertEqual(mock_post.call_count, 4)
-        self.assertEqual(mock_report_cycle.call_count, 4)
+        self.assertEqual(mock_report_cycle.call_count, 5)
         self.assertEqual(mock_unlock_session.call_count, 3)
 
-        # Test case 5: suspend_system fails
+        # Test case 6: suspend_system fails
         mock_suspend_system.return_value = False
         result = self.validator.run(
             duration=10, count=1, wait=5, rand=False, logind=False

@@ -790,6 +790,11 @@ class SleepValidator(AmdTool):
             self.logind = True
 
         if rand:
+            if duration <= min_duration:
+                print_color(f"Invalid max duration {duration}", "❌")
+                self.db.sync()
+                self.report_cycle()
+                return False
             print_color(
                 f"Running {count} cycle random test with min duration of {min_duration}s, max duration of {duration}s and a max wait of {wait}s",
                 "🗣️",
