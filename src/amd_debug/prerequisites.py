@@ -134,7 +134,6 @@ class PrerequisiteValidator(AmdTool):
         if len(edids) == 0:
             self.db.record_debug("No EDID data found")
             return True
-
         for name, p in edids.items():
             output = None
             for tool in ["di-edid-decode", "edid-decode"]:
@@ -142,7 +141,7 @@ class PrerequisiteValidator(AmdTool):
                     cmd = [tool, p]
                     output = subprocess.check_output(
                         cmd, stderr=subprocess.DEVNULL
-                    ).decode("utf-8")
+                    ).decode("utf-8", errors="ignore")
                     break
                 except FileNotFoundError:
                     self.db.record_debug(f"{cmd} not installed")
