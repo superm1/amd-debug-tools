@@ -308,10 +308,8 @@ def parse_args():
     test_cmd.add_argument(
         "--random",
         action="store_true",
-        help=(
-            "Run sleep cycles for random durations and wait, using the "
-            "--duration and --wait arguments as an upper bound",
-        ),
+        help="Run sleep cycles for random durations and wait, using the "
+        "--duration and --wait arguments as an upper bound",
     )
     test_cmd.add_argument(
         "--force",
