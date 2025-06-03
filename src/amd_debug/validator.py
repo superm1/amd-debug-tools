@@ -782,6 +782,7 @@ class SleepValidator(AmdTool):
 
     def run(self, duration, count, wait, rand, logind):
         """Run the suspend test"""
+        min_duration = 4
         if not count:
             return True
 
@@ -790,7 +791,7 @@ class SleepValidator(AmdTool):
 
         if rand:
             print_color(
-                f"Running {count} cycle random test with max duration of {duration}s and a max wait of {wait}s",
+                f"Running {count} cycle random test with min duration of {min_duration}s, max duration of {duration}s and a max wait of {wait}s",
                 "🗣️",
             )
         elif count > 1:
@@ -801,7 +802,7 @@ class SleepValidator(AmdTool):
             )
         for i in range(1, count + 1):
             if rand:
-                self.requested_duration = random.randint(1, duration)
+                self.requested_duration = random.randint(min_duration, duration)
                 requested_wait = random.randint(1, wait)
             else:
                 self.requested_duration = duration
