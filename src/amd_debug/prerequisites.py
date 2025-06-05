@@ -1145,7 +1145,6 @@ class PrerequisiteValidator(AmdTool):
             if not found_iommu:
                 self.db.record_prereq("IOMMU disabled", "✅")
                 return True
-            debug_str += "DMA protection:\n"
             p = os.path.join("/", "sys", "firmware", "acpi", "tables", "IVRS")
             with open(p, "rb") as f:
                 data = f.read()
