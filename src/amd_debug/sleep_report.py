@@ -4,8 +4,8 @@
 import os
 import re
 import math
-import numpy as np
 from datetime import datetime, timedelta
+import numpy as np
 from tabulate import tabulate
 from jinja2 import Environment, FileSystemLoader
 import pandas as pd
@@ -206,6 +206,7 @@ class SleepReport(AmdTool):
             )
 
     def convert_gpio_dataframe(self, content):
+        """Convert the GPIO dataframe table to an HTML table"""
         header = False
         rows = []
         for line in content.split("\n"):
@@ -236,9 +237,7 @@ class SleepReport(AmdTool):
                 content = row[0]
                 if self.format == "html" and "int|active" in content:
                     content = self.convert_gpio_dataframe(content)
-                prereq_debug.append(
-                    {"data": "{message}".format(message=content.strip())}
-                )
+                prereq_debug.append({"data": f"{content.strip()}"})
         return prereq, t0, prereq_debug
 
     def get_cycle_data(self):
@@ -250,7 +249,7 @@ class SleepReport(AmdTool):
             if self.format == "html":
                 data = ""
                 for line in self.db.report_cycle_data(cycle).split("\n"):
-                    data += "<p>{line}</p>".format(line=line)
+                    data += f"<p>{line}</p>"
                 cycles.append({"cycle_num": num, "data": data})
             else:
                 cycles.append([num, self.db.report_cycle_data(cycle)])
@@ -322,8 +321,7 @@ class SleepReport(AmdTool):
                     if "<tr>" in line:
                         line = line.replace(
                             "<tr>",
-                            '<tr class="row-low" onclick="pick_summary_cycle(%d)">'
-                            % row,
+                            f'<tr class="row-low" onclick="pick_summary_cycle({row})">',
                         )
                         row = row + 1
                     summary += line
@@ -363,7 +361,7 @@ class SleepReport(AmdTool):
             "failures": failures,
         }
         if self.fname:
-            with open(self.fname, "w") as f:
+            with open(self.fname, "w", encoding="utf-8") as f:
                 f.write(template.render(context))
             if "SUDO_UID" in os.environ:
                 os.chown(
@@ -375,30 +373,30 @@ class SleepReport(AmdTool):
 
     def build_battery_chart(self):
         """Build a battery chart using matplotlib and seaborn"""
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        import io
+        import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+        import seaborn as sns  # pylint: disable=import-outside-toplevel
+        import io  # pylint: disable=import-outside-toplevel
 
         if "Battery Ave Rate" not in self.df.columns:
             return
 
         plt.set_loglevel("warning")
-        fig, ax1 = plt.subplots()
-        lns3 = ax1.plot(
+        _fig, ax1 = plt.subplots()
+        ax1.plot(
             self.df["Battery Ave Rate"], color="green", label="Charge/Discharge Rate"
         )
 
         ax2 = ax1.twinx()
-        lns1 = sns.barplot(
+        sns.barplot(
             x=self.df.index,
             y=self.df["Battery Delta"],
             color="grey",
             label="Battery Change",
             alpha=0.3,
         )
-        max = int(len(self.df.index) / 10)
-        if max:
-            ax1.set_xticks(range(0, len(self.df.index), max))
+        max_range = int(len(self.df.index) / 10)
+        if max_range:
+            ax1.set_xticks(range(0, len(self.df.index), max_range))
         ax1.set_xlabel("Cycle")
         ax1.set_ylabel("Rate (Watts)")
         ax2.set_ylabel("Battery Change (%)")
@@ -415,20 +413,20 @@ class SleepReport(AmdTool):
 
     def build_hw_sleep_chart(self):
         """Build the hardware sleep chart using matplotlib and seaborn"""
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        import io
+        import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+        import seaborn as sns  # pylint: disable=import-outside-toplevel
+        import io  # pylint: disable=import-outside-toplevel
 
         plt.set_loglevel("warning")
-        fig, ax1 = plt.subplots()
-        lns3 = ax1.plot(
+        _fig, ax1 = plt.subplots()
+        ax1.plot(
             self.df["Hardware Sleep"],
             color="red",
             label="Hardware Sleep",
         )
 
         ax2 = ax1.twinx()
-        lns1 = sns.barplot(
+        sns.barplot(
             x=self.df.index,
             y=self.df["Duration"] / 60,
             color="grey",
@@ -436,9 +434,9 @@ class SleepReport(AmdTool):
             alpha=0.3,
         )
 
-        max = int(len(self.df.index) / 10)
-        if max:
-            ax1.set_xticks(range(0, len(self.df.index), max))
+        max_range = int(len(self.df.index) / 10)
+        if max_range:
+            ax1.set_xticks(range(0, len(self.df.index), max_range))
         ax1.set_xlabel("Cycle")
         ax1.set_ylabel("Percent")
         ax2.set_yscale("log")
