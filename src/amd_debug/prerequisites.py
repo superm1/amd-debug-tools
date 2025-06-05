@@ -522,7 +522,7 @@ class PrerequisiteValidator(AmdTool):
                 f"{keys['sys_vendor']} {keys['product_name']} ({keys['product_family']})",
                 "💻",
             )
-            debug_str = "DMI data:\n"
+            debug_str = "DMI|value\n"
             for key, value in keys.items():
                 if (
                     "product_name" in key
@@ -530,7 +530,7 @@ class PrerequisiteValidator(AmdTool):
                     or "product_family" in key
                 ):
                     continue
-                debug_str += f"{key}: {value}\n"
+                debug_str += f"{key}| {value}\n"
             self.db.record_debug(debug_str)
         return True
 
@@ -911,7 +911,7 @@ class PrerequisiteValidator(AmdTool):
         devices = []
         for dev in self.pyudev.list_devices(subsystem="pci"):
             devices.append(dev)
-        debug_str = "PCI devices\n"
+        debug_str = "PCI Slot | Vendor | Class | ID | ACPI path\n"
         for dev in devices:
             pci_id = dev.properties["PCI_ID"].lower()
             pci_slot_name = dev.properties["PCI_SLOT_NAME"]
@@ -934,15 +934,12 @@ class PrerequisiteValidator(AmdTool):
             p = os.path.join(dev.sys_path, "firmware_node", "path")
             if os.path.exists(p):
                 acpi = read_file(p)
-                debug_str += (
-                    f"{prefix}{pci_slot_name} : "
-                    f"{database_vendor} {database_class} [{pci_id}] : {acpi}\n"
-                )
             else:
-                debug_str += (
-                    f"{prefix}{pci_slot_name} : "
-                    f"{database_vendor} {database_class} [{pci_id}]\n"
-                )
+                acpi = ""
+            debug_str += (
+                f"{prefix}{pci_slot_name} | "
+                f"{database_vendor} | {database_class} | {pci_id} | {acpi}\n"
+            )
         if debug_str:
             self.db.record_debug(debug_str)
 
@@ -959,12 +956,8 @@ class PrerequisiteValidator(AmdTool):
                 if status == 0:
                     continue
             devices.append(dev)
-        debug_str = "ACPI name: ACPI path [driver]\n"
+        debug_str = "ACPI name | ACPI path | Kernel driver\n"
         for dev in devices:
-            if dev == devices[-1]:
-                prefix = "└─"
-            else:
-                prefix = "│ "
             p = os.path.join(dev.sys_path, "path")
             pth = read_file(p)
             p = os.path.join(dev.sys_path, "physical_node", "driver")
@@ -972,7 +965,7 @@ class PrerequisiteValidator(AmdTool):
                 driver = os.path.basename(os.readlink(p))
             else:
                 driver = None
-            debug_str += f"{prefix}{dev.sys_name}: {pth} [{driver}]\n"
+            debug_str += f"{dev.sys_name} | {pth} | {driver}\n"
         if debug_str:
             self.db.record_debug(debug_str)
         return True

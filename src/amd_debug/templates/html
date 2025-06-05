@@ -42,12 +42,14 @@
         table,
         th,
         td {
-            border-width: 0;
+            border-width: 1;
+            border-collapse: collapse;
             table-layout: fixed;
             font-family: sans-serif;
             letter-spacing: 0.02em;
             color: #000000;
-            margin-bottom: 10px;
+            text-align: left;
+            padding: 3px;
         }
 
         .○ {

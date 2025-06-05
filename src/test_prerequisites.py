@@ -500,9 +500,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         result = self.validator.map_acpi_path()
         self.assertTrue(result)
         self.mock_db.record_debug.assert_called_with(
-            "ACPI name: ACPI path [driver]\n"
-            "│ device1: mocked_path [driver]\n"
-            "└─device2: mocked_path [driver]\n"
+            "ACPI name | ACPI path | Kernel driver\ndevice1 | mocked_path | driver\ndevice2 | mocked_path | driver\n"
         )
 
     @patch("amd_debug.prerequisites.os.path.exists")
@@ -545,7 +543,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         result = self.validator.map_acpi_path()
         self.assertTrue(result)
         self.mock_db.record_debug.assert_called_with(
-            "ACPI name: ACPI path [driver]\n└─device1: mocked_path [None]\n"
+            "ACPI name | ACPI path | Kernel driver\ndevice1 | mocked_path | None\n"
         )
 
     @patch("amd_debug.prerequisites.read_file")
@@ -569,8 +567,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
 
         self.validator.capture_pci_acpi()
         self.mock_db.record_debug.assert_called_with(
-            "PCI devices\n"
-            "└─0000:00:1f.0 : Intel Corporation ISA bridge [1234abcd] : mocked_acpi_path\n"
+            "PCI Slot | Vendor | Class | ID | ACPI path\n└─0000:00:1f.0 | Intel Corporation | ISA bridge | 1234abcd | mocked_acpi_path\n"
         )
 
     @patch("amd_debug.prerequisites.read_file")
@@ -593,8 +590,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
 
         self.validator.capture_pci_acpi()
         self.mock_db.record_debug.assert_called_with(
-            "PCI devices\n"
-            "└─0000:01:00.0 : NVIDIA Corporation VGA compatible controller [5678efgh]\n"
+            "PCI Slot | Vendor | Class | ID | ACPI path\n└─0000:01:00.0 | NVIDIA Corporation | VGA compatible controller | 5678efgh | \n"
         )
 
     @patch("amd_debug.prerequisites.read_file")
@@ -628,9 +624,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
 
         self.validator.capture_pci_acpi()
         self.mock_db.record_debug.assert_called_with(
-            "PCI devices\n"
-            "│ 0000:00:1f.0 : Intel Corporation ISA bridge [1234abcd] : mocked_acpi_path\n"
-            "└─0000:01:00.0 : NVIDIA Corporation VGA compatible controller [5678efgh] : mocked_acpi_path\n"
+            "PCI Slot | Vendor | Class | ID | ACPI path\n│ 0000:00:1f.0 | Intel Corporation | ISA bridge | 1234abcd | mocked_acpi_path\n└─0000:01:00.0 | NVIDIA Corporation | VGA compatible controller | 5678efgh | mocked_acpi_path\n"
         )
 
     def test_capture_pci_acpi_no_devices(self):
@@ -638,7 +632,9 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_pyudev.list_devices.return_value = []
 
         self.validator.capture_pci_acpi()
-        self.mock_db.record_debug.assert_called_with("PCI devices\n")
+        self.mock_db.record_debug.assert_called_with(
+            "PCI Slot | Vendor | Class | ID | ACPI path\n"
+        )
 
     @patch("amd_debug.prerequisites.read_file")
     def test_check_aspm_default_policy(self, mock_read_file):
@@ -1006,7 +1002,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "MockVendor MockProduct (MockFamily)", "💻"
         )
         self.mock_db.record_debug.assert_called_with(
-            "DMI data:\nchassis_type: Desktop\n"
+            "DMI|value\nchassis_type| Desktop\n"
         )
 
     @patch("amd_debug.prerequisites.os.walk")
@@ -1034,7 +1030,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_prereq.assert_called_with(
             "MockVendor MockProduct (MockFamily)", "💻"
         )
-        self.mock_db.record_debug.assert_called_with("DMI data:\n")
+        self.mock_db.record_debug.assert_called_with("DMI|value\n")
 
     @patch("amd_debug.prerequisites.os.walk")
     @patch("amd_debug.prerequisites.read_file")

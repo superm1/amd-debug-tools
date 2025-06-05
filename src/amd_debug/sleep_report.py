@@ -205,8 +205,8 @@ class SleepReport(AmdTool):
                 format_watts
             )
 
-    def convert_gpio_dataframe(self, content):
-        """Convert the GPIO dataframe table to an HTML table"""
+    def convert_table_dataframe(self, content):
+        """Convert a table like dataframe to an HTML table"""
         header = False
         rows = []
         for line in content.split("\n"):
@@ -215,17 +215,20 @@ class SleepReport(AmdTool):
                 if header:
                     continue
                 header = True
+            line = line.strip("│")
+            line = line.replace("├─", "└─")
             if "|" in line:
                 # first column missing '|'
                 rows.append(line.replace("\t", "|"))
         columns = [row.split("|") for row in rows]
         df = pd.DataFrame(columns[1:], columns=columns[0])
-        return df.to_html(index=False, table_id="gpio")
+        return df.to_html(index=False, justify="center", col_space=30)
 
     def get_prereq_data(self):
         """Get the prereq data"""
         prereq = []
         prereq_debug = []
+        tables = ["int|active", "ACPI name", "PCI Slot", "DMI|value"]
         ts = self.db.get_last_prereq_ts()
         if not ts:
             return [], "", []
@@ -235,8 +238,10 @@ class SleepReport(AmdTool):
         if self.debug:
             for row in self.db.report_debug(t0):
                 content = row[0]
-                if self.format == "html" and "int|active" in content:
-                    content = self.convert_gpio_dataframe(content)
+                if self.format == "html" and [
+                    table for table in tables if table in content
+                ]:
+                    content = self.convert_table_dataframe(content)
                 prereq_debug.append({"data": f"{content.strip()}"})
         return prereq, t0, prereq_debug
 
