@@ -146,9 +146,7 @@ class PrerequisiteValidator(AmdTool):
                 except FileNotFoundError:
                     self.db.record_debug(f"{cmd} not installed")
                 except subprocess.CalledProcessError as e:
-                    self.db.record_debug(
-                        f"failed to capture edid with {cmd}: {e.output}"
-                    )
+                    pass
             if not output:
                 self.db.record_prereq("Failed to capture EDID table", "👀")
             else:
