@@ -229,7 +229,12 @@ class SleepReport(AmdTool):
         """Get the prereq data"""
         prereq = []
         prereq_debug = []
-        tables = ["int|active", "ACPI name", "PCI Slot", "DMI|value"]
+        tables = [
+            "int|active",
+            "ACPI name",
+            "PCI Slot",
+            "DMI|value",
+        ]
         ts = self.db.get_last_prereq_ts()
         if not ts:
             return [], "", []
@@ -250,6 +255,7 @@ class SleepReport(AmdTool):
         """Get the cycle data"""
         cycles = []
         debug = []
+        tables = ["Wakeup Source"]
         num = 0
         for cycle in self.df["Start Time"]:
             if self.format == "html":
@@ -263,7 +269,12 @@ class SleepReport(AmdTool):
                 messages = []
                 priorities = []
                 for row in self.db.report_debug(cycle):
-                    messages.append(row[0])
+                    content = row[0]
+                    if self.format == "html" and [
+                        table for table in tables if table in content
+                    ]:
+                        content = self.convert_table_dataframe(content)
+                    messages.append(content)
                     priorities.append(get_log_priority(row[1]))
                 debug.append(
                     {"cycle_num": num, "messages": messages, "priorities": priorities}

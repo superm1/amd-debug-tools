@@ -158,9 +158,8 @@ class TestValidator(unittest.TestCase):
         self.validator.capture_wake_sources()
 
         # Validate debug messages
-        mock_record_debug.assert_any_call("Possible wakeup sources:")
         mock_record_debug.assert_any_call(
-            "└─ [/sys/devices/pci0000:00/0000:00:14.0]: enabled"
+            "Wakeup Source|Linux Device|Status\n|/sys/devices/pci0000:00/0000:00:14.0|enabled\n"
         )
 
         # Stop patches

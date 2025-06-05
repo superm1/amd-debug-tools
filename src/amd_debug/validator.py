@@ -290,13 +290,12 @@ class SleepValidator(AmdTool):
                 sys_name = pnp.sys_name
 
             name = name.replace('"', "")
-            devices.append(f"{name} [{sys_name}]: {wake_en}")
+            devices.append(f"{name}|{sys_name}|{wake_en}")
         devices.sort()
-        self.db.record_debug("Possible wakeup sources:")
+        debug_str = "Wakeup Source|Linux Device|Status\n"
         for dev in devices:
-            # set prefix if last device
-            prefix = "│ " if dev != devices[-1] else "└─"
-            self.db.record_debug(f"{prefix}{dev}")
+            debug_str += f"{dev}\n"
+        self.db.record_debug(debug_str)
 
     def capture_lid(self) -> None:
         """Capture lid state"""
