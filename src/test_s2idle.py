@@ -455,12 +455,18 @@ class TestTestFunction(unittest.TestCase):
 
     @patch("amd_debug.s2idle.Installer")
     @patch("amd_debug.s2idle.PrerequisiteValidator")
-    @patch("amd_debug.prerequisites.SleepDatabase")
-    @patch("amd_debug.validator.SleepDatabase")
+    @patch("amd_debug.s2idle.SleepValidator")
+    @patch("amd_debug.s2idle.SleepReport")
+    @patch("amd_debug.s2idle.prompt_test_arguments")
+    @patch("amd_debug.s2idle.prompt_report_arguments")
+    @patch("amd_debug.s2idle.display_report_file")
     def test_test_prerequisite_failure(
         self,
-        _mock_sleep_db,
-        _mock_sleep_db_prerequisite,
+        mock_display_report_file,
+        mock_prompt_report_arguments,
+        mock_prompt_test_arguments,
+        mock_sleep_report,
+        mock_sleep_validator,
         mock_prerequisite_validator,
         mock_installer,
     ):
@@ -470,6 +476,17 @@ class TestTestFunction(unittest.TestCase):
 
         mock_prerequisite_instance = mock_prerequisite_validator.return_value
         mock_prerequisite_instance.run.return_value = False
+
+        mock_prompt_test_arguments.return_value = (10, 5, 3)
+        mock_prompt_report_arguments.return_value = (
+            "2023-01-01",
+            "2023-02-01",
+            "report.html",
+            "html",
+            True,
+        )
+        mock_sleep_validator_instance = mock_sleep_validator.return_value
+        mock_sleep_report_instance = mock_sleep_report.return_value
 
         result = run_test_cycle(
             duration=None,
@@ -492,7 +509,20 @@ class TestTestFunction(unittest.TestCase):
         mock_prerequisite_validator.assert_called_once_with(True)
         mock_prerequisite_instance.run.assert_called_once()
         mock_prerequisite_instance.report.assert_called_once()
-        self.assertFalse(result)
+        mock_prompt_test_arguments.assert_called_once_with(None, None, None, False)
+        mock_prompt_report_arguments.assert_called_once()
+        mock_sleep_validator_instance.assert_not_called()
+        mock_sleep_report.assert_called_once_with(
+            since=None,
+            until=None,
+            fname="report.html",
+            fmt="html",
+            tool_debug=True,
+            report_debug=True,
+        )
+        mock_sleep_report_instance.run.assert_called_once()
+        mock_display_report_file.assert_called_once_with("report.html", "html")
+        self.assertTrue(result)
 
     @patch("amd_debug.s2idle.Installer")
     @patch("amd_debug.s2idle.PrerequisiteValidator")
@@ -533,9 +563,9 @@ class TestTestFunction(unittest.TestCase):
             "iasl", "ethtool", "edid-decode"
         )
         mock_installer_instance.install_dependencies.assert_called_once()
-        mock_prerequisite_validator.assert_called_once_with(True)
-        mock_prerequisite_instance.run.assert_called_once()
-        mock_prerequisite_instance.report.assert_called_once()
+        mock_prerequisite_validator.assert_not_called()
+        mock_prerequisite_instance.run.assert_not_called()
+        mock_prerequisite_instance.report.assert_not_called()
         mock_prompt_test_arguments.assert_called_once_with(None, None, None, False)
 
 

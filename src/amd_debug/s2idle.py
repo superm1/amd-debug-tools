@@ -212,6 +212,14 @@ def run_test_cycle(
         return False
 
     try:
+        duration, wait, count = prompt_test_arguments(duration, wait, count, rand)
+        since, until, fname, fmt, report_debug = prompt_report_arguments(
+            datetime.now().isoformat(), Defaults.until.isoformat(), fname, fmt, True
+        )
+    except KeyboardInterrupt:
+        sys.exit("\nTest cancelled")
+
+    try:
         app = PrerequisiteValidator(debug)
         run = app.run()
     except PermissionError as e:
@@ -221,37 +229,32 @@ def run_test_cycle(
 
     if run or force:
         app = SleepValidator(tool_debug=debug, bios_debug=bios_debug)
-        try:
-            duration, wait, count = prompt_test_arguments(duration, wait, count, rand)
-            since, until, fname, fmt, report_debug = prompt_report_arguments(
-                datetime.now().isoformat(), Defaults.until.isoformat(), fname, fmt, True
-            )
-        except KeyboardInterrupt:
-            sys.exit("\nTest cancelled")
 
-        app.run(
+        run = app.run(
             duration=duration,
             wait=wait,
             count=count,
             rand=rand,
             logind=logind,
         )
+    else:
+        since = None
+        until = None
 
-        app = SleepReport(
-            since=since,
-            until=until,
-            fname=fname,
-            fmt=fmt,
-            tool_debug=debug,
-            report_debug=report_debug,
-        )
-        app.run()
+    app = SleepReport(
+        since=since,
+        until=until,
+        fname=fname,
+        fmt=fmt,
+        tool_debug=debug,
+        report_debug=report_debug,
+    )
+    app.run()
 
-        # open report in browser if it's html
-        display_report_file(fname, fmt)
+    # open report in browser if it's html
+    display_report_file(fname, fmt)
 
-        return True
-    return False
+    return True
 
 
 def install(debug) -> None:

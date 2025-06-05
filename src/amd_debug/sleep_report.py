@@ -98,8 +98,23 @@ class SleepReport(AmdTool):
         self.debug = report_debug
         self.format = fmt
         self.failures = []
-        self.df = self.db.report_summary_dataframe(self.since, self.until)
-        self.pre_process_dataframe()
+        if since and until:
+            self.df = self.db.report_summary_dataframe(self.since, self.until)
+            self.pre_process_dataframe()
+        else:
+            self.df = pd.DataFrame(
+                columns=[
+                    "t0",
+                    "t1",
+                    "requested",
+                    "hw",
+                    "b0",
+                    "b1",
+                    "full",
+                    "wake_irq",
+                    "gpio",
+                ]
+            )
         self.battery_svg = None
         self.hwsleep_svg = None
 
@@ -268,58 +283,70 @@ class SleepReport(AmdTool):
             prereq, prereq_date, prereq_debug = self.get_prereq_data()
 
         # Load the cycle and/or debug data
-        cycles, debug = self.get_cycle_data()
+        if not self.df.empty:
+            cycles, debug = self.get_cycle_data()
 
-        self.post_process_dataframe()
-        failures = None
-        if self.format == "md":
-            summary = self.df.to_markdown(floatfmt=".02f")
-            cycle_data = tabulate(cycles, headers=["Cycle", "data"], tablefmt="pipe")
-            if self.failures:
-                failures = tabulate(
-                    self.failures,
-                    headers=["Cycle", "Problem", "Explanation"],
-                    tablefmt="pipe",
+            self.post_process_dataframe()
+            failures = None
+            if self.format == "md":
+                summary = self.df.to_markdown(floatfmt=".02f")
+                cycle_data = tabulate(
+                    cycles, headers=["Cycle", "data"], tablefmt="pipe"
                 )
-        elif self.format == "txt":
-            summary = tabulate(self.df, headers=self.df.columns, tablefmt="fancy_grid")
-            cycle_data = tabulate(
-                cycles, headers=["Cycle", "data"], tablefmt="fancy_grid"
-            )
-            if self.failures:
-                failures = tabulate(
-                    self.failures,
-                    headers=["Cycle", "Problem", "Explanation"],
-                    tablefmt="fancy_grid",
-                )
-        elif self.format == "html":
-            summary = ""
-            row = 0
-            # we will use javascript to highlight the high values
-            for line in self.df.to_html(table_id="summary", render_links=True).split(
-                "\n"
-            ):
-                if "<tr>" in line:
-                    line = line.replace(
-                        "<tr>",
-                        '<tr class="row-low" onclick="pick_summary_cycle(%d)">' % row,
+                if self.failures:
+                    failures = tabulate(
+                        self.failures,
+                        headers=["Cycle", "Problem", "Explanation"],
+                        tablefmt="pipe",
                     )
-                    row = row + 1
-                summary += line
-            cycle_data = cycles
-            failures = self.failures
-        # only show one cycle in stdout output even if we found more
-        else:
-            df = self.df.tail(1)
-            summary = tabulate(
-                df, headers=self.df.columns, tablefmt="fancy_grid", showindex=False
-            )
-            if cycles[-1][0] == df.index.start:
-                cycle_data = cycles[-1][-1]
+            elif self.format == "txt":
+                summary = tabulate(
+                    self.df, headers=self.df.columns, tablefmt="fancy_grid"
+                )
+                cycle_data = tabulate(
+                    cycles, headers=["Cycle", "data"], tablefmt="fancy_grid"
+                )
+                if self.failures:
+                    failures = tabulate(
+                        self.failures,
+                        headers=["Cycle", "Problem", "Explanation"],
+                        tablefmt="fancy_grid",
+                    )
+            elif self.format == "html":
+                summary = ""
+                row = 0
+                # we will use javascript to highlight the high values
+                for line in self.df.to_html(
+                    table_id="summary", render_links=True
+                ).split("\n"):
+                    if "<tr>" in line:
+                        line = line.replace(
+                            "<tr>",
+                            '<tr class="row-low" onclick="pick_summary_cycle(%d)">'
+                            % row,
+                        )
+                        row = row + 1
+                    summary += line
+                cycle_data = cycles
+                failures = self.failures
+            # only show one cycle in stdout output even if we found more
             else:
-                cycle_data = None
-            if self.failures and self.failures[-1][0] == df.index.start:
-                failures = self.failures[-1][-1]
+                df = self.df.tail(1)
+                summary = tabulate(
+                    df, headers=self.df.columns, tablefmt="fancy_grid", showindex=False
+                )
+                if cycles[-1][0] == df.index.start:
+                    cycle_data = cycles[-1][-1]
+                else:
+                    cycle_data = None
+                if self.failures and self.failures[-1][0] == df.index.start:
+                    failures = self.failures[-1][-1]
+        else:
+            cycles = []
+            debug = []
+            cycle_data = []
+            summary = "No sleep cycles found in the database."
+            failures = None
 
         # let it burn
         context = {
@@ -430,15 +457,13 @@ class SleepReport(AmdTool):
     def run(self, inc_prereq=True):
         """Run the report"""
 
-        if self.df.empty:
-            raise ValueError(f"No data found between {self.since} and {self.until}")
-
         characters = print_temporary_message("Building report, please wait...")
 
-        # Build charts in the page for html format
-        if len(self.df.index) > 1 and self.format == "html":
-            self.build_battery_chart()
-            self.build_hw_sleep_chart()
+        if not self.df.empty:
+            # Build charts in the page for html format
+            if len(self.df.index) > 1 and self.format == "html":
+                self.build_battery_chart()
+                self.build_hw_sleep_chart()
 
         # Render the template using jinja
         msg = self.build_template(inc_prereq)
