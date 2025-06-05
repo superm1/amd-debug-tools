@@ -142,7 +142,7 @@ class MissingDriver(S0i3Failure):
         self.description = f"{slot} driver is missing"
         self.explanation = (
             f"No driver has been bound to PCI device {slot} "
-            "Without a driver, the hardware may be able to enter a low power. "
+            "Without a driver, the hardware may be able to enter a low power "
             "state, but there may be spurious wake up events."
         )
 
