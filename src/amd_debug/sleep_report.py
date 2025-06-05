@@ -74,6 +74,8 @@ def format_percent(val):
 
 def format_timedelta(val):
     """Format seconds as a nicer format"""
+    if math.isnan(val):
+        val = 0
     return str(timedelta(seconds=val))
 
 
@@ -195,8 +197,7 @@ class SleepReport(AmdTool):
 
     def post_process_dataframe(self):
         """Display pandas dataframe in a more user friendly format"""
-        if self.df["Duration"].notna().all():
-            self.df["Duration"] = self.df["Duration"].apply(format_timedelta)
+        self.df["Duration"] = self.df["Duration"].apply(format_timedelta)
         self.df["Hardware Sleep"] = self.df["Hardware Sleep"].apply(format_percent)
         if "Battery Start" in self.df.columns:
             self.df["Battery Start"] = self.df["Battery Start"].apply(format_percent)
