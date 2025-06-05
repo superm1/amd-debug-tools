@@ -1710,9 +1710,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
         ]
         result = self.validator.check_storage()
         self.assertTrue(result)
-        self.mock_db.record_debug.assert_called_with(
-            "New enough kernel to avoid NVME check"
-        )
 
     def test_check_storage_no_kernel_log(self):
         """Test check_storage when kernel log is unavailable"""

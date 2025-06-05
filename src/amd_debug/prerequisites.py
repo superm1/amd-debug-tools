@@ -242,7 +242,6 @@ class PrerequisiteValidator(AmdTool):
         for dev in self.pyudev.list_devices(subsystem="pci", DRIVER="nvme"):
             # https://git.kernel.org/torvalds/c/e79a10652bbd3
             if minimum_kernel(6, 10):
-                self.db.record_debug("New enough kernel to avoid NVME check")
                 break
             pci_slot_name = dev.properties["PCI_SLOT_NAME"]
             vendor = dev.properties.get("ID_VENDOR_FROM_DATABASE", "")
@@ -316,7 +315,6 @@ class PrerequisiteValidator(AmdTool):
         # not needed to check in newer kernels
         # see https://github.com/torvalds/linux/commit/77f1972bdcf7513293e8bbe376b9fe837310ee9c
         if minimum_kernel(6, 10):
-            self.db.record_debug("New enough kernel to avoid HSMP check")
             return True
         f = os.path.join("/", "boot", f"config-{platform.uname().release}")
         if os.path.exists(f):
