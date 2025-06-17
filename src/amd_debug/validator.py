@@ -443,11 +443,12 @@ class SleepValidator(AmdTool):
         """Check for hardware sleep state"""
         # try from kernel 6.4's suspend stats interface first because it works
         # even with kernel lockdown
-        if not self.hw_sleep_duration:
+        p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
+        if os.path.exists(p):
             p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
             if os.path.exists(p):
                 self.hw_sleep_duration = int(read_file(p)) / 10**6
-        if not self.hw_sleep_duration:
+        if not os.path.exists(p) and not self.hw_sleep_duration:
             p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
                 val = read_file(p)
