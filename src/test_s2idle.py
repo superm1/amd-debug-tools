@@ -180,7 +180,7 @@ class TestMainFunction(unittest.TestCase):
             mock_report.assert_called_once_with(
                 "2023-01-01", "2023-02-01", None, "html", False, False
             )
-            self.assertTrue(result)
+            self.assertIsNone(result)
 
     @patch("amd_debug.s2idle.relaunch_sudo")
     @patch("amd_debug.s2idle.run_test_cycle")
@@ -207,7 +207,7 @@ class TestMainFunction(unittest.TestCase):
             mock_test.assert_called_once_with(
                 None, None, "5", "txt", None, False, False, False, False, False
             )
-            self.assertTrue(result)
+            self.assertIsNone(result)
 
     @patch("amd_debug.s2idle.version")
     def test_main_version(self, mock_version):
@@ -220,7 +220,7 @@ class TestMainFunction(unittest.TestCase):
                 result = main()
                 mock_version.assert_called_once()
                 mock_print.assert_called_once_with("1.0.0")
-                self.assertTrue(result)
+                self.assertIsNone(result)
 
     def test_main_no_action(self):
         """Test main function with no action specified"""
