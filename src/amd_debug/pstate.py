@@ -300,15 +300,17 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None|int:
     """Main function"""
     args = parse_args()
     ret = False
     if args.command == "version":
         print(version())
-        return True
+        return
     elif args.command == "triage":
         triage = AmdPstateTriage(args.tool_debug)
         ret = triage.run()
     show_log_info()
-    return ret
+    if ret is False:
+        return 1
+    return
