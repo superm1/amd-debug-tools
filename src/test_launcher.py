@@ -26,10 +26,11 @@ class TestLauncher(unittest.TestCase):
         """Test launching as unknown exe"""
 
         with patch("builtins.print") as mock_print:
-            amd_debug.launch_tool("unknown_exe.py")
+            result = amd_debug.launch_tool("unknown_exe.py")
             mock_print.assert_called_once_with(
                 "\033[91mUnknown exe: unknown_exe.py\033[0m"
             )
+            self.assertIsNotNone(result)
 
     def test_launcher_amd_s2idle(self):
         """Test launching amd_s2idle"""

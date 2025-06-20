@@ -42,4 +42,4 @@ def launch_tool(tool_name):
         return tools[tool_name]()
     else:
         print(f"\033[91mUnknown exe: {tool_name}\033[0m")
-        return False
+        return 1
