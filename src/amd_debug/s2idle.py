@@ -394,7 +394,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> None|int:
     """Main function"""
     args = parse_args()
     ret = False
@@ -429,8 +429,10 @@ def main():
         )
     elif args.action == "version":
         print(version())
-        return True
+        return
     else:
         sys.exit("no action specified")
     show_log_info()
-    return ret
+    if ret is False:
+        return 1
+    return
