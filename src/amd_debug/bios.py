@@ -122,7 +122,7 @@ def parse_args():
     return args
 
 
-def main():
+def main() -> None|int:
     """Main function"""
     args = parse_args()
     ret = False
@@ -135,4 +135,6 @@ def main():
     elif args.command == "version":
         print(version())
     show_log_info()
-    return ret
+    if ret is False:
+        return 1
+    return
