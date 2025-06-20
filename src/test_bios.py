@@ -194,7 +194,7 @@ class TestAmdBios(unittest.TestCase):
         mock_amd_bios.assert_called_once_with(None, True)
         mock_app.set_tracing.assert_called_once_with(True)
         mock_show_log_info.assert_called_once()
-        self.assertTrue(result)
+        self.assertIsNone(result)
 
     @patch("amd_debug.bios.AmdBios")
     @patch("amd_debug.bios.parse_args")
@@ -217,7 +217,7 @@ class TestAmdBios(unittest.TestCase):
         mock_amd_bios.assert_called_once_with("test.log", True)
         mock_app.run.assert_called_once()
         mock_show_log_info.assert_called_once()
-        self.assertTrue(result)
+        self.assertIsNone(result)
 
     @patch("amd_debug.bios.parse_args")
     @patch("amd_debug.bios.version")
@@ -235,7 +235,7 @@ class TestAmdBios(unittest.TestCase):
         mock_parse_args.assert_called_once()
         mock_version.assert_called_once()
         mock_show_log_info.assert_called_once()
-        self.assertEqual(result, False)
+        self.assertEqual(result, 1)
 
     @patch("amd_debug.bios.parse_args")
     @patch("amd_debug.bios.show_log_info")
@@ -247,4 +247,4 @@ class TestAmdBios(unittest.TestCase):
 
         mock_parse_args.assert_called_once()
         mock_show_log_info.assert_called_once()
-        self.assertFalse(result)
+        self.assertEqual(result, 1)
