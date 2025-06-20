@@ -446,7 +446,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def install_dep_superset() -> bool:
+def install_dep_superset() -> None|int:
     """Install all python supserset dependencies"""
     args = parse_args()
     tool = Installer(tool_debug=args.tool_debug)
@@ -465,4 +465,6 @@ def install_dep_superset() -> bool:
     if ret:
         print_color("All dependencies installed", "✅")
     show_log_info()
-    return ret
+    if ret is False:
+        return 1
+    return
