@@ -28,7 +28,6 @@ def main():
             f"Missing dependency: {e}\n"
             f"Run ./install_deps.py to install dependencies."
         )
-        return False
 
 
 if __name__ == "__main__":
