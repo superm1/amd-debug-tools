@@ -595,6 +595,9 @@ class PrerequisiteValidator(AmdTool):
                 with open(target, "rb") as r:
                     r.seek(0x70)
                     found = struct.unpack("<I", r.read(4))[0] & BIT(21)
+            except FileNotFoundError:
+                self.db.record_prereq("FADT check unavailable", "🚦")
+                return True
             except PermissionError:
                 self.db.record_prereq("FADT check unavailable", "🚦")
                 return True
