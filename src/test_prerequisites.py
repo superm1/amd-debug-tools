@@ -798,8 +798,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertFalse(result)
         self.assertTrue(any(isinstance(f, FadtWrong) for f in self.validator.failures))
 
-    @patch("amd_debug.prerequisites.os.path.exists", return_value=False)
-    def test_check_fadt_file_not_found(self, mock_path_exists):
+    def test_check_fadt_file_not_found(self):
         """Test check_fadt when FADT file is not found"""
         self.mock_kernel_log.match_line.return_value = False
         result = self.validator.check_fadt()
