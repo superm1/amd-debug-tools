@@ -120,7 +120,7 @@ def prompt_report_arguments(since, until, fname, fmt, report_debug) -> str:
     if report_debug is None:
         inp = (
             input(
-                f"{Headers.ReportDebugDescription} ({colorize_choices(Defaults.boolean_choices, "true")})? "
+                f"{Headers.ReportDebugDescription} ({colorize_choices(Defaults.boolean_choices, 'true')})? "
             )
             .lower()
             .capitalize()
