@@ -144,6 +144,16 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(result)
 
     @patch("amd_debug.prerequisites.version.parse")
+    def test_check_port_pm_override_smu_version_missing(self, mock_version_parse):
+        """Test check_port_pm_override with SMU version undefined"""
+        self.validator.cpu_family = 0x19
+        self.validator.cpu_model = 0x74
+        mock_version_parse.side_effect = lambda v: v if isinstance(v, str) else None
+        self.validator.smu_version = ""
+        result = self.validator.check_port_pm_override()
+        self.assertTrue(result)
+
+    @patch("amd_debug.prerequisites.version.parse")
     def test_check_port_pm_override_smu_version_too_low(self, mock_version_parse):
         """Test check_port_pm_override with SMU version < 76.18.0"""
         self.validator.cpu_family = 0x19

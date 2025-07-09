@@ -1190,6 +1190,8 @@ class PrerequisiteValidator(AmdTool):
             return True
         if self.cpu_model not in [0x74, 0x78]:
             return True
+        if not self.smu_version:
+            return True
         if version.parse(self.smu_version) > version.parse("76.60.0"):
             return True
         if version.parse(self.smu_version) < version.parse("76.18.0"):
