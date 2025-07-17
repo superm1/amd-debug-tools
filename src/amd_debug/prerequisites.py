@@ -1148,6 +1148,22 @@ class PrerequisiteValidator(AmdTool):
             if not found_iommu:
                 self.db.record_prereq("IOMMU disabled", "✅")
                 return True
+            for dev in self.pyudev.list_devices(subsystem="acpi"):
+                if "MSFT0201" in dev.sys_path:
+                    found_acpi = True
+            if not found_acpi:
+                self.db.record_prereq(
+                    "IOMMU is misconfigured: missing MSFT0201 ACPI device", "❌"
+                )
+                self.failures += [MissingIommuACPI("MSFT0201")]
+                return False
+            # check that policy is bound to it
+            for dev in self.pyudev.list_devices(subsystem="platform"):
+                if "MSFT0201" in dev.sys_path:
+                    p = os.path.join(dev.sys_path, "iommu")
+                    if not os.path.exists(p):
+                        self.failures += [MissingIommuPolicy("MSFT0201")]
+                        return False
             p = os.path.join("/", "sys", "firmware", "acpi", "tables", "IVRS")
             with open(p, "rb") as f:
                 data = f.read()
@@ -1165,22 +1181,6 @@ class PrerequisiteValidator(AmdTool):
                 )
                 self.failures += [DMArNotEnabled()]
                 return False
-            for dev in self.pyudev.list_devices(subsystem="acpi"):
-                if "MSFT0201" in dev.sys_path:
-                    found_acpi = True
-            if not found_acpi:
-                self.db.record_prereq(
-                    "IOMMU is misconfigured: missing MSFT0201 ACPI device", "❌"
-                )
-                self.failures += [MissingIommuACPI("MSFT0201")]
-                return False
-            # check that policy is bound to it
-            for dev in self.pyudev.list_devices(subsystem="platform"):
-                if "MSFT0201" in dev.sys_path:
-                    p = os.path.join(dev.sys_path, "iommu")
-                    if not os.path.exists(p):
-                        self.failures += [MissingIommuPolicy("MSFT0201")]
-                        return False
             self.db.record_prereq("IOMMU properly configured", "✅")
         return True
 

@@ -195,15 +195,18 @@ class TestPrerequisiteValidator(unittest.TestCase):
         new_callable=unittest.mock.mock_open,
         read_data=b"\x00" * 45,
     )
-    def test_check_iommu_no_dma_protection(self, _mock_open):
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
+    def test_check_iommu_no_dma_protection(self, _mock_open, _mock_exists):
         """Test check_iommu when DMA protection is not enabled"""
         self.validator.cpu_family = 0x1A
         self.validator.cpu_model = 0x20
         iommu_device = MagicMock(sys_path="/sys/devices/iommu")
+        acpi_device = MagicMock(sys_path="/sys/devices/acpi/MSFT0201")
+        platform_device = MagicMock(sys_path="/sys/devices/platform/MSFT0201")
         self.mock_pyudev.list_devices.side_effect = [
             [iommu_device],
-            [],
-            [],
+            [acpi_device],
+            [platform_device],
         ]
         result = self.validator.check_iommu()
         self.assertFalse(result)
