@@ -196,8 +196,8 @@ class TestPrerequisiteValidator(unittest.TestCase):
         read_data=b"\x00" * 45,
     )
     @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
-    def test_check_iommu_no_dma_protection(self, _mock_open, _mock_exists):
-        """Test check_iommu when DMA protection is not enabled"""
+    def test_check_iommu_no_dma_protection_no_msft0201(self, _mock_open, _mock_exists):
+        """Test check_iommu when DMA protection is not enabled and no MSFT0201 in IVRS"""
         self.validator.cpu_family = 0x1A
         self.validator.cpu_model = 0x20
         iommu_device = MagicMock(sys_path="/sys/devices/iommu")
@@ -216,6 +216,27 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_prereq.assert_called_with(
             "IOMMU is misconfigured: Pre-boot DMA protection not enabled", "❌"
         )
+
+    @patch(
+        "amd_debug.prerequisites.open",
+        new_callable=unittest.mock.mock_open,
+        read_data=b"\x00" * 45 + "MSFT0201".encode("utf-8"),
+    )
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
+    def test_check_iommu_no_dma_protection_BUT_msft0201(self, _mock_open, _mock_exists):
+        """Test check_iommu when DMA protection is not enabled BUT MSFT0201 is in IVRS"""
+        self.validator.cpu_family = 0x1A
+        self.validator.cpu_model = 0x20
+        iommu_device = MagicMock(sys_path="/sys/devices/iommu")
+        acpi_device = MagicMock(sys_path="/sys/devices/acpi/MSFT0201")
+        platform_device = MagicMock(sys_path="/sys/devices/platform/MSFT0201")
+        self.mock_pyudev.list_devices.side_effect = [
+            [iommu_device],
+            [acpi_device],
+            [platform_device],
+        ]
+        result = self.validator.check_iommu()
+        self.assertTrue(result)
 
     @patch(
         "amd_debug.prerequisites.open",

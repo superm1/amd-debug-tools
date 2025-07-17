@@ -1145,9 +1145,13 @@ class PrerequisiteValidator(AmdTool):
                 found_iommu = True
                 debug_str += f"Found IOMMU {dev.sys_path}\n"
                 break
+
+            # User turned off IOMMU, no problems
             if not found_iommu:
                 self.db.record_prereq("IOMMU disabled", "✅")
                 return True
+
+            # Look for MSFT0201 in DSDT/SSDT
             for dev in self.pyudev.list_devices(subsystem="acpi"):
                 if "MSFT0201" in dev.sys_path:
                     found_acpi = True
@@ -1157,13 +1161,16 @@ class PrerequisiteValidator(AmdTool):
                 )
                 self.failures += [MissingIommuACPI("MSFT0201")]
                 return False
-            # check that policy is bound to it
+
+            # Check that policy is bound to it
             for dev in self.pyudev.list_devices(subsystem="platform"):
                 if "MSFT0201" in dev.sys_path:
                     p = os.path.join(dev.sys_path, "iommu")
                     if not os.path.exists(p):
                         self.failures += [MissingIommuPolicy("MSFT0201")]
                         return False
+
+            # Check pre-boot DMA
             p = os.path.join("/", "sys", "firmware", "acpi", "tables", "IVRS")
             with open(p, "rb") as f:
                 data = f.read()
@@ -1172,10 +1179,16 @@ class PrerequisiteValidator(AmdTool):
                     "IVRS table appears too small to contain virtualization info."
                 )
             virt_info = struct.unpack_from("I", data, 36)[0]
-            debug_str += f"Virtualization info: 0x{virt_info:x}"
-            found_dmar = (virt_info & 0x2) != 0
+            debug_str += f"IVRS: Virtualization info: 0x{virt_info:x}\n"
+            found_ivrs_dmar = (virt_info & 0x2) != 0
+
+            # check for MSFT0201 in IVRS (alternative to pre-boot DMA)
+            target_bytes = "MSFT0201".encode("utf-8")
+            found_ivrs_msft0201 = data.find(target_bytes) != -1
+            debug_str += f"IVRS: Found MSFT0201: {found_ivrs_msft0201}"
+
             self.db.record_debug(debug_str)
-            if not found_dmar:
+            if not found_ivrs_dmar and not found_ivrs_msft0201:
                 self.db.record_prereq(
                     "IOMMU is misconfigured: Pre-boot DMA protection not enabled", "❌"
                 )
