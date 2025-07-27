@@ -85,7 +85,7 @@ class TestKernelLog(unittest.TestCase):
 
         # test a real post code line
         line = 'ex_trace_args: "  POST CODE: %X  ACPI TIMER: %X  TIME: %d.%d ms\\n", b0003f33, 83528798, 0, 77, 0, 0'
-        expected_output = "POST CODE: B0003F33  ACPI TIMER: 83528798  TIME: 0.77 ms"
+        expected_output = "POST CODE: B0003F33  ACPI TIMER: 83528798  TIME: 0.119 ms"
         result = sscanf_bios_args(line)
         self.assertEqual(result, expected_output)
 

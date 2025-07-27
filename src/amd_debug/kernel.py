@@ -115,24 +115,16 @@ def sscanf_bios_args(line):
 
             converted_args = []
             arg_index = 0
-            for specifier in format_specifiers:
+            for _specifier in format_specifiers:
                 if arg_index < len(arguments):
                     value = arguments[arg_index]
                     if value == "Unknown":
                         converted_args.append(-1)
-                    elif specifier.lower() == "x":
+                    else:
                         try:
                             converted_args.append(int(value, 16))
                         except ValueError:
                             return None
-                    else:  # Decimal conversion
-                        try:
-                            converted_args.append(int(value))
-                        except ValueError:
-                            try:
-                                converted_args.append(int(value, 16))
-                            except ValueError:
-                                return None
                     arg_index += 1
                 else:
                     break
