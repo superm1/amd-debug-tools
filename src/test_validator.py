@@ -71,7 +71,8 @@ class TestValidator(unittest.TestCase):
         logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
     @patch("amd_debug.validator.SleepDatabase")
-    def setUp(self, _db_mock):
+    @patch("subprocess.run")
+    def setUp(self, _db_mock, _mock_run):
         """Set up a mock context for testing"""
         self.validator = SleepValidator(tool_debug=True, bios_debug=False)
 
