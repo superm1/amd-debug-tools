@@ -156,12 +156,12 @@ class TestAmdBios(unittest.TestCase):
         self.assertFalse(args.enable)
         self.assertTrue(args.disable)
 
-    @patch("sys.argv", ["bios.py", "version"])
+    @patch("sys.argv", ["bios.py", "--version"])
     def test_parse_args_version_command(self):
         """Test parse_args with version command"""
 
         args = parse_args()
-        self.assertEqual(args.command, "version")
+        self.assertTrue(args.version)
 
     @patch("sys.argv", ["bios.py"])
     @patch("argparse.ArgumentParser.print_help")
@@ -243,7 +243,7 @@ class TestAmdBios(unittest.TestCase):
         self, _mock_print, mock_show_log_info, mock_version, mock_parse_args
     ):
         """Test main function with version command"""
-        mock_parse_args.return_value = argparse.Namespace(command="version")
+        mock_parse_args.return_value = argparse.Namespace(version=True, command=None)
         mock_version.return_value = "1.0.0"
 
         result = main()
@@ -257,7 +257,9 @@ class TestAmdBios(unittest.TestCase):
     @patch("amd_debug.bios.show_log_info")
     def test_main_invalid_command(self, mock_show_log_info, mock_parse_args):
         """Test main function with an invalid command"""
-        mock_parse_args.return_value = argparse.Namespace(command="invalid")
+        mock_parse_args.return_value = argparse.Namespace(
+            version=False, command="invalid"
+        )
 
         result = main()
 

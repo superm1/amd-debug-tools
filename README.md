@@ -107,7 +107,7 @@ The following optional arguments are supported for this command:
 If the tool is launched with an environment that can call `xdg-open`, the report
 will be opened in a browser.
 
-### `amd-s2idle version`
+### `amd-s2idle --version`
 This will print the version of the tool and exit.
 
 ### Debug output
@@ -140,7 +140,7 @@ The following optional arguments are supported for this command:
         --input INPUT  Optional input file to parse
         --tool-debug   Enable tool debug logging
 
-### `amd-bios version`
+### `amd-bios --version`
 This will print the version of the tool and exit.
 
 ## amd-pstate

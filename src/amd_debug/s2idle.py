@@ -385,7 +385,9 @@ def parse_args():
             help="Enable tool debug logging",
         )
 
-    subparsers.add_parser("version", help="Show version information")
+    parser.add_argument(
+        "--version", action="store_true", help="Show version information"
+    )
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -394,7 +396,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main() -> None|int:
+def main() -> None | int:
     """Main function"""
     args = parse_args()
     ret = False
@@ -427,7 +429,7 @@ def main() -> None|int:
             args.logind,
             args.bios_debug,
         )
-    elif args.action == "version":
+    elif args.version:
         print(version())
         return
     else:

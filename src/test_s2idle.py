@@ -117,9 +117,9 @@ class TestParseArgs(unittest.TestCase):
 
     def test_version_command(self):
         """Test parse_args with version command"""
-        sys.argv = ["s2idle.py", "version"]
+        sys.argv = ["s2idle.py", "--version"]
         args = parse_args()
-        self.assertEqual(args.action, "version")
+        self.assertTrue(args.version)
 
 
 class TestMainFunction(unittest.TestCase):
@@ -214,7 +214,7 @@ class TestMainFunction(unittest.TestCase):
         """Test main function with version action"""
         sys.argv = ["s2idle.py", "version"]
         with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(action="version")
+            mock_parse_args.return_value = argparse.Namespace(version=True, action=None)
             mock_version.return_value = "1.0.0"
             with patch("builtins.print") as mock_print:
                 result = main()
@@ -226,7 +226,9 @@ class TestMainFunction(unittest.TestCase):
         """Test main function with no action specified"""
         sys.argv = ["s2idle.py"]
         with patch("amd_debug.s2idle.parse_args") as mock_parse_args:
-            mock_parse_args.return_value = argparse.Namespace(action=None)
+            mock_parse_args.return_value = argparse.Namespace(
+                version=False, action=None
+            )
             with self.assertRaises(SystemExit) as cm:
                 main()
             self.assertEqual(cm.exception.code, "no action specified")

@@ -105,7 +105,9 @@ def parse_args():
         action="store_true",
         help="Enable tool debug logging",
     )
-    subparsers.add_parser("version", help="Show version information")
+    parser.add_argument(
+        "--version", action="store_true", help="Show version information"
+    )
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -122,7 +124,7 @@ def parse_args():
     return args
 
 
-def main() -> None|int:
+def main() -> None | int:
     """Main function"""
     args = parse_args()
     ret = False
@@ -132,7 +134,7 @@ def main() -> None|int:
     elif args.command == "parse":
         app = AmdBios(args.input, args.tool_debug)
         ret = app.run()
-    elif args.command == "version":
+    elif args.version:
         print(version())
     show_log_info()
     if ret is False:
