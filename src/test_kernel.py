@@ -114,7 +114,8 @@ class TestDmesgLogger(unittest.TestCase):
     """Test Dmesg logger functions"""
 
     @classmethod
-    def setUpClass(cls):
+    @patch("subprocess.run")
+    def setUpClass(cls, _mock_run=None):
         logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
     def test_dmesg_logger_initialization(self):
