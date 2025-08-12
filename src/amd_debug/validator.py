@@ -703,6 +703,22 @@ class SleepValidator(AmdTool):
         else:
             print_color("No RTC device found, please manually wake system", "🚦")
 
+    def toggle_nvidia(self, value):
+        """Write to the NVIDIA suspend interface"""
+        p = os.path.join("/", "proc", "driver", "nvidia", "suspend")
+        if not os.path.exists(p):
+            return True
+        fd = os.open(p, os.O_WRONLY | os.O_SYNC)
+        try:
+            os.write(fd, value)
+        except OSError as e:
+            self.db.record_cycle_data(f"Failed to set {value} in NVIDIA {e}", "❌")
+            return False
+        finally:
+            os.close(fd)
+        self.db.record_debug(f"Wrote {value} to NVIDIA driver")
+        return True
+
     @pm_debugging
     def suspend_system(self):
         """Suspend the system using the dbus or sysfs interface"""
@@ -744,6 +760,8 @@ class SleepValidator(AmdTool):
                 self.db.record_cycle_data("Missing dbus", "❌")
                 return False
         else:
+            if not self.toggle_nvidia(b"suspend"):
+                return False
             old = get_wakeup_count()
             p = os.path.join("/", "sys", "power", "state")
             fd = os.open(p, os.O_WRONLY | os.O_SYNC)
@@ -757,6 +775,8 @@ class SleepValidator(AmdTool):
                 return False
             finally:
                 os.close(fd)
+            if not self.toggle_nvidia(b"resume"):
+                return False
             return True
 
     def unlock_session(self):

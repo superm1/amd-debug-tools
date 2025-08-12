@@ -1959,3 +1959,79 @@ class TestPrerequisiteValidator(unittest.TestCase):
         result = self.validator.check_dpia_pg_dmcub()
         self.assertTrue(result)
         self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_capture_nvidia_version_file_missing(self, mock_exists):
+        """Test capture_nvidia when /proc/driver/nvidia/version does not exist"""
+        mock_exists.side_effect = lambda p: False if "version" in p else True
+        result = self.validator.capture_nvidia()
+        self.assertTrue(result)
+        self.mock_db.record_debug_file.assert_not_called()
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_capture_nvidia_gpus_dir_missing(self, mock_exists):
+        """Test capture_nvidia when /proc/driver/nvidia/gpus does not exist"""
+
+        def exists_side_effect(path):
+            if "version" in path:
+                return True
+            if "gpus" in path:
+                return False
+            return True
+
+        mock_exists.side_effect = exists_side_effect
+        result = self.validator.capture_nvidia()
+        self.assertTrue(result)
+        self.mock_db.record_debug_file.assert_called_once_with(
+            "/proc/driver/nvidia/version"
+        )
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_capture_nvidia_success(self, mock_exists, mock_walk):
+        """Test capture_nvidia when NVIDIA GPU files are present and readable"""
+        mock_exists.side_effect = lambda p: True
+        mock_walk.return_value = [
+            ("/proc/driver/nvidia/gpus/0000:01:00.0", [], ["info", "power"])
+        ]
+        result = self.validator.capture_nvidia()
+        self.assertTrue(result)
+        self.mock_db.record_debug_file.assert_any_call("/proc/driver/nvidia/version")
+        self.mock_db.record_debug.assert_any_call("NVIDIA info")
+        self.mock_db.record_debug_file.assert_any_call(
+            "/proc/driver/nvidia/gpus/0000:01:00.0/info"
+        )
+        self.mock_db.record_debug.assert_any_call("NVIDIA power")
+        self.mock_db.record_debug_file.assert_any_call(
+            "/proc/driver/nvidia/gpus/0000:01:00.0/power"
+        )
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_capture_nvidia_permission_error_on_version(self, mock_exists, mock_walk):
+        """Test capture_nvidia when PermissionError occurs reading version file"""
+        mock_exists.side_effect = lambda p: True if "version" in p else False
+        self.mock_db.record_debug_file.side_effect = PermissionError
+        result = self.validator.capture_nvidia()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "NVIDIA GPU version not readable", "👀"
+        )
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_capture_nvidia_permission_error_on_gpu_file(self, mock_exists, mock_walk):
+        """Test capture_nvidia when PermissionError occurs reading a GPU file"""
+        mock_exists.side_effect = lambda p: True
+        mock_walk.return_value = [
+            ("/proc/driver/nvidia/gpus/0000:01:00.0", [], ["info"])
+        ]
+        self.mock_db.record_debug_file.side_effect = [None, PermissionError]
+        result = self.validator.capture_nvidia()
+        self.assertTrue(result)
+        self.mock_db.record_debug.assert_any_call("NVIDIA info")
+        self.mock_db.record_prereq.assert_called_with(
+            "NVIDIA GPU {f} not readable", "👀"
+        )
