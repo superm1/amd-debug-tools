@@ -831,3 +831,64 @@ class TestValidator(unittest.TestCase):
         )
         mock_os_write.assert_called_once_with(3, b"mem")
         mock_os_close.assert_called_once_with(3)
+
+    @patch("os.path.exists")
+    @patch("os.open")
+    @patch("os.write")
+    @patch("os.close")
+    def test_toggle_nvidia_file_not_exists(
+        self, mock_close, mock_write, mock_open, mock_exists
+    ):
+        """Test toggle_nvidia returns True if NVIDIA suspend file does not exist"""
+        mock_exists.return_value = False
+        result = self.validator.toggle_nvidia(b"suspend")
+        self.assertTrue(result)
+        mock_open.assert_not_called()
+        mock_write.assert_not_called()
+        mock_close.assert_not_called()
+
+    @patch("os.path.exists")
+    @patch("os.open")
+    @patch("os.write")
+    @patch("os.close")
+    def test_toggle_nvidia_success(
+        self, mock_close, mock_write, mock_open, mock_exists
+    ):
+        """Test toggle_nvidia writes value and returns True on success"""
+        mock_exists.return_value = True
+        mock_open.return_value = 42
+        mock_write.return_value = None
+        with patch.object(self.validator.db, "record_debug") as mock_record_debug:
+            result = self.validator.toggle_nvidia(b"suspend")
+            self.assertTrue(result)
+            mock_open.assert_called_once_with(
+                "/proc/driver/nvidia/suspend", os.O_WRONLY | os.O_SYNC
+            )
+            mock_write.assert_called_once_with(42, b"suspend")
+            mock_close.assert_called_once_with(42)
+            mock_record_debug.assert_called_once_with(
+                "Wrote b'suspend' to NVIDIA driver"
+            )
+
+    @patch("os.path.exists")
+    @patch("os.open")
+    @patch("os.write")
+    @patch("os.close")
+    def test_toggle_nvidia_oserror(
+        self, mock_close, mock_write, mock_open, mock_exists
+    ):
+        """Test toggle_nvidia handles OSError and returns False"""
+        mock_exists.return_value = True
+        mock_open.return_value = 99
+        mock_write.side_effect = OSError("write error")
+        with patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_record_cycle_data:
+            result = self.validator.toggle_nvidia(b"resume")
+            self.assertFalse(result)
+            mock_open.assert_called_once_with(
+                "/proc/driver/nvidia/suspend", os.O_WRONLY | os.O_SYNC
+            )
+            mock_write.assert_called_once_with(99, b"resume")
+            mock_close.assert_called_once_with(99)
+            mock_record_cycle_data.assert_called_once()

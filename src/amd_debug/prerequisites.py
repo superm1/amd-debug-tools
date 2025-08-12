@@ -128,6 +128,28 @@ class PrerequisiteValidator(AmdTool):
         if not self.db.get_last_prereq_ts():
             self.run()
 
+    def capture_nvidia(self):
+        """Capture the NVIDIA GPU state"""
+        p = os.path.join("/", "proc", "driver", "nvidia", "version")
+        if not os.path.exists(p):
+            return True
+        try:
+            self.db.record_debug_file(p)
+        except PermissionError:
+            self.db.record_prereq("NVIDIA GPU version not readable", "👀")
+            return True
+        p = os.path.join("/", "proc", "driver", "nvidia", "gpus")
+        if not os.path.exists(p):
+            return True
+        for root, _dirs, files in os.walk(p, topdown=False):
+            for f in files:
+                try:
+                    self.db.record_debug(f"NVIDIA {f}")
+                    self.db.record_debug_file(os.path.join(root, f))
+                except PermissionError:
+                    self.db.record_prereq("NVIDIA GPU {f} not readable", "👀")
+        return True
+
     def capture_edid(self):
         """Capture and decode the EDID data"""
         edids = self.display.get_edid()
@@ -1244,6 +1266,7 @@ class PrerequisiteValidator(AmdTool):
             self.capture_logind,
             self.capture_pci_acpi,
             self.capture_edid,
+            self.capture_nvidia,
         ]
         checks = []
 
