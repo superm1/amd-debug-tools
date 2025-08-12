@@ -326,7 +326,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
             BIT(9) | 1
         )  # Kernel warnings ignored, other taint present
         result = self.validator.check_taint()
-        self.assertFalse(result)
+        self.assertTrue(result)
         self.assertTrue(
             any(isinstance(f, TaintedKernel) for f in self.validator.failures)
         )

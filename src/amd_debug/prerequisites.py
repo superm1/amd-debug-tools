@@ -1249,9 +1249,8 @@ class PrerequisiteValidator(AmdTool):
         # ignore kernel warnings
         taint &= ~BIT(9)
         if taint != 0:
-            self.db.record_prereq(f"Kernel is tainted: {taint}", "❌")
+            self.db.record_prereq(f"Kernel is tainted: {taint}", "🚦")
             self.failures += [TaintedKernel()]
-            return False
         return True
 
     def run(self):
