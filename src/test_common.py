@@ -15,6 +15,7 @@ from platform import uname_result
 
 from amd_debug.common import (
     apply_prefix_wrapper,
+    bytes_to_gb,
     Colors,
     convert_string_to_bool,
     colorize_choices,
@@ -22,12 +23,15 @@ from amd_debug.common import (
     compare_file,
     find_ip_version,
     fatal_error,
+    gb_to_pages,
     get_distro,
     get_log_priority,
     get_pretty_distro,
+    get_system_mem,
     is_root,
     minimum_kernel,
     print_color,
+    reboot,
     run_countdown,
     systemd_in_use,
     running_ssh,
@@ -442,3 +446,90 @@ class TestCommon(unittest.TestCase):
         with patch("sys.exit") as mock_exit:
             convert_string_to_bool("[unclosed_list")
             mock_exit.assert_called_once_with("Invalid entry: [unclosed_list")
+
+    def test_bytes_to_gb(self):
+        """Test bytes_to_gb conversion"""
+        # 4096 bytes should be 4096*4096/(1024*1024*1024) GB
+        self.assertAlmostEqual(bytes_to_gb(1), 4096 / (1024 * 1024 * 1024))
+        self.assertAlmostEqual(bytes_to_gb(0), 0)
+        self.assertAlmostEqual(bytes_to_gb(1024), 1024 * 4096 / (1024 * 1024 * 1024))
+
+    def test_gb_to_pages(self):
+        """Test gb_to_pages conversion"""
+        # 1 GB should be int(1 * (1024*1024*1024) / 4096)
+        self.assertEqual(gb_to_pages(1), int((1024 * 1024 * 1024) / 4096))
+        self.assertEqual(gb_to_pages(0), 0)
+        self.assertEqual(gb_to_pages(2), int(2 * (1024 * 1024 * 1024) / 4096))
+
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="MemTotal:       16384516 kB\n",
+    )
+    @patch("os.path.join", return_value="/proc/meminfo")
+    def test_get_system_mem_valid(self, _mock_join, mock_file):
+        """Test get_system_mem returns correct value"""
+        expected_gb = 16384516 / (1024 * 1024)
+        self.assertAlmostEqual(get_system_mem(), expected_gb)
+        mock_file.assert_called_once_with("/proc/meminfo", "r", encoding="utf-8")
+
+    @patch("builtins.open", new_callable=mock_open, read_data="NoMemHere: 1234\n")
+    @patch("os.path.join", return_value="/proc/meminfo")
+    def test_get_system_mem_missing(self, _mock_join, _mock_file):
+        """Test get_system_mem raises ValueError if MemTotal is missing"""
+        with self.assertRaises(ValueError):
+            get_system_mem()
+
+    @patch("amd_debug.common.fatal_error")
+    def test_reboot_importerror(self, mock_fatal_error):
+        """Test reboot handles ImportError"""
+        with patch.dict("sys.modules", {"dbus": None}):
+            reboot()
+            mock_fatal_error.assert_called_once_with("Missing dbus")
+
+    @patch("amd_debug.common.fatal_error")
+    def test_reboot_dbus_exception(self, mock_fatal_error):
+        """Test reboot handles dbus.exceptions.DBusException"""
+
+        class DummyDBusException(Exception):
+            """Dummy exception"""
+
+        class DummyIntf:
+            """Dummy interface"""
+
+            def Reboot(self, _arg):  # pylint: disable=invalid-name
+                """Dummy Reboot method"""
+                raise DummyDBusException("fail")
+
+        class DummyObj:  # pylint: disable=too-few-public-methods
+            """Dummy object"""
+
+            def __init__(self):
+                pass
+
+        class DummyBus:  # pylint: disable=too-few-public-methods
+            """Dummy bus"""
+
+            def get_object(self, *args, **kwargs):
+                """Dummy get_object method"""
+                return DummyObj()
+
+        class DummyDBus:
+            """Dummy dbus"""
+
+            class exceptions:  # pylint: disable=invalid-name
+                """Dummy exceptions"""
+
+                DBusException = DummyDBusException
+
+            def SystemBus(self):  # pylint: disable=invalid-name
+                """Dummy SystemBus method"""
+                return DummyBus()
+
+            def Interface(self, _obj, _name):  # pylint: disable=invalid-name
+                """Dummy Interface method"""
+                return DummyIntf()
+
+        with patch.dict("sys.modules", {"dbus": DummyDBus()}):
+            reboot()
+            self.assertTrue(mock_fatal_error.called)
