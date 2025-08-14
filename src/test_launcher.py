@@ -52,3 +52,10 @@ class TestLauncher(unittest.TestCase):
         with patch("amd_debug.pstate.main") as mock_main:
             amd_debug.launch_tool("amd_pstate.py")
             mock_main.assert_called_once()
+
+    def test_launcher_amd_ttm(self):
+        """Test launching amd_ttm"""
+
+        with patch("amd_debug.ttm.main") as mock_main:
+            amd_debug.launch_tool("amd_ttm.py")
+            mock_main.assert_called_once()
