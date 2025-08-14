@@ -9,7 +9,7 @@ from amd_debug.common import (
     bytes_to_gb,
     gb_to_pages,
     get_system_mem,
-    is_root,
+    relaunch_sudo,
     print_color,
     reboot,
     version,
@@ -57,9 +57,7 @@ class AmdTtmTool(AmdTool):
 
     def set(self, gb_value) -> bool:
         """Set a new page limit"""
-        if not is_root():
-            print_color("Root privileges required", "❌")
-            return False
+        relaunch_sudo()
 
         # Check against system memory
         total = get_system_mem()
@@ -108,9 +106,7 @@ class AmdTtmTool(AmdTool):
             print_color(f"{MODPROBE_CONF_PATH} doesn't exist", "❌")
             return False
 
-        if not is_root():
-            print_color("Root privileges required", "❌")
-            return False
+        relaunch_sudo()
 
         os.remove(MODPROBE_CONF_PATH)
         print_color(f"Configuration {MODPROBE_CONF_PATH} removed", "🐧")
