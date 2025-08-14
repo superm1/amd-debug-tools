@@ -226,6 +226,45 @@ def get_pretty_distro() -> str:
     return distro
 
 
+def bytes_to_gb(bytes_value):
+    """Convert bytes to GB"""
+    return bytes_value * 4096 / (1024 * 1024 * 1024)
+
+
+def gb_to_pages(gb_value):
+    """Convert GB into bytes"""
+    return int(gb_value * (1024 * 1024 * 1024) / 4096)
+
+
+def reboot():
+    """Reboot the system"""
+    try:
+        import dbus  # pylint: disable=import-outside-toplevel
+
+        bus = dbus.SystemBus()
+        obj = bus.get_object("org.freedesktop.login1", "/org/freedesktop/login1")
+        intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
+        intf.Reboot(True)
+        return True
+    except ImportError:
+        fatal_error("Missing dbus")
+    except dbus.exceptions.DBusException as e:
+        fatal_error({e})
+    return True
+
+
+def get_system_mem():
+    """Get the total system memory in GB using /proc/meminfo"""
+    with open(os.path.join("/", "proc", "meminfo"), "r", encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("MemTotal:"):
+                # MemTotal line format: "MemTotal:       16384516 kB"
+                # Extract the number and convert from kB to GB
+                mem_kb = int(line.split()[1])
+                return mem_kb / (1024 * 1024)
+    raise ValueError("Could not find MemTotal in /proc/meminfo")
+
+
 def is_root() -> bool:
     """Check if the user is root"""
     return os.geteuid() == 0

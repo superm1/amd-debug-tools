@@ -2,6 +2,7 @@
         "cSpell.words": [
                 "acpica",
                 "CPPC",
+                "dbus",
                 "ENDC",
                 "geteuid",
                 "hwsleep",
@@ -30,6 +31,7 @@
         "python.testing.unittestEnabled": false,
         "cSpell.ignoreWords": [
                 "barplot",
+                "intf",
                 "line",
                 "message",
                 "showindex",

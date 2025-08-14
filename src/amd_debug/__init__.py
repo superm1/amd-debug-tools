@@ -23,8 +23,15 @@ def amd_pstate():
     return pstate.main()
 
 
+def amd_ttm():
+    """Launch the amd-ttm tool."""
+    from . import ttm  # pylint: disable=import-outside-toplevel
+
+    return ttm.main()
+
+
 def install_dep_superset():
-    """Install all supserset dependencies."""
+    """Install all superset dependencies."""
     from . import installer  # pylint: disable=import-outside-toplevel
 
     return installer.install_dep_superset()
@@ -36,6 +43,7 @@ def launch_tool(tool_name):
         "amd_s2idle.py": amd_s2idle,
         "amd_bios.py": amd_bios,
         "amd_pstate.py": amd_pstate,
+        "amd_ttm.py": amd_ttm,
         "install_deps.py": install_dep_superset,
     }
     if tool_name in tools:

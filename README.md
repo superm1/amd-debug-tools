@@ -148,6 +148,9 @@ This will print the version of the tool and exit.
 It will capture some state from the system as well as from the machine specific registers that
 amd-pstate uses.
 
+## amd-ttm
+`amd-ttm` is a tool used for managing the TTM memory settings on AMD systems.
+
 ## Compatibility scripts
 
 Compatibility scripts are provided for the previous names the tools went by:

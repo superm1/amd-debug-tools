@@ -446,8 +446,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def install_dep_superset() -> None|int:
-    """Install all python supserset dependencies"""
+def install_dep_superset() -> None | int:
+    """Install all python superset dependencies"""
     args = parse_args()
     tool = Installer(tool_debug=args.tool_debug)
     tool.set_requirements(
