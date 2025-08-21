@@ -21,7 +21,7 @@ import pyudev
 
 from amd_debug.wake import WakeIRQ
 from amd_debug.display import Display
-from amd_debug.kernel import get_kernel_log, SystemdLogger, DmesgLogger
+from amd_debug.kernel import get_kernel_log, SystemdLogger, CySystemdLogger, DmesgLogger
 from amd_debug.common import (
     apply_prefix_wrapper,
     BIT,
@@ -672,7 +672,9 @@ class PrerequisiteValidator(AmdTool):
         """Check the source for kernel logs"""
         if isinstance(self.kernel_log, SystemdLogger):
             self.db.record_prereq("Logs are provided via systemd", "✅")
-        if isinstance(self.kernel_log, DmesgLogger):
+        elif isinstance(self.kernel_log, CySystemdLogger):
+            self.db.record_prereq("Logs are provided via cysystemd", "✅")
+        elif isinstance(self.kernel_log, DmesgLogger):
             self.db.record_prereq(
                 "Logs are provided via dmesg, timestamps may not be accurate over multiple cycles",
                 "🚦",
