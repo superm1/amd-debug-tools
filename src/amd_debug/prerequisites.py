@@ -1320,7 +1320,7 @@ class PrerequisiteValidator(AmdTool):
             if not check():
                 result = False
         if not result:
-            self.db.record_prereq(Headers.BrokenPrerequisites, "💯")
+            self.db.record_prereq(Headers.BrokenPrerequisites, "🚫")
         self.db.sync()
         clear_temporary_message(len(msg))
         return result
