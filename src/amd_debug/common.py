@@ -47,7 +47,7 @@ def get_group_color(group) -> str:
         color = Colors.WARNING
     elif group == "🗣️":
         color = Colors.HEADER
-    elif group == "🚫":
+    elif any(mk in group for mk in ["💯", "🚫"]):
         color = Colors.UNDERLINE
     elif any(mk in group for mk in ["🦟", "🖴"]):
         color = Colors.DEBUG

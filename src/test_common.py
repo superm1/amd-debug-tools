@@ -48,6 +48,7 @@ color_dict = {
     "💻": Colors.OK,
     "○": Colors.OK,
     "💤": Colors.OK,
+    "💯": Colors.UNDERLINE,
     "🚫": Colors.UNDERLINE,
     "🗣️": Colors.HEADER,
 }

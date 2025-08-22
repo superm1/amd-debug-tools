@@ -7,7 +7,7 @@
 {% if cycle_data %}{{ cycle_data }}{% endif %}
 {% if debug_data %}🗣️Debug Data{% for obj in debug_data %}
 
-🚫Cycle {{ obj.cycle_num }}{% for index in range(obj.messages | length) %}
+💯Cycle {{ obj.cycle_num }}{% for index in range(obj.messages | length) %}
 {{obj.priorities[index]}}{{obj.messages[index]}}{% endfor %}
 {% endfor %}{% endif %}
 {% if failures %}{{ failures }}{% endif %}
