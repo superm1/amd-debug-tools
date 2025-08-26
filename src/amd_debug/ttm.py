@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """TTM configuration tool"""
 
+import asyncio
 import os
 import argparse
 from amd_debug.common import (

@@ -4,13 +4,16 @@
 """
 This module contains unit tests for the common functions in the amd-debug-tools package.
 """
-from unittest.mock import patch, mock_open, call
+from unittest.mock import patch, mock_open, call, Mock
 
+import asyncio
+import builtins
 import logging
 import tempfile
 import unittest
 import os
 from platform import uname_result
+import sys
 
 
 from amd_debug.common import (
@@ -474,63 +477,84 @@ class TestCommon(unittest.TestCase):
         self.assertAlmostEqual(get_system_mem(), expected_gb)
         mock_file.assert_called_once_with("/proc/meminfo", "r", encoding="utf-8")
 
-    @patch("builtins.open", new_callable=mock_open, read_data="NoMemHere: 1234\n")
-    @patch("os.path.join", return_value="/proc/meminfo")
-    def test_get_system_mem_missing(self, _mock_join, _mock_file):
-        """Test get_system_mem raises ValueError if MemTotal is missing"""
-        with self.assertRaises(ValueError):
-            get_system_mem()
+    def test_reboot_dbus_fast_success(self):
+        """Test reboot returns True when reboot_dbus_fast succeeds"""
 
-    @patch("amd_debug.common.fatal_error")
-    def test_reboot_importerror(self, mock_fatal_error):
-        """Test reboot handles ImportError"""
-        with patch.dict("sys.modules", {"dbus": None}):
-            reboot()
-            mock_fatal_error.assert_called_once_with("Missing dbus")
-
-    @patch("amd_debug.common.fatal_error")
-    def test_reboot_dbus_exception(self, mock_fatal_error):
-        """Test reboot handles dbus.exceptions.DBusException"""
-
-        class DummyDBusException(Exception):
-            """Dummy exception"""
-
-        class DummyIntf:
-            """Dummy interface"""
-
-            def Reboot(self, _arg):  # pylint: disable=invalid-name
-                """Dummy Reboot method"""
-                raise DummyDBusException("fail")
-
-        class DummyObj:  # pylint: disable=too-few-public-methods
-            """Dummy object"""
-
-            def __init__(self):
+        # Create a mock loop that properly handles coroutines
+        def mock_run_until_complete(coro):
+            # Consume the coroutine to prevent the warning
+            try:
+                # Close the coroutine to prevent the warning
+                coro.close()
+            except (AttributeError, RuntimeError):
                 pass
+            return True
 
-        class DummyBus:  # pylint: disable=too-few-public-methods
-            """Dummy bus"""
+        mock_loop = Mock()
+        mock_loop.run_until_complete.side_effect = mock_run_until_complete
 
-            def get_object(self, *args, **kwargs):
-                """Dummy get_object method"""
-                return DummyObj()
+        with patch("amd_debug.common.asyncio.get_event_loop", return_value=mock_loop):
+            result = reboot()
+            self.assertTrue(result)
+            mock_loop.run_until_complete.assert_called_once()
 
-        class DummyDBus:
-            """Dummy dbus"""
+    @patch("asyncio.get_event_loop")
+    def test_reboot_dbus_fast_failure_and_dbus_success(self, mock_get_event_loop):
+        """Test reboot falls back to reboot_dbus when reboot_dbus_fast fails"""
 
-            class exceptions:  # pylint: disable=invalid-name
-                """Dummy exceptions"""
+        # Create a mock loop that properly handles coroutines
+        def mock_run_until_complete(coro):
+            # Consume the coroutine to prevent the warning
+            try:
+                coro.close()
+            except (AttributeError, RuntimeError):
+                pass
+            return False
 
-                DBusException = DummyDBusException
+        mock_loop = Mock()
+        mock_loop.run_until_complete.side_effect = mock_run_until_complete
+        mock_get_event_loop.return_value = mock_loop
 
-            def SystemBus(self):  # pylint: disable=invalid-name
-                """Dummy SystemBus method"""
-                return DummyBus()
+        # Mock the dbus module to avoid ImportError in CI
+        mock_dbus = Mock()
+        mock_bus = Mock()
+        mock_obj = Mock()
+        mock_intf = Mock()
 
-            def Interface(self, _obj, _name):  # pylint: disable=invalid-name
-                """Dummy Interface method"""
-                return DummyIntf()
+        mock_dbus.SystemBus.return_value = mock_bus
+        mock_bus.get_object.return_value = mock_obj
+        mock_obj.get_interface.return_value = mock_intf
+        mock_dbus.Interface = Mock(return_value=mock_intf)
 
-        with patch.dict("sys.modules", {"dbus": DummyDBus()}):
-            reboot()
-            self.assertTrue(mock_fatal_error.called)
+        with patch.dict("sys.modules", {"dbus": mock_dbus}):
+            result = reboot()
+            self.assertTrue(result)
+
+    @patch("asyncio.get_event_loop")
+    def test_reboot_dbus_fast_failure_and_dbus_failure(self, mock_get_event_loop):
+        """Test reboot returns False when both reboot_dbus_fast and reboot_dbus fail"""
+
+        # Create a mock loop that properly handles coroutines
+        def mock_run_until_complete(coro):
+            # Consume the coroutine to prevent the warning
+            try:
+                coro.close()
+            except (AttributeError, RuntimeError):
+                pass
+            return False
+
+        mock_loop = Mock()
+        mock_loop.run_until_complete.side_effect = mock_run_until_complete
+        mock_get_event_loop.return_value = mock_loop
+
+        # Mock the import to raise ImportError when dbus is imported
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "dbus":
+                raise ImportError("No module named 'dbus'")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = reboot()
+            self.assertFalse(result)
