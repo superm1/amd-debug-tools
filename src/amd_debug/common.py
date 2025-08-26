@@ -5,6 +5,7 @@
 This module contains common utility functions and classes for various amd-debug-tools.
 """
 
+import asyncio
 import importlib.metadata
 import logging
 import os
@@ -238,18 +239,47 @@ def gb_to_pages(gb_value):
 
 def reboot():
     """Reboot the system"""
-    try:
-        import dbus  # pylint: disable=import-outside-toplevel
 
-        bus = dbus.SystemBus()
-        obj = bus.get_object("org.freedesktop.login1", "/org/freedesktop/login1")
-        intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
-        intf.Reboot(True)
+    async def reboot_dbus_fast():
+        """Reboot using dbus-fast"""
+        try:
+            from dbus_fast.aio import (  # pylint: disable=import-outside-toplevel
+                MessageBus,
+            )
+            from dbus_fast import BusType  # pylint: disable=import-outside-toplevel
+
+            bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+            introspection = await bus.introspect(
+                "org.freedesktop.login1", "/org/freedesktop/login1"
+            )
+            proxy_obj = bus.get_proxy_object(
+                "org.freedesktop.login1", "/org/freedesktop/login1", introspection
+            )
+            interface = proxy_obj.get_interface("org.freedesktop.login1.Manager")
+            await interface.call_reboot(True)
+
+        except ImportError:
+            return False
         return True
-    except ImportError:
-        fatal_error("Missing dbus")
-    except dbus.exceptions.DBusException as e:
-        fatal_error({e})
+
+    def reboot_dbus():
+        """Reboot using python-dbus"""
+        try:
+            import dbus  # pylint: disable=import-outside-toplevel
+
+            bus = dbus.SystemBus()
+            obj = bus.get_object("org.freedesktop.login1", "/org/freedesktop/login1")
+            intf = dbus.Interface(obj, "org.freedesktop.login1.Manager")
+            intf.Reboot(True)
+        except ImportError:
+            return False
+        return True
+
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(reboot_dbus_fast())
+    if not result:
+        return reboot_dbus()
+
     return True
 
 
