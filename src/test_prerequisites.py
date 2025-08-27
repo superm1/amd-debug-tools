@@ -2035,3 +2035,76 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_prereq.assert_called_with(
             "NVIDIA GPU {f} not readable", "👀"
         )
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch(
+        "builtins.open",
+        new_callable=unittest.mock.mock_open,
+        read_data=b"C1 state info",
+    )
+    def test_capture_cstates_single_file(self, mock_open, mock_walk):
+        """Test capture_cstates with a single cpuidle file"""
+        mock_walk.return_value = [
+            ("/sys/bus/cpu/devices/cpu0/cpuidle", [], ["state1"]),
+        ]
+        self.validator.capture_cstates()
+        self.mock_db.record_debug.assert_called_with(
+            "ACPI C-state information\n└─/sys/bus/cpu/devices/cpu0/cpuidle/state1: C1 state info"
+        )
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_capture_cstates_multiple_files(self, mock_open_func, mock_walk):
+        """Test capture_cstates with multiple cpuidle files"""
+        # Setup mock file reads for two files
+        file_contents = {
+            "/sys/bus/cpu/devices/cpu0/cpuidle/state1": b"C1 info",
+            "/sys/bus/cpu/devices/cpu0/cpuidle/state2": b"C2 info",
+        }
+
+        def side_effect(path, mode="rb"):
+            mock_file = mock_open(read_data=file_contents[path])()
+            return mock_file
+
+        mock_open_func.side_effect = side_effect
+        mock_walk.return_value = [
+            ("/sys/bus/cpu/devices/cpu0/cpuidle", [], ["state1", "state2"]),
+        ]
+        self.validator.capture_cstates()
+        # The prefix logic is based on order, so check for both lines
+        debug_call = self.mock_db.record_debug.call_args[0][0]
+        self.assertIn("/sys/bus/cpu/devices/cpu0/cpuidle/state1: C1 info", debug_call)
+        self.assertIn("/sys/bus/cpu/devices/cpu0/cpuidle/state2: C2 info", debug_call)
+        self.assertTrue(debug_call.startswith("ACPI C-state information\n"))
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch("builtins.open", new_callable=mock_open, read_data=b"")
+    def test_capture_cstates_empty_files(self, _mock_open, mock_walk):
+        """Test capture_cstates with empty cpuidle files"""
+        mock_walk.return_value = [
+            ("/sys/bus/cpu/devices/cpu0/cpuidle", [], ["state1"]),
+        ]
+        self.validator.capture_cstates()
+        self.mock_db.record_debug.assert_called_with(
+            "ACPI C-state information\n└─/sys/bus/cpu/devices/cpu0/cpuidle/state1: "
+        )
+
+    @patch("amd_debug.prerequisites.os.walk")
+    @patch("builtins.open", side_effect=PermissionError)
+    def test_capture_cstates_permission_error(self, _mock_open, mock_walk):
+        """Test capture_cstates when reading cpuidle files raises PermissionError"""
+        mock_walk.return_value = [
+            ("/sys/bus/cpu/devices/cpu0/cpuidle", [], ["state1"]),
+        ]
+        with self.assertRaises(PermissionError):
+            self.validator.capture_cstates()
+        self.mock_db.record_debug.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.walk")
+    def test_capture_cstates_no_files(self, mock_walk):
+        """Test capture_cstates when no cpuidle files are present"""
+        mock_walk.return_value = [
+            ("/sys/bus/cpu/devices/cpu0/cpuidle", [], []),
+        ]
+        self.validator.capture_cstates()
+        self.mock_db.record_debug.assert_called_with("ACPI C-state information\n")
