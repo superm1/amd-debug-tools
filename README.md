@@ -38,7 +38,7 @@ to set up the environment:
 This will add the `pipx` environment to your path.
 
 ## Running in-tree
-Documentation about running directly from a git checkout is available [here](docs/in-tree.md).
+Documentation about running directly from a git checkout is available [here](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-s2idle.md).
 
 ## Tools
 
