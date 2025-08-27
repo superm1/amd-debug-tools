@@ -1031,6 +1031,21 @@ class PrerequisiteValidator(AmdTool):
                     shutil.rmtree(tmpd)
         return True
 
+    def capture_cstates(self):
+        """Capture ACPI C state information for the first CPU (assumes the same for all CPUs)"""
+        base = os.path.join("/", "sys", "bus", "cpu", "devices", "cpu0", "cpuidle")
+        paths = {}
+        for root, _dirs, files in os.walk(base, topdown=False):
+            for fname in files:
+                target = os.path.join(root, fname)
+                with open(target, "rb") as f:
+                    paths[target] = f.read()
+        debug_str = "ACPI C-state information\n"
+        for path, data in paths.items():
+            prefix = "│ " if path != list(paths.keys())[-1] else "└─"
+            debug_str += f"{prefix}{path}: {data.decode('utf-8', 'ignore')}"
+        self.db.record_debug(debug_str)
+
     def capture_battery(self):
         """Capture battery information"""
         obj = Batteries()
@@ -1268,6 +1283,7 @@ class PrerequisiteValidator(AmdTool):
             self.capture_pci_acpi,
             self.capture_edid,
             self.capture_nvidia,
+            self.capture_cstates,
         ]
         checks = []
 
