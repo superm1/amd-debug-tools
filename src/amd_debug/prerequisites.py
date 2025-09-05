@@ -1173,9 +1173,7 @@ class PrerequisiteValidator(AmdTool):
     def check_iommu(self):
         """Check IOMMU configuration"""
         affected_1a = (
-            list(range(0x20, 0x2F))
-            + [x for x in range(0x60, 0x6F) if x not in (0x68,)]
-            + list(range(0x70, 0x7F))
+            list(range(0x20, 0x2F)) + list(range(0x60, 0x6F)) + list(range(0x70, 0x7F))
         )
         debug_str = ""
         if self.cpu_family == 0x1A and self.cpu_model in affected_1a:
