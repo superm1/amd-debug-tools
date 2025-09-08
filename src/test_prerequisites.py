@@ -2108,3 +2108,19 @@ class TestPrerequisiteValidator(unittest.TestCase):
         ]
         self.validator.capture_cstates()
         self.mock_db.record_debug.assert_called_with("ACPI C-state information\n")
+
+    @patch("amd_debug.prerequisites.read_file")
+    def test_check_pinctrl_amd_driver_loaded_with_missing_file_error(
+        self, mock_read_file
+    ):
+        """Test check_pinctrl_amd when the driver is loaded but debug file is missing"""
+        mock_read_file.side_effect = FileNotFoundError
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(properties={"DRIVER": "amd_gpio"})
+        ]
+
+        result = self.validator.check_pinctrl_amd()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "GPIO debugfs not available", "👀"
+        )

@@ -742,6 +742,9 @@ class PrerequisiteValidator(AmdTool):
             p = os.path.join("/", "sys", "kernel", "debug", "gpio")
             try:
                 contents = read_file(p)
+            except FileNotFoundError:
+                self.db.record_prereq("GPIO debugfs not available", "👀")
+                contents = None
             except PermissionError:
                 self.db.record_debug(f"Unable to capture {p}")
                 contents = None
