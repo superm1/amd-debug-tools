@@ -213,8 +213,10 @@ def run_test_cycle(
 
     try:
         duration, wait, count = prompt_test_arguments(duration, wait, count, rand)
+        total_seconds = (duration + wait) * count
+        until_time = datetime.now() + timedelta(seconds=total_seconds)
         since, until, fname, fmt, report_debug = prompt_report_arguments(
-            datetime.now().isoformat(), Defaults.until.isoformat(), fname, fmt, True
+            datetime.now().isoformat(), until_time.isoformat(), fname, fmt, True
         )
     except KeyboardInterrupt:
         sys.exit("\nTest cancelled")
