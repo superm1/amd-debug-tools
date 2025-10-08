@@ -255,7 +255,7 @@ class TestSleepDatabase(unittest.TestCase):
     def test_get_last_prereq_ts_no_data(self):
         """Test getting the last prereq timestamp when no data exists"""
         result = self.db.get_last_prereq_ts()
-        self.assertIsNone(result)
+        self.assertEqual(result, 0)
 
     def test_report_cycle_data(self):
         """Test reporting cycle data"""

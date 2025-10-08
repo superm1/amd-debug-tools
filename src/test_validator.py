@@ -264,7 +264,7 @@ class TestValidator(unittest.TestCase):
 
         # Validate debug messages
         mock_record_debug.assert_called_once_with(
-            "Woke up from input source /sys/devices/input0 (3->5)", "💤"
+            "Woke up from input source /sys/devices/input0 (3->5)"
         )
 
         # Stop patches

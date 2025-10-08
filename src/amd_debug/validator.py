@@ -435,7 +435,6 @@ class SleepValidator(AmdTool):
                 continue
             self.db.record_debug(
                 f"Woke up from input source {device} ({self.wakeup_count[device]}->{count})",
-                "💤",
             )
         self.wakeup_count = wakeup_count
 
@@ -583,7 +582,6 @@ class SleepValidator(AmdTool):
                     if bit_changed & BIT(bit):
                         self.db.record_debug(
                             f"Idle mask bit {bit} (0x{BIT(bit):x}) changed during suspend",
-                            "○",
                         )
         if self.upep:
             if self.upep_microsoft:
