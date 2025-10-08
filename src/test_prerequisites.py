@@ -2124,3 +2124,88 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_prereq.assert_called_with(
             "GPIO debugfs not available", "👀"
         )
+
+    def test_check_amdgpu_no_devices(self):
+        """Test check_amdgpu when no PCI devices are found"""
+        self.mock_pyudev.list_devices.return_value = []
+        result = self.validator.check_amdgpu()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with("Integrated GPU not found", "❌")
+        self.assertTrue(any(isinstance(f, MissingGpu) for f in self.validator.failures))
+
+    def test_check_amdgpu_non_amd_devices(self):
+        """Test check_amdgpu when PCI devices are present but not AMD GPUs"""
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(
+                properties={
+                    "PCI_CLASS": "30000",
+                    "PCI_ID": "8086abcd",
+                    "DRIVER": "i915",
+                }
+            ),
+        ]
+        result = self.validator.check_amdgpu()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with("Integrated GPU not found", "❌")
+        self.assertTrue(any(isinstance(f, MissingGpu) for f in self.validator.failures))
+
+    def test_check_amdgpu_driver_not_loaded(self):
+        """Test check_amdgpu when AMD GPU is present but driver is not loaded"""
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(
+                properties={"PCI_CLASS": "30000", "PCI_ID": "1002abcd", "DRIVER": None}
+            ),
+        ]
+        result = self.validator.check_amdgpu()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "GPU driver `amdgpu` not loaded", "❌"
+        )
+        self.assertTrue(
+            any(isinstance(f, MissingAmdgpu) for f in self.validator.failures)
+        )
+
+    def test_check_amdgpu_driver_loaded(self):
+        """Test check_amdgpu when AMD GPU is present and driver is loaded"""
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(
+                properties={
+                    "PCI_CLASS": "30000",
+                    "PCI_ID": "1002abcd",
+                    "DRIVER": "amdgpu",
+                    "PCI_SLOT_NAME": "0000:01:00.0",
+                }
+            ),
+        ]
+        result = self.validator.check_amdgpu()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "GPU driver `amdgpu` bound to 0000:01:00.0", "✅"
+        )
+
+    def test_check_amdgpu_multiple_devices_mixed(self):
+        """Test check_amdgpu with multiple devices, one with driver loaded, one without"""
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(
+                properties={
+                    "PCI_CLASS": "30000",
+                    "PCI_ID": "1002abcd",
+                    "DRIVER": "amdgpu",
+                    "PCI_SLOT_NAME": "0000:01:00.0",
+                }
+            ),
+            MagicMock(
+                properties={"PCI_CLASS": "30000", "PCI_ID": "1002abcd", "DRIVER": None}
+            ),
+        ]
+        result = self.validator.check_amdgpu()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_any_call(
+            "GPU driver `amdgpu` bound to 0000:01:00.0", "✅"
+        )
+        self.mock_db.record_prereq.assert_any_call(
+            "GPU driver `amdgpu` not loaded", "❌"
+        )
+        self.assertTrue(
+            any(isinstance(f, MissingAmdgpu) for f in self.validator.failures)
+        )

@@ -48,6 +48,19 @@ class RtcAlarmWrong(S0i3Failure):
         self.url = "https://github.com/systemd/systemd/issues/24279"
 
 
+class MissingGpu(S0i3Failure):
+    """GPU device is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "GPU device is missing"
+        self.explanation = (
+            "Running the s2idle sequence without an integrated GPU is likely "
+            "to cause problems. If you have a mux in BIOS, enable the integrated "
+            "GPU."
+        )
+
+
 class MissingAmdgpu(S0i3Failure):
     """AMDGPU driver is missing"""
 

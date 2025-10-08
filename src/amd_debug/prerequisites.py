@@ -58,6 +58,7 @@ from amd_debug.failures import (
     MissingAmdgpu,
     MissingAmdgpuFirmware,
     MissingAmdPmc,
+    MissingGpu,
     MissingDriver,
     MissingIommuACPI,
     MissingIommuPolicy,
@@ -177,6 +178,7 @@ class PrerequisiteValidator(AmdTool):
 
     def check_amdgpu(self):
         """Check for the AMDGPU driver"""
+        count = 0
         for device in self.pyudev.list_devices(subsystem="pci"):
             klass = device.properties.get("PCI_CLASS")
             if klass not in ["30000", "38000"]:
@@ -184,6 +186,7 @@ class PrerequisiteValidator(AmdTool):
             pci_id = device.properties.get("PCI_ID")
             if not pci_id.startswith("1002"):
                 continue
+            count += 1
             if device.properties.get("DRIVER") != "amdgpu":
                 self.db.record_prereq("GPU driver `amdgpu` not loaded", "❌")
                 self.failures += [MissingAmdgpu()]
@@ -191,6 +194,10 @@ class PrerequisiteValidator(AmdTool):
             slot = device.properties.get("PCI_SLOT_NAME")
 
             self.db.record_prereq(f"GPU driver `amdgpu` bound to {slot}", "✅")
+        if count == 0:
+            self.db.record_prereq("Integrated GPU not found", "❌")
+            self.failures += [MissingGpu()]
+            return False
         return True
 
     def check_amdgpu_parameters(self):
