@@ -158,7 +158,7 @@ class KernelLogger:
     def seek_tail(self, tim=None):
         """Seek to the end of the log"""
 
-    def process_callback(self, callback, priority):
+    def process_callback(self, callback, priority=None):
         """Process the log"""
 
     def match_line(self, _matches) -> str:
