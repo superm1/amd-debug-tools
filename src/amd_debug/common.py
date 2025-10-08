@@ -13,7 +13,6 @@ import platform
 import time
 import struct
 import subprocess
-import re
 import sys
 from ast import literal_eval
 from datetime import date, timedelta
