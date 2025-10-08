@@ -40,7 +40,7 @@ class TestDisplay(unittest.TestCase):
         display = Display()
 
         # Verify the EDID paths are correctly set
-        expected_edid = {"card0": "/sys/devices/card0/edid"}
+        expected_edid = ["/sys/devices/card0/edid"]
         self.assertEqual(display.get_edid(), expected_edid)
         mock_context.assert_called_once()
 
@@ -54,7 +54,7 @@ class TestDisplay(unittest.TestCase):
         display = Display()
 
         # Verify the EDID dictionary is empty
-        self.assertEqual(display.get_edid(), {})
+        self.assertEqual(display.get_edid(), [])
 
     @patch("amd_debug.display.Context")
     def test_device_without_card(self, mock_context):
@@ -70,7 +70,7 @@ class TestDisplay(unittest.TestCase):
         display = Display()
 
         # Verify the EDID dictionary is empty
-        self.assertEqual(display.get_edid(), {})
+        self.assertEqual(display.get_edid(), [])
 
     @patch("amd_debug.display.Context")
     @patch("amd_debug.display.read_file")
@@ -94,7 +94,7 @@ class TestDisplay(unittest.TestCase):
         display = Display()
 
         # Verify the EDID dictionary is empty
-        self.assertEqual(display.get_edid(), {})
+        self.assertEqual(display.get_edid(), [])
 
     @patch("amd_debug.display.Context")
     @patch("amd_debug.display.read_file")
@@ -116,7 +116,7 @@ class TestDisplay(unittest.TestCase):
         display = Display()
 
         # Verify the EDID dictionary is empty
-        self.assertEqual(display.get_edid(), {})
+        self.assertEqual(display.get_edid(), [])
 
     @patch("amd_debug.display.Context")
     @patch("amd_debug.display.read_file")
@@ -140,4 +140,4 @@ class TestDisplay(unittest.TestCase):
         display = Display()
 
         # Verify the EDID dictionary is empty
-        self.assertEqual(display.get_edid(), {})
+        self.assertEqual(display.get_edid(), [])

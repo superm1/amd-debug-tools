@@ -3,6 +3,8 @@
                 "acpica",
                 "CPPC",
                 "dbus",
+                "edid",
+                "edids",
                 "ENDC",
                 "geteuid",
                 "hwsleep",

@@ -157,7 +157,7 @@ class PrerequisiteValidator(AmdTool):
         if len(edids) == 0:
             self.db.record_debug("No EDID data found")
             return True
-        for name, p in edids.items():
+        for p in edids:
             output = None
             for tool in ["di-edid-decode", "edid-decode"]:
                 try:
@@ -173,7 +173,7 @@ class PrerequisiteValidator(AmdTool):
             if not output:
                 self.db.record_prereq("Failed to capture EDID table", "👀")
             else:
-                self.db.record_debug(apply_prefix_wrapper(f"EDID for {name}:", output))
+                self.db.record_debug(apply_prefix_wrapper(f"EDID for {p}:", output))
         return True
 
     def check_amdgpu(self):

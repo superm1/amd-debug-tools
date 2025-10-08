@@ -12,7 +12,7 @@ class Display:
 
     def __init__(self):
         self.pyudev = Context()
-        self.edid = {}
+        self.edid = []
 
         for dev in self.pyudev.list_devices(subsystem="drm"):
             if not "card" in dev.device_path:
@@ -27,7 +27,7 @@ class Display:
             f = read_file(p)
             if f != "enabled":
                 continue
-            self.edid[dev.sys_name] = os.path.join(dev.sys_path, "edid")
+            self.edid.append(os.path.join(dev.sys_path, "edid"))
 
     def get_edid(self) -> list:
         """Get the path for EDID data for all connected displays"""
