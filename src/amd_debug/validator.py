@@ -470,7 +470,7 @@ class SleepValidator(AmdTool):
                 self.db.record_debug(f"HW sleep statistics file {p} is missing")
         if not self.hw_sleep_duration:
             self.db.record_cycle_data("Did not reach hardware sleep state", "❌")
-        return self.hw_sleep_duration
+        return self.hw_sleep_duration > 0
 
     def capture_command_line(self):
         """Capture the kernel command line to debug"""
