@@ -1365,7 +1365,7 @@ class PrerequisiteValidator(AmdTool):
                     logging.debug(line)
 
         if len(self.failures) == 0:
-            return True
+            return
         print_color(Headers.ExplanationReport, "🗣️")
         for item in self.failures:
             item.get_failure()
