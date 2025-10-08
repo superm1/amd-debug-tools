@@ -384,6 +384,6 @@ def get_kernel_log(input_file=None) -> KernelLogger:
             kernel_log = DmesgLogger()
         except subprocess.CalledProcessError as e:
             fatal_error(f"{e}")
-            kernel_log = None
+            kernel_log = KernelLogger()
     logging.debug("Kernel log provider: %s", kernel_log.__class__.__name__)
     return kernel_log
