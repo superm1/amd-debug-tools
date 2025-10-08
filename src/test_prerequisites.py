@@ -2153,6 +2153,9 @@ class TestPrerequisiteValidator(unittest.TestCase):
         """Test check_amdgpu when AMD GPU is present but driver is not loaded"""
         self.mock_pyudev.list_devices.return_value = [
             MagicMock(
+                properties={"PCI_CLASS": "20000", "PCI_ID": "1111abcd", "DRIVER": None}
+            ),
+            MagicMock(
                 properties={"PCI_CLASS": "30000", "PCI_ID": "1002abcd", "DRIVER": None}
             ),
         ]
