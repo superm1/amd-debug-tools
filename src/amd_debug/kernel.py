@@ -175,7 +175,7 @@ class InputFile(KernelLogger):
 
     def __init__(self, fname):
         self.since_support = False
-        self.buffer = None
+        self.buffer = ""
         self.seeked = False
         self.buffer = read_file(fname)
 
@@ -190,7 +190,7 @@ class DmesgLogger(KernelLogger):
 
     def __init__(self):
         self.since_support = False
-        self.buffer = None
+        self.buffer = ""
         self.seeked = False
 
         cmd = ["dmesg", "-h"]
@@ -204,7 +204,7 @@ class DmesgLogger(KernelLogger):
         self._refresh_head()
 
     def _refresh_head(self):
-        self.buffer = []
+        self.buffer = ""
         self.seeked = False
         result = subprocess.run(self.command, check=True, capture_output=True)
         if result.returncode == 0:
