@@ -263,11 +263,11 @@ class SleepDatabase:
         )
         return cur.fetchall()
 
-    def report_debug(self, t0) -> str:
+    def report_debug(self, t0) -> list:
         """Helper function to report the debug database"""
         assert self.db
         if t0 is None:
-            return ""
+            return []
         cur = self.db.cursor()
         cur.execute(
             "SELECT message, priority FROM debug WHERE t0=?",
@@ -323,7 +323,7 @@ class SleepDatabase:
         cur = self.db.cursor()
         cur.execute("SELECT * FROM prereq_data ORDER BY t0 DESC LIMIT 1")
         result = cur.fetchone()
-        return result[0] if result else None
+        return result[0] if result else 0
 
     def get_last_cycle(self) -> list:
         """Helper function to report the last line from battery database"""

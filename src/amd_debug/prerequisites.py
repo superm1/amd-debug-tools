@@ -788,7 +788,7 @@ class PrerequisiteValidator(AmdTool):
                     "utf-8"
                 )
             except FileNotFoundError:
-                self.db.record_prereq(f"ethtool is missing", "👀")
+                self.db.record_prereq("ethtool is missing", "👀")
                 return True
             for line in output.split("\n"):
                 if "Supports Wake-on" in line:
@@ -1189,7 +1189,6 @@ class PrerequisiteValidator(AmdTool):
         if self.cpu_family == 0x1A and self.cpu_model in affected_1a:
             found_iommu = False
             found_acpi = False
-            found_dmar = False
             for dev in self.pyudev.list_devices(subsystem="iommu"):
                 found_iommu = True
                 debug_str += f"Found IOMMU {dev.sys_path}\n"

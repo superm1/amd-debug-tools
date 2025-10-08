@@ -557,7 +557,7 @@ class TestValidator(unittest.TestCase):
             # Set attributes for record_cycle
             self.validator.requested_duration = 60
             self.validator.active_gpios = ["GPIO1"]
-            self.validator.wakeup_irqs = [5]
+            self.validator.wakeup_irqs = ["5"]
             self.validator.kernel_duration = 1.5
             self.validator.hw_sleep_duration = 1.0
 
@@ -580,10 +580,10 @@ class TestValidator(unittest.TestCase):
             # Assert record_cycle was called with correct arguments
             mock_record_cycle.assert_called_once_with(
                 self.validator.requested_duration,
-                self.validator.active_gpios,
-                self.validator.wakeup_irqs,
-                self.validator.kernel_duration,
-                self.validator.hw_sleep_duration,
+                ",".join(str(gpio) for gpio in self.validator.active_gpios),
+                ",".join(str(irq) for irq in self.validator.wakeup_irqs),
+                int(self.validator.kernel_duration),
+                int(self.validator.hw_sleep_duration),
             )
 
     def test_program_wakealarm(self):

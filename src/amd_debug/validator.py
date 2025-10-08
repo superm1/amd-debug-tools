@@ -659,10 +659,10 @@ class SleepValidator(AmdTool):
             check()
         self.db.record_cycle(
             self.requested_duration,
-            self.active_gpios,
-            self.wakeup_irqs,
-            self.kernel_duration,
-            self.hw_sleep_duration,
+            ",".join(str(gpio) for gpio in self.active_gpios),
+            ",".join(str(irq) for irq in self.wakeup_irqs),
+            int(self.kernel_duration),
+            int(self.hw_sleep_duration),
         )
 
     def prep(self):

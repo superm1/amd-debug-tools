@@ -75,7 +75,7 @@ def display_report_file(fname, fmt) -> None:
 def get_report_file(report_file, extension) -> str:
     """Prompt user for report file"""
     if extension == "stdout":
-        return None
+        return ""
     if not report_file:
         return f"amd-s2idle-report-{date.today()}.{extension}"
     return report_file
@@ -88,7 +88,7 @@ def get_report_format() -> str:
     return "html"
 
 
-def prompt_report_arguments(since, until, fname, fmt, report_debug) -> str:
+def prompt_report_arguments(since, until, fname, fmt, report_debug) -> list:
     """Prompt user for report configuration"""
     if not since:
         default = Defaults.since

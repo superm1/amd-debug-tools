@@ -262,7 +262,11 @@ class CySystemdLogger(KernelLogger):
     """Class for logging using systemd journal using cython"""
 
     def __init__(self):
-        from cysystemd.reader import JournalReader, JournalOpenMode, Rule
+        from cysystemd.reader import (
+            JournalReader,
+            JournalOpenMode,
+            Rule,
+        )  # pylint: disable=import-outside-toplevel
 
         boot_reader = JournalReader()
         boot_reader.open(JournalOpenMode.SYSTEM)
