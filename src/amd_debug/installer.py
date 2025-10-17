@@ -197,7 +197,7 @@ class DisplayInfoPackage(DistroPackage):
     def __init__(self):
         super().__init__(
             deb="libdisplay-info-bin",
-            rpm="libdisplay-info",
+            rpm="libdisplay-info-tools",
             arch="libdisplay-info",
             message=Headers.MissingDiEdidDecode,
         )

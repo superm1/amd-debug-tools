@@ -231,7 +231,7 @@ class TestInstaller(unittest.TestCase):
         self.installer.set_requirements("edid-decode")
         ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(
-            ["dnf", "install", "-y", "libdisplay-info"]
+            ["dnf", "install", "-y", "libdisplay-info-tools"]
         )
         self.assertTrue(ret)
 
