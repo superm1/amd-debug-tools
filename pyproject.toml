@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=59.8.0", "setuptools-git-versioning>=2.0,<3"]
+requires = ["setuptools>=80", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -10,13 +10,12 @@ amd_debug = ["s2idle-hook"]
 "amd_debug.templates" = ["*"]
 "amd_debug.bash" = ["amd-s2idle"]
 
-[tool.setuptools-git-versioning]
-enabled = true
-
 [tool.coverage.run]
 branch = true
 source = ["src"]
 omit = ["src/launcher.py"]
+
+[tool.setuptools_scm]
 
 [project]
 name = "amd-debug-tools"
