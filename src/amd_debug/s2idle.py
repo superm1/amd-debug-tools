@@ -238,6 +238,7 @@ def run_test_cycle(
             rand=rand,
             logind=logind,
         )
+        until = datetime.now()
     else:
         since = None
         until = None

@@ -360,8 +360,10 @@ class TestTestFunction(unittest.TestCase):
     @patch("amd_debug.s2idle.prompt_test_arguments")
     @patch("amd_debug.s2idle.prompt_report_arguments")
     @patch("amd_debug.s2idle.display_report_file")
+    @patch("amd_debug.s2idle.datetime")
     def test_test_success(
         self,
+        mock_datetime,
         mock_display_report_file,
         mock_prompt_report_arguments,
         mock_prompt_test_arguments,
@@ -371,6 +373,11 @@ class TestTestFunction(unittest.TestCase):
         mock_installer,
     ):
         """Test the test function when everything succeeds"""
+        from datetime import datetime
+
+        mock_datetime.now.return_value = datetime(2023, 2, 1, 0, 0, 0)
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
         mock_installer_instance = mock_installer.return_value
         mock_installer_instance.install_dependencies.return_value = True
 
@@ -416,9 +423,11 @@ class TestTestFunction(unittest.TestCase):
         mock_sleep_validator_instance.run.assert_called_once_with(
             duration=10, wait=5, count=3, rand=False, logind=False
         )
+        from datetime import datetime
+
         mock_sleep_report.assert_called_once_with(
             since="2023-01-01",
-            until="2023-02-01",
+            until=datetime(2023, 2, 1, 0, 0, 0),
             fname="report.html",
             fmt="html",
             tool_debug=True,
