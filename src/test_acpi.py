@@ -79,7 +79,7 @@ class TestAcpi(unittest.TestCase):
     def test_acpica_trace_no_acpi_debug(self):
         """Test AcpicaTracer class when ACPI tracing is not supported"""
         with patch("os.path.exists", return_value=False), patch(
-            "builtins.open", mock_open(read_data="foo")
+            "amd_debug.common.open", mock_open(read_data="foo")
         ):
             tracer = AcpicaTracer()
             self.assertFalse(tracer.supported)

@@ -26,7 +26,7 @@ class TestKernelLog(unittest.TestCase):
         kernel_cmdline = "quiet splash"
         expected_output = ""
         with patch(
-            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+            "amd_debug.common.open", new_callable=mock_open, read_data=kernel_cmdline
         ) as _mock_file:
             result = get_kernel_command_line()
             self.assertEqual(result, expected_output)
@@ -35,7 +35,7 @@ class TestKernelLog(unittest.TestCase):
         kernel_cmdline = ""
         expected_output = ""
         with patch(
-            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+            "amd_debug.common.open", new_callable=mock_open, read_data=kernel_cmdline
         ) as _mock_file:
             result = get_kernel_command_line()
             self.assertEqual(result, expected_output)
@@ -44,7 +44,7 @@ class TestKernelLog(unittest.TestCase):
         kernel_cmdline = "quiet splash --debug=1"
         expected_output = "--debug=1"
         with patch(
-            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+            "amd_debug.common.open", new_callable=mock_open, read_data=kernel_cmdline
         ) as _mock_file:
             result = get_kernel_command_line()
             self.assertEqual(result, expected_output)
@@ -53,7 +53,7 @@ class TestKernelLog(unittest.TestCase):
         kernel_cmdline = "quiet splash initrd=foo modprobe.blacklist=foo"
         expected_output = "modprobe.blacklist=foo"
         with patch(
-            "builtins.open", new_callable=mock_open, read_data=kernel_cmdline
+            "amd_debug.common.open", new_callable=mock_open, read_data=kernel_cmdline
         ) as _mock_file:
             result = get_kernel_command_line()
             self.assertEqual(result, expected_output)

@@ -44,7 +44,7 @@ class TestValidatorHelpers(unittest.TestCase):
             return "Test function executed"
 
         # Mock /sys/power/pm_debug_messages existing and all ACPI existing
-        with patch("builtins.open", new_callable=mock_open, read_data="0") as mock_file:
+        with patch("amd_debug.validator.open", new_callable=mock_open, read_data="0") as mock_file:
             handlers = (
                 mock_file.return_value,
                 mock_open(read_data="0").return_value,
@@ -57,7 +57,7 @@ class TestValidatorHelpers(unittest.TestCase):
 
         # Mock /sys/power/pm_debug_messages missing
         with patch(
-            "builtins.open", side_effect=FileNotFoundError("not found")
+            "amd_debug.validator.open", side_effect=FileNotFoundError("not found")
         ) as mock_file:
             with self.assertRaises(FileNotFoundError):
                 result = test_function()
