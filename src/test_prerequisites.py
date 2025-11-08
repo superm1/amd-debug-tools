@@ -1112,7 +1112,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
 
     @patch("amd_debug.prerequisites.os.path.exists")
     @patch(
-        "builtins.open",
+        "amd_debug.prerequisites.open",
         new_callable=unittest.mock.mock_open,
         read_data="ignore_wake_value",
     )
@@ -1127,7 +1127,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         )
 
     @patch("amd_debug.prerequisites.os.path.exists")
-    @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data="(null)")
+    @patch("amd_debug.prerequisites.open", new_callable=unittest.mock.mock_open, read_data="(null)")
     def test_capture_disabled_pins_with_null_values(self, _mock_open, mock_path_exists):
         mock_path_exists.side_effect = (
             lambda path: "ignore_wake" in path or "ignore_interrupt" in path
@@ -2090,7 +2090,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
         )
 
     @patch("amd_debug.prerequisites.os.walk")
-    @patch("builtins.open", side_effect=PermissionError)
+    @patch("amd_debug.prerequisites.open", side_effect=PermissionError)
     def test_capture_cstates_permission_error(self, _mock_open, mock_walk):
         """Test capture_cstates when reading cpuidle files raises PermissionError"""
         mock_walk.return_value = [
