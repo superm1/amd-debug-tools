@@ -44,6 +44,7 @@ from amd_debug.failures import (
     AmdHsmpBug,
     AmdgpuPpFeatureMask,
     ASpmWrong,
+    CpuTopologyUnknown,
     DeepSleep,
     DevSlpDiskIssue,
     DevSlpHostIssue,
@@ -1113,11 +1114,23 @@ class PrerequisiteValidator(AmdTool):
         # check for artificially limited CPUs
         p = os.path.join("/", "sys", "devices", "system", "cpu", "kernel_max")
         max_cpus = int(read_file(p)) + 1  # 0 indexed
-        # https://www.amd.com/content/dam/amd/en/documents/processor-tech-docs/programmer-references/24594.pdf
-        # Extended Topology Enumeration (NumLogCores)
-        # CPUID 0x80000026 subleaf 1
+        # https://docs.amd.com/v/u/en-US/40332-PUB_4.08
+        # E.4.24 Function 8000_0026—Extended CPU Topology
         try:
-            _, cpu_count, _, _ = read_cpuid(0, 0x80000026, 1)
+            # Need to discover the socket level to look at all CCDs in the socket
+            for level in range(0, 5):
+                _, _, ecx, _ = read_cpuid(0, 0x80000026, level)
+                level_type = (ecx >> 8) & 0xFF
+                if level_type == 0:
+                    self.db.record_prereq(
+                        "Unable to discover CPU topology, didn't find socket level",
+                        "❌",
+                    )
+                    self.failures += [CpuTopologyUnknown()]
+                    return False
+                if level_type == 4:
+                    break
+            _, cpu_count, _, _ = read_cpuid(0, 0x80000026, level)
             if cpu_count > max_cpus:
                 self.db.record_prereq(
                     f"The kernel has been limited to {max_cpus} CPU cores, "

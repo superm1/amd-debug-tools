@@ -576,6 +576,15 @@ class LimitedCores(S0i3Failure):
         )
 
 
+class CpuTopologyUnknown(S0i3Failure):
+    """CPU topology unknown"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "CPU topology unknown"
+        self.explanation = "The CPU topology could not be determined. This may prevent the system from entering hardware sleep states correctly."
+
+
 class RogAllyOldMcu(S0i3Failure):
     """MCU firwmare is too old"""
 
