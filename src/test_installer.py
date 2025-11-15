@@ -4,7 +4,7 @@
 """
 This module contains unit tests for the installer functions in the amd-debug-tools package.
 """
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
 import logging
 import unittest
@@ -102,9 +102,6 @@ class TestInstaller(unittest.TestCase):
 
     @patch("builtins.print")
     @patch("amd_debug.installer.get_distro", return_value="fedora")
-    @patch(
-        "builtins.open", new_callable=mock_open, read_data="VARIANT_ID=workstation\n"
-    )
     @patch("os.execvp", return_value=None)
     @patch("subprocess.check_call", return_value=0)
     @patch("subprocess.call", return_value=1)
@@ -112,12 +109,32 @@ class TestInstaller(unittest.TestCase):
         self,
         _mock_call,
         _mock_check_call,
-        _mock_variant,
         _mock_distro,
         _fake_sudo,
         _mock_print,
     ):
         """Test install requirements function"""
+        self.installer.set_requirements("iasl")
+        ret = self.installer.install_dependencies()
+        _mock_check_call.assert_called_once_with(
+            ["dnf", "install", "-y", "acpica-tools"]
+        )
+        self.assertTrue(ret)
+
+    @patch("builtins.print")
+    @patch("amd_debug.installer.get_distro", return_value="fedora")
+    @patch("os.execvp", return_value=None)
+    @patch("subprocess.check_call", return_value=0)
+    @patch("subprocess.call", return_value=1)
+    def test_install_iasl_fedora_kde(
+        self,
+        _mock_call,
+        _mock_check_call,
+        _mock_distro,
+        _fake_sudo,
+        _mock_print,
+    ):
+        """Test install requirements function on Fedora KDE variant"""
         self.installer.set_requirements("iasl")
         ret = self.installer.install_dependencies()
         _mock_check_call.assert_called_once_with(
@@ -141,9 +158,6 @@ class TestInstaller(unittest.TestCase):
 
     @patch("builtins.print")
     @patch("amd_debug.installer.get_distro", return_value="fedora")
-    @patch(
-        "builtins.open", new_callable=mock_open, read_data="VARIANT_ID=workstation\n"
-    )
     @patch("os.execvp", return_value=None)
     @patch("subprocess.check_call", return_value=0)
     @patch("subprocess.call", return_value=1)
@@ -151,7 +165,6 @@ class TestInstaller(unittest.TestCase):
         self,
         _mock_call,
         _mock_check_call,
-        _mock_variant,
         _mock_distro,
         _fake_sudo,
         _mock_print,
@@ -212,9 +225,6 @@ class TestInstaller(unittest.TestCase):
 
     @patch("builtins.print")
     @patch("amd_debug.installer.get_distro", return_value="fedora")
-    @patch(
-        "builtins.open", new_callable=mock_open, read_data="VARIANT_ID=workstation\n"
-    )
     @patch("os.execvp", return_value=None)
     @patch("subprocess.check_call", return_value=0)
     @patch("subprocess.call", return_value=1)
@@ -222,7 +232,6 @@ class TestInstaller(unittest.TestCase):
         self,
         _mock_call,
         _mock_check_call,
-        _mock_variant,
         _mock_distro,
         _fake_sudo,
         _mock_print,
