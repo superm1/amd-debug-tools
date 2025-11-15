@@ -64,7 +64,7 @@ class DistroPackage:
             for line in release.split("\n"):
                 if line.startswith("VARIANT_ID"):
                     variant = line.split("=")[-1]
-            if variant != "workstation":
+            if variant not in ("workstation", "kde"):
                 return False
             installer = ["dnf", "install", "-y", self.rpm]
         elif dist == "arch" or os.path.exists("/etc/arch-release"):
