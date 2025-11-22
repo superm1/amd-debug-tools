@@ -548,9 +548,9 @@ class TestPrerequisiteValidator(unittest.TestCase):
             struct.pack("4I", 0, 16, 0, 0),  # subleaf 4: cpu_count = 16
         ]
         result = self.validator.check_cpu()
-        self.assertFalse(result)
+        self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with(
-            "Unable to discover CPU topology, didn't find socket level", "❌"
+            "Unable to discover CPU topology, didn't find socket level", "🚦"
         )
 
     @patch("builtins.open", new_callable=mock_open)

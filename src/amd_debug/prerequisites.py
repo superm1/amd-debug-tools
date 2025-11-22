@@ -44,7 +44,6 @@ from amd_debug.failures import (
     AmdHsmpBug,
     AmdgpuPpFeatureMask,
     ASpmWrong,
-    CpuTopologyUnknown,
     DeepSleep,
     DevSlpDiskIssue,
     DevSlpHostIssue,
@@ -1124,10 +1123,9 @@ class PrerequisiteValidator(AmdTool):
                 if level_type == 0:
                     self.db.record_prereq(
                         "Unable to discover CPU topology, didn't find socket level",
-                        "❌",
+                        "🚦",
                     )
-                    self.failures += [CpuTopologyUnknown()]
-                    return False
+                    return True
                 if level_type == 4:
                     break
             _, cpu_count, _, _ = read_cpuid(0, 0x80000026, level)
