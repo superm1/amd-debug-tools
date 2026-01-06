@@ -98,6 +98,7 @@ jobs:
         python-version: "3.x"
     - name: install apt deps
       run: |
+        sudo apt update
         sudo apt install libsystemd-dev -y
     - name: install deps
       run: |
