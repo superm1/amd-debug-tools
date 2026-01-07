@@ -6,7 +6,7 @@ import os
 
 from amd_debug.common import read_file
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def migrate(cur, user_version) -> None:
@@ -17,6 +17,16 @@ def migrate(cur, user_version) -> None:
     # - add priority column
     if val == 0:
         cur.execute("ALTER TABLE debug ADD COLUMN priority INTEGER")
+    # Schema 2
+    # - add voltage columns v0 and v1 to battery table
+    if val <= 1:
+        # Check if columns already exist
+        cur.execute("PRAGMA table_info(battery)")
+        columns = [row[1] for row in cur.fetchall()]
+        if "v0" not in columns:
+            cur.execute("ALTER TABLE battery ADD COLUMN v0 INTEGER")
+        if "v1" not in columns:
+            cur.execute("ALTER TABLE battery ADD COLUMN v1 INTEGER")
     # Update schema if necessary
     if val != user_version:
         cur.execute(f"PRAGMA user_version = {user_version}")
@@ -83,6 +93,8 @@ class SleepDatabase:
             "b0 INTEGER,"
             "b1 INTEGER,"
             "full INTEGER,"
+            "v0 INTEGER,"
+            "v1 INTEGER,"
             "unit TEXT)"
         )
         self.prereq_data_cnt = 0
@@ -150,7 +162,7 @@ class SleepDatabase:
         except PermissionError:
             self.record_debug(f"Unable to capture {fn}")
 
-    def record_battery_energy(self, name, energy, full, unit):
+    def record_battery_energy(self, name, energy, full, voltage, unit):
         """Helper function to record battery energy"""
         assert self.db
         assert self.last_suspend
@@ -161,14 +173,14 @@ class SleepDatabase:
         )
         if cur.fetchone():
             cur.execute(
-                "UPDATE battery SET b1=? WHERE t0=?",
-                (energy, int(self.last_suspend.strftime("%Y%m%d%H%M%S"))),
+                "UPDATE battery SET b1=?, v1=? WHERE t0=?",
+                (energy, voltage, int(self.last_suspend.strftime("%Y%m%d%H%M%S"))),
             )
         else:
             cur.execute(
                 """
-                INSERT into battery (t0, name, b0, b1, full, unit) 
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT into battery (t0, name, b0, b1, full, v0, v1, unit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     int(self.last_suspend.strftime("%Y%m%d%H%M%S")),
@@ -176,6 +188,8 @@ class SleepDatabase:
                     energy,
                     None,
                     full,
+                    voltage,
+                    None,
                     unit,
                 ),
             )
@@ -339,7 +353,7 @@ class SleepDatabase:
 
         pd.set_option("display.precision", 2)
         return pd.read_sql_query(
-            sql="SELECT cycle.t0, cycle.t1, hw, requested, gpio, wake_irq, b0, b1, full FROM cycle LEFT JOIN battery ON cycle.t0 = battery.t0 WHERE cycle.t0 >= ? and cycle.t0 <= ?",
+            sql="SELECT cycle.t0, cycle.t1, hw, requested, gpio, wake_irq, b0, b1, full, v0, v1, unit FROM cycle LEFT JOIN battery ON cycle.t0 = battery.t0 WHERE cycle.t0 >= ? and cycle.t0 <= ?",
             con=self.db,
             params=(
                 int(since.strftime("%Y%m%d%H%M%S")),

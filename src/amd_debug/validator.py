@@ -163,9 +163,12 @@ class SleepValidator(AmdTool):
             unit = self.batteries.get_energy_unit(name)
             energy = self.batteries.get_energy(name)
             full = self.batteries.get_energy_full(name)
+            voltage = self.batteries.get_voltage(name)
             self.db.record_debug(f"{name} energy level is {energy} {unit}")
+            if voltage:
+                self.db.record_debug(f"{name} voltage is {voltage} µV")
             report_unit = "W" if unit == "µWh" else "A"
-            self.db.record_battery_energy(name, energy, full, report_unit)
+            self.db.record_battery_energy(name, energy, full, voltage, report_unit)
 
     def check_rtc_cmos(self):
         """Check if the RTC is configured to use ACPI alarm"""

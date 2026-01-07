@@ -44,14 +44,14 @@ class TestSleepDatabase(unittest.TestCase):
         """Test recording battery energy"""
         timestamp = datetime.now()
         self.db.start_cycle(timestamp)
-        self.db.record_battery_energy("Battery1", 50, 100, "mWh")
+        self.db.record_battery_energy("Battery1", 50, 100, 12000000, "mWh")
         cur = self.db.db.cursor()
         cur.execute(
-            "SELECT name, b0, b1, full, unit FROM battery WHERE t0=?",
+            "SELECT name, b0, b1, full, v0, v1, unit FROM battery WHERE t0=?",
             (int(timestamp.strftime("%Y%m%d%H%M%S")),),
         )
         result = cur.fetchone()
-        self.assertEqual(result, ("Battery1", 50, None, 100, "mWh"))
+        self.assertEqual(result, ("Battery1", 50, None, 100, 12000000, None, "mWh"))
 
     def test_record_cycle_data(self):
         """Test recording cycle data"""
@@ -97,7 +97,7 @@ class TestSleepDatabase(unittest.TestCase):
         """Test reporting battery data"""
         timestamp = datetime.now()
         self.db.start_cycle(timestamp)
-        self.db.record_battery_energy("Battery1", 50, 100, "mWh")
+        self.db.record_battery_energy("Battery1", 50, 100, 12000000, "mWh")
         result = self.db.report_battery(timestamp)
         self.assertEqual(
             result,
@@ -108,6 +108,8 @@ class TestSleepDatabase(unittest.TestCase):
                     50,
                     None,
                     100,
+                    12000000,
+                    None,
                     "mWh",
                 )
             ],

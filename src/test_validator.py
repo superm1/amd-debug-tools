@@ -44,7 +44,9 @@ class TestValidatorHelpers(unittest.TestCase):
             return "Test function executed"
 
         # Mock /sys/power/pm_debug_messages existing and all ACPI existing
-        with patch("amd_debug.validator.open", new_callable=mock_open, read_data="0") as mock_file:
+        with patch(
+            "amd_debug.validator.open", new_callable=mock_open, read_data="0"
+        ) as mock_file:
             handlers = (
                 mock_file.return_value,
                 mock_open(read_data="0").return_value,
@@ -112,13 +114,18 @@ class TestValidator(unittest.TestCase):
         ), patch.object(
             self.validator.batteries, "get_energy_full", return_value=60000
         ), patch.object(
+            self.validator.batteries, "get_voltage", return_value=12000000
+        ), patch.object(
             self.validator.db, "record_debug"
         ) as mock_record_debug, patch.object(
             self.validator.db, "record_battery_energy"
         ) as mock_record_battery_energy:
             self.validator.capture_battery()
-            mock_record_debug.assert_called_with("BAT0 energy level is 50000 µWh")
-            mock_record_battery_energy.assert_called_with("BAT0", 50000, 60000, "W")
+            mock_record_debug.assert_any_call("BAT0 energy level is 50000 µWh")
+            mock_record_debug.assert_any_call("BAT0 voltage is 12000000 µV")
+            mock_record_battery_energy.assert_called_with(
+                "BAT0", 50000, 60000, 12000000, "W"
+            )
 
     def test_check_rtc_cmos(self):
         """Test check_rtc_cmos method"""

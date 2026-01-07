@@ -72,6 +72,19 @@ class TestBatteries(unittest.TestCase):
         result = self.batteries.get_energy_full("BAT0")
         self.assertEqual(result, "60000")
 
+    def test_get_voltage(self):
+        """Test getting voltage for a battery"""
+        mock_device = MagicMock()
+        mock_device.device_path = "/devices/LNXSYSTM:00/device:00/PNP0C0A:00"
+        mock_device.properties = {
+            "POWER_SUPPLY_NAME": "BAT0",
+            "POWER_SUPPLY_VOLTAGE_NOW": "12000000",
+        }
+        self.mock_context.list_devices.return_value = [mock_device]
+
+        result = self.batteries.get_voltage("BAT0")
+        self.assertEqual(result, "12000000")
+
     def test_get_description_string(self):
         """Test getting description string for a battery"""
         mock_device = MagicMock()

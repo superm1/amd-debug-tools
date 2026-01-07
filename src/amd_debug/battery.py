@@ -68,6 +68,14 @@ class Batteries:
             energy = _get_property(dev.properties, "POWER_SUPPLY_CHARGE_FULL")
         return energy
 
+    def get_voltage(self, name) -> int:
+        """Get the current voltage for the given battery name (in µV)"""
+        dev = self._get_battery(name)
+        if not dev:
+            return ""
+        voltage = _get_property(dev.properties, "POWER_SUPPLY_VOLTAGE_NOW")
+        return voltage if voltage else ""
+
     def get_description_string(self, name) -> str:
         """Get a description string for the given battery name"""
         dev = self._get_battery(name)

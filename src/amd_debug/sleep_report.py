@@ -162,9 +162,44 @@ class SleepReport(AmdTool):
             self.df["Battery Delta"] = (
                 (self.df["b1"] - self.df["b0"]) / self.df["full"] * 100
             )
-            self.df["Battery Ave Rate"] = (
-                (self.df["b1"] - self.df["b0"]) / self.df["Duration"] / 360
-            )
+            # Calculate average power rate
+            # For µWh: (µWh) / (seconds) * 3600 / 1000000 = W
+            # For µAh: (µAh) * (µV) / (seconds) * 3600 / 1000000^2 = W
+            energy_diff = self.df["b1"] - self.df["b0"]
+            # Check if unit is 'W' (energy-based) or 'A' (charge-based)
+            if "unit" in self.df.columns and not self.df["unit"].isnull().all():
+                # Use vectorized operation with apply for mixed units
+                def calc_rate(row):
+                    if pd.isna(row["b0"]) or pd.isna(row["b1"]) or row["Duration"] == 0:
+                        return np.nan
+                    energy_change = row["b1"] - row["b0"]
+                    if row["unit"] == "W":
+                        # Energy-based (µWh): convert to watts
+                        return (energy_change / row["Duration"]) * 3600 / 1000000
+                    elif (
+                        row["unit"] == "A"
+                        and not pd.isna(row["v0"])
+                        and not pd.isna(row["v1"])
+                    ):
+                        # Charge-based (µAh): need voltage to calculate power
+                        avg_voltage = (
+                            row["v0"] + row["v1"]
+                        ) / 2  # Average voltage in µV
+                        return (
+                            (energy_change * avg_voltage / row["Duration"])
+                            * 3600
+                            / (1000000 * 1000000)
+                        )
+                    else:
+                        # Fallback for charge-based without voltage
+                        return (energy_change / row["Duration"]) * 3600 / 1000000
+
+                self.df["Battery Ave Rate"] = self.df.apply(calc_rate, axis=1)
+            else:
+                # Fallback: assume energy-based (µWh)
+                self.df["Battery Ave Rate"] = (
+                    energy_diff / self.df["Duration"] * 3600 / 1000000
+                )
 
         # Wake sources
         self.df["Wake Pin"] = self.df["gpio"].apply(format_gpio_as_str)
