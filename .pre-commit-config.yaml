@@ -5,3 +5,19 @@ repos:
     hooks:
     - id: black
       exclude_types: [symlink]
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+    -   id: check-added-large-files
+    -   id: check-executables-have-shebangs
+    -   id: forbid-new-submodules
+    -   id: check-symlinks
+    -   id: check-xml
+    -   id: end-of-file-fixer
+        types_or: [c, shell, python, proto]
+    -   id: trailing-whitespace
+        types_or: [c, shell, python, xml]
+    -   id: check-docstring-first
+    -   id: check-merge-conflict
+    -   id: mixed-line-ending
+        args: [--fix=lf]
