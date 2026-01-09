@@ -317,6 +317,9 @@ class SleepValidator(AmdTool):
             actions = read_file(os.path.join(p, "actions"))
             message = f"{Headers.WokeFromIrq} {n} ({chip_name} {hw}-{name} {actions})"
             self.db.record_debug(message)
+            irq = int(n)
+            if irq and irq not in self.wakeup_irqs:
+                self.wakeup_irqs += [irq]
         except OSError:
             pass
         return True
