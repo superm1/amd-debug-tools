@@ -610,3 +610,32 @@ class DmcubTooOld(S0i3Failure):
             f"The DMCUB microcode version {hex(current)} is older than the"
             f"minimum suggested version {hex(expected)}."
         )
+
+
+class MissingIsp4PlatformDriver(S0i3Failure):
+    """ISP4 platform driver is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "ISP4 platform driver is missing"
+        self.explanation = (
+            "The ISP4 platform driver is required for the camera interface included "
+            "with the SOC to enter the proper power states. "
+            "Be sure that you have enabled CONFIG_AMD_ISP_PLATFORM in your kernel."
+        )
+
+
+class MissingAmdCaptureModule(S0i3Failure):
+    """AMD Capture module is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "AMD Capture module is missing"
+        self.explanation = (
+            "The amd_capture module is required for the camera interface included "
+            "with the SOC to enter the proper power states. "
+            "Be sure that the amd_capture module is loaded."
+            ""
+            "If the module is not available, disable the camera in the BIOS to prevent issues."
+        )
+        self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/4869"
