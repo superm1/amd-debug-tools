@@ -54,6 +54,7 @@ from amd_debug.failures import (
     I2CHidBug,
     KernelRingBufferWrapped,
     LimitedCores,
+    MissingAmdCaptureModule,
     MissingAmdgpu,
     MissingAmdgpuFirmware,
     MissingAmdPmc,
@@ -61,6 +62,7 @@ from amd_debug.failures import (
     MissingDriver,
     MissingIommuACPI,
     MissingIommuPolicy,
+    MissingIsp4PlatformDriver,
     MissingThunderbolt,
     MissingXhciHcd,
     MSRFailure,
@@ -979,6 +981,44 @@ class PrerequisiteValidator(AmdTool):
         if debug_str:
             self.db.record_debug(debug_str)
 
+    def check_isp4(self):
+        """Check if camera supported by ISP is present and set up properly"""
+        devices = []
+        for dev in self.pyudev.list_devices(subsystem="acpi"):
+            # look for ACPI device for camera (OMNI5C10:00 is seen today)
+            if not dev.sys_name.startswith("OMNI5C10"):
+                continue
+            p = os.path.join(dev.sys_path, "path")
+            if not os.path.exists(p):
+                continue
+            devices.append(dev)
+        for dev in devices:
+            p = os.path.join(dev.sys_path, "physical_node", "driver")
+            if os.path.exists(p):
+                driver = os.path.basename(os.readlink(p))
+            else:
+                driver = None
+            if driver != "amd-isp4":
+                self.db.record_prereq(
+                    f"ISP4 platform camera driver 'amd-isp4' not bound to {dev.sys_name}",
+                    "❌",
+                )
+                self.failures += [MissingIsp4PlatformDriver()]
+                return False
+            self.db.record_prereq(
+                f"ISP4 platform camera driver 'amd-isp4' bound to {dev.sys_name}", "✅"
+            )
+            # check if `amd_capture` module is loaded
+            p = os.path.join("/", "sys", "module", "amd_capture")
+            if not os.path.exists(p):
+                self.db.record_prereq(
+                    "Camera driver module 'amd_capture' not loaded", "❌"
+                )
+                self.failures += [MissingAmdCaptureModule()]
+                return False
+            self.db.record_prereq("Camera driver module 'amd_capture' loaded", "✅")
+        return True
+
     def map_acpi_path(self):
         """Map of ACPI devices to ACPI paths"""
         devices = []
@@ -1332,6 +1372,7 @@ class PrerequisiteValidator(AmdTool):
                 self.check_iommu,
                 self.check_asus_rog_ally,
                 self.check_dpia_pg_dmcub,
+                self.check_isp4,
             ]
 
         checks += [

@@ -2387,3 +2387,152 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(
             any(isinstance(f, MissingAmdgpu) for f in self.validator.failures)
         )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch("amd_debug.prerequisites.os.readlink")
+    def test_check_isp4_no_devices(self, _mock_readlink, _mock_path_exists):
+        """Test check_isp4 when no ISP4 camera devices are found"""
+        self.mock_pyudev.list_devices.return_value = []
+        result = self.validator.check_isp4()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch("amd_debug.prerequisites.os.readlink")
+    def test_check_isp4_device_without_path(self, _mock_readlink, mock_path_exists):
+        """Test check_isp4 when ACPI device exists but path file is missing"""
+        mock_path_exists.return_value = False
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00")
+        ]
+        result = self.validator.check_isp4()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch("amd_debug.prerequisites.os.readlink")
+    def test_check_isp4_driver_not_bound(self, _mock_readlink, mock_path_exists):
+        """Test check_isp4 when ISP4 driver is not bound to the device"""
+        mock_path_exists.side_effect = lambda p: "path" in p
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00")
+        ]
+        result = self.validator.check_isp4()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "ISP4 platform camera driver 'amd-isp4' not bound to OMNI5C10:00", "❌"
+        )
+        self.assertTrue(
+            any(
+                isinstance(f, MissingIsp4PlatformDriver)
+                for f in self.validator.failures
+            )
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch(
+        "amd_debug.prerequisites.os.readlink",
+        return_value="/sys/devices/platform/drivers/amd-isp4",
+    )
+    def test_check_isp4_driver_bound_but_module_not_loaded(
+        self, _mock_readlink, mock_path_exists
+    ):
+        """Test check_isp4 when driver is bound but amd_capture module is not loaded"""
+
+        def exists_side_effect(path):
+            if "path" in path or "driver" in path:
+                return True
+            if "amd_capture" in path:
+                return False
+            return True
+
+        mock_path_exists.side_effect = exists_side_effect
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00")
+        ]
+        result = self.validator.check_isp4()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_any_call(
+            "ISP4 platform camera driver 'amd-isp4' bound to OMNI5C10:00", "✅"
+        )
+        self.mock_db.record_prereq.assert_any_call(
+            "Camera driver module 'amd_capture' not loaded", "❌"
+        )
+        self.assertTrue(
+            any(isinstance(f, MissingAmdCaptureModule) for f in self.validator.failures)
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch(
+        "amd_debug.prerequisites.os.readlink",
+        return_value="/sys/devices/platform/drivers/amd-isp4",
+    )
+    def test_check_isp4_fully_configured(self, _mock_readlink, mock_path_exists):
+        """Test check_isp4 when ISP4 is fully configured with driver and module"""
+        mock_path_exists.return_value = True
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00")
+        ]
+        result = self.validator.check_isp4()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_any_call(
+            "ISP4 platform camera driver 'amd-isp4' bound to OMNI5C10:00", "✅"
+        )
+        self.mock_db.record_prereq.assert_any_call(
+            "Camera driver module 'amd_capture' loaded", "✅"
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch(
+        "amd_debug.prerequisites.os.readlink",
+        return_value="/sys/devices/platform/drivers/other-driver",
+    )
+    def test_check_isp4_wrong_driver(self, _mock_readlink, mock_path_exists):
+        """Test check_isp4 when wrong driver is bound to the device"""
+        mock_path_exists.side_effect = lambda p: "path" in p or "driver" in p
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00")
+        ]
+        result = self.validator.check_isp4()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "ISP4 platform camera driver 'amd-isp4' not bound to OMNI5C10:00", "❌"
+        )
+        self.assertTrue(
+            any(
+                isinstance(f, MissingIsp4PlatformDriver)
+                for f in self.validator.failures
+            )
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    @patch(
+        "amd_debug.prerequisites.os.readlink",
+        return_value="/sys/devices/platform/drivers/amd-isp4",
+    )
+    def test_check_isp4_multiple_devices(self, _mock_readlink, mock_path_exists):
+        """Test check_isp4 with multiple ISP4 camera devices"""
+        mock_path_exists.return_value = True
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00"),
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:01", sys_name="OMNI5C10:01"),
+        ]
+        result = self.validator.check_isp4()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_any_call(
+            "ISP4 platform camera driver 'amd-isp4' bound to OMNI5C10:00", "✅"
+        )
+        self.mock_db.record_prereq.assert_any_call(
+            "ISP4 platform camera driver 'amd-isp4' bound to OMNI5C10:01", "✅"
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_isp4_device_not_starting_with_omni5c10(self, mock_path_exists):
+        """Test check_isp4 when ACPI devices don't match OMNI5C10 pattern"""
+        mock_path_exists.return_value = True
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OTHER:00", sys_name="OTHER:00")
+        ]
+        result = self.validator.check_isp4()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
