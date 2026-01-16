@@ -611,12 +611,18 @@ class TestDisplayReportFile(unittest.TestCase):
         self, mock_subprocess_call, mock_env_get, mock_is_root
     ):
         """Test display_report_file when format is html, user is root, and SUDO_USER is set"""
-        display_report_file("report.html", "html")
+        with self.assertRaises(SystemExit):
+            display_report_file("/tmp/report.html", "html")
         mock_is_root.assert_called_once()
         mock_env_get.assert_any_call("SUDO_USER")
-        mock_env_get.assert_any_call("XDG_SESSION_TYPE")
         mock_subprocess_call.assert_called_once_with(
-            ["sudo", "-E", "-u", "testuser", "xdg-open", "report.html"]
+            [
+                "systemd-run",
+                "--user",
+                "--machine=testuser@.host",
+                "xdg-open",
+                "/tmp/report.html",
+            ]
         )
 
     @patch("amd_debug.s2idle.is_root", return_value=True)
