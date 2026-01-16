@@ -10,6 +10,7 @@ from datetime import date, timedelta, datetime
 from amd_debug.common import (
     convert_string_to_bool,
     colorize_choices,
+    fatal_error,
     is_root,
     relaunch_sudo,
     show_log_info,
@@ -60,15 +61,16 @@ def display_report_file(fname, fmt) -> None:
         return
     user = os.environ.get("SUDO_USER")
     if user:
-        # ensure that xdg tools will know how to display the file
-        # (user may need to call tool with sudo -E)
-        if os.environ.get("XDG_SESSION_TYPE"):
-            subprocess.call(["sudo", "-E", "-u", user, "xdg-open", fname])
-        else:
-            print(
-                "To display report automatically in browser launch tool "
-                f"with '-E' argument (Example: sudo -E {sys.argv[0]})"
-            )
+        cmd = [
+            "systemd-run",
+            "--user",
+            f"--machine={user}@.host",
+            "xdg-open",
+            os.path.abspath(fname),
+        ]
+        ret = subprocess.call(cmd)
+        if ret:
+            fatal_error(f"Failed to open report: {ret}")
 
 
 def get_report_file(report_file, extension) -> str:
