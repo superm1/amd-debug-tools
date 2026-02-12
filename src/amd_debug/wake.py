@@ -25,16 +25,28 @@ class WakeIRQ:
     def __init__(self, num, context=Context()):
         self.num = num
         p = os.path.join("/", "sys", "kernel", "irq", str(num))
-        self.chip_name = read_file(os.path.join(p, "chip_name"))
-        self.actions = read_file(os.path.join(p, "actions"))
+        try:
+            self.chip_name = read_file(os.path.join(p, "chip_name"))
+        except (PermissionError, FileNotFoundError):
+            self.chip_name = ""
+        try:
+            self.actions = read_file(os.path.join(p, "actions"))
+        except (PermissionError, FileNotFoundError):
+            self.actions = ""
         self.driver = ""
         self.name = ""
-        wakeup = read_file(os.path.join(p, "wakeup"))
+        try:
+            wakeup = read_file(os.path.join(p, "wakeup"))
+        except (PermissionError, FileNotFoundError):
+            wakeup = ""
 
         # This is an IRQ tied to _AEI
         if self.chip_name == "amd_gpio":
-            hw_gpio = read_file(os.path.join(p, "hwirq"))
-            self.name = f"GPIO {hw_gpio}"
+            try:
+                hw_gpio = read_file(os.path.join(p, "hwirq"))
+                self.name = f"GPIO {hw_gpio}"
+            except (PermissionError, FileNotFoundError):
+                self.name = "GPIO (unknown)"
         # legacy IRQs
         elif "IR-IO-APIC" in self.chip_name:
             if self.actions == "acpi":
@@ -73,10 +85,16 @@ class WakeIRQ:
                         os.path.join(p, directory), followlinks=True
                     ):
                         if "name" in files:
-                            self.name = read_file(os.path.join(root, "name"))
+                            try:
+                                self.name = read_file(os.path.join(root, "name"))
+                            except (PermissionError, FileNotFoundError):
+                                pass
                             t = os.path.join(root, "driver")
                             if os.path.exists(t):
-                                self.driver = os.path.basename(os.readlink(t))
+                                try:
+                                    self.driver = os.path.basename(os.readlink(t))
+                                except (PermissionError, FileNotFoundError, OSError):
+                                    pass
                             break
                     if self.name:
                         break
