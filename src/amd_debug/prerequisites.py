@@ -340,6 +340,20 @@ class PrerequisiteValidator(AmdTool):
             and (valid_ahci or not has_sata)
         )
 
+    def check_amd_xdna(self):
+        """Check for AMD XDNA driver"""
+        for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="118000"):
+            slot = device.properties["PCI_SLOT_NAME"]
+            driver = device.properties.get("DRIVER")
+            if not driver:
+                self.db.record_prereq(f"NPU device in {slot} missing driver", "🚦")
+                self.failures += [MissingDriver(slot)]
+                return False
+            p = os.path.join(device.sys_path, "fw_version")
+            xdna_fw_version = read_file(p)
+            self.db.record_prereq(f"NPU loaded with firmware {xdna_fw_version}", "✅")
+        return True
+
     def check_amd_hsmp(self):
         """Check for AMD HSMP driver"""
         # not needed to check in newer kernels
@@ -1356,6 +1370,7 @@ class PrerequisiteValidator(AmdTool):
                 self.check_i2c_hid,
                 self.check_pinctrl_amd,
                 self.check_amd_hsmp,
+                self.check_amd_xdna,
                 self.check_amd_pmc,
                 self.check_amd_cpu_hpet_wa,
                 self.check_port_pm_override,
