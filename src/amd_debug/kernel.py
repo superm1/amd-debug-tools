@@ -168,6 +168,10 @@ class KernelLogger:
         """Find lines that match a pattern"""
         return ""
 
+    def get_full_log(self) -> str:
+        """Get the full log as a string"""
+        return ""
+
 
 class InputFile(KernelLogger):
     """Class for input file parsing"""
@@ -182,6 +186,10 @@ class InputFile(KernelLogger):
         """Process the log"""
         for entry in self.buffer.split("\n"):
             callback(entry, priority)
+
+    def get_full_log(self):
+        """Get the full log as a string"""
+        return self.buffer
 
 
 class DmesgLogger(KernelLogger):
@@ -256,6 +264,10 @@ class DmesgLogger(KernelLogger):
         """Capture the header of the log"""
         return self.buffer.split("\n")[0]
 
+    def get_full_log(self):
+        """Get the full log as a string"""
+        return self.buffer
+
 
 class CySystemdLogger(KernelLogger):
     """Class for logging using systemd journal using cython"""
@@ -319,6 +331,11 @@ class CySystemdLogger(KernelLogger):
                 return entry["MESSAGE"]
         return None
 
+    def get_full_log(self):
+        """Get the full log as a string"""
+        self.seek()
+        return "\n".join([entry["MESSAGE"] for entry in self.journal])
+
 
 class SystemdLogger(KernelLogger):
     """Class for logging using systemd journal"""
@@ -362,6 +379,11 @@ class SystemdLogger(KernelLogger):
             if re.search(pattern, entry["MESSAGE"]):
                 return entry["MESSAGE"]
         return ""
+
+    def get_full_log(self):
+        """Get the full log as a string"""
+        self.seek()
+        return "\n".join([entry["MESSAGE"] for entry in self.journal])
 
 
 def get_kernel_log(input_file=None) -> KernelLogger:

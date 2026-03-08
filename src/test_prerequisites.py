@@ -1991,11 +1991,78 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "USB4 routers found, no need to check DMCUB version"
         )
 
+    @patch("amd_debug.prerequisites.clear_temporary_message")
+    def test_run_failure_records_kernel_log(self, _mock_clear):
+        """Test that the whole kernel log is recorded when prerequisites fail"""
+        # Mock all check and info methods to avoid system access
+        check_methods = [
+            "check_aspm",
+            "check_i2c_hid",
+            "check_pinctrl_amd",
+            "check_amd_hsmp",
+            "check_amd_xdna",
+            "check_amd_pmc",
+            "check_amd_cpu_hpet_wa",
+            "check_port_pm_override",
+            "check_usb3",
+            "check_usb4",
+            "check_sleep_mode",
+            "check_storage",
+            "check_wcn6855_bug",
+            "check_amdgpu",
+            "check_amdgpu_parameters",
+            "check_cpu",
+            "check_msr",
+            "check_smt",
+            "check_iommu",
+            "check_asus_rog_ally",
+            "check_dpia_pg_dmcub",
+            "check_isp4",
+            "check_fadt",
+            "check_logger",
+            "check_lps0",
+            "check_permissions",
+            "check_wlan",
+            "check_taint",
+            "capture_acpi",
+            "map_acpi_path",
+            "check_device_firmware",
+            "check_network",
+            "capture_disabled_pins",
+        ]
+        for method in check_methods:
+            setattr(self.validator, method, MagicMock(return_value=True))
+
+        # Mock one check to fail
+        self.validator.check_permissions.return_value = False
+
+        # Mock get_cpu_vendor
+        self.validator.get_cpu_vendor = MagicMock(return_value="AuthenticAMD")
+
+        # Set a mock kernel log
+        mock_log_content = "Mocked full kernel log content"
+        self.mock_kernel_log.get_full_log.return_value = mock_log_content
+
+        # Run the validator
+        with patch(
+            "amd_debug.prerequisites.print_temporary_message", return_value="msg"
+        ):
+            result = self.validator.run()
+
+        self.assertFalse(result)
+        # Verify Headers.BrokenPrerequisites was recorded
+        from amd_debug.prerequisites import Headers
+
+        self.mock_db.record_prereq.assert_any_call(Headers.BrokenPrerequisites, "🚫")
+        # Verify the whole kernel log was recorded to debug
+        self.mock_db.record_debug.assert_called_with(mock_log_content)
+
     @patch("amd_debug.prerequisites.find_ip_version", return_value=True)
     @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
     @patch("amd_debug.prerequisites.read_file", return_value="0x90001B01")
+    @patch("amd_debug.prerequisites.version.parse")
     def test_check_dpia_pg_dmcub_dmcub_fw_version_new_enough(
-        self, mock_read_file, mock_path_exists, mock_find_ip_version
+        self, mock_version_parse, mock_read_file, mock_path_exists, mock_find_ip_version
     ):
         """Test check_dpia_pg_dmcub when DMCUB firmware version is new enough"""
         self.mock_pyudev.list_devices.side_effect = [
