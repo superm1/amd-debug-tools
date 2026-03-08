@@ -345,6 +345,9 @@ class PrerequisiteValidator(AmdTool):
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="118000"):
             slot = device.properties["PCI_SLOT_NAME"]
             driver = device.properties.get("DRIVER")
+            pci_id = device.properties.get("PCI_ID")
+            if not pci_id.startswith("1022"):
+                continue
             if not driver:
                 self.db.record_prereq(f"NPU device in {slot} missing driver", "🚦")
                 self.failures += [MissingDriver(slot)]
