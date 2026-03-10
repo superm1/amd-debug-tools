@@ -60,14 +60,20 @@ def display_report_file(fname, fmt) -> None:
         return
     user = os.environ.get("SUDO_USER")
     if user:
-        # ensure that xdg tools will know how to display the file
-        # (user may need to call tool with sudo -E)
-        if os.environ.get("XDG_SESSION_TYPE"):
-            subprocess.call(["sudo", "-E", "-u", user, "xdg-open", fname])
+        env_vars = []
+        for var in ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR",
+                    "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE"]:
+            value = os.environ.get(var)
+            if value:
+                env_vars.append(f"{var}={value}")
+
+        if env_vars:
+            cmd = ["sudo", "-u", user] + [f"env"] + env_vars + ["xdg-open", fname]
+            subprocess.call(cmd)
         else:
             print(
-                "To display report automatically in browser launch tool "
-                f"with '-E' argument (Example: sudo -E {sys.argv[0]})"
+                "Unable to detect graphical session environment. "
+                "Report saved to: " + fname
             )
 
 

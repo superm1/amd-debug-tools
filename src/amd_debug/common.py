@@ -382,7 +382,19 @@ def relaunch_sudo() -> None:
     """Relaunch the script with sudo if not already running as root"""
     if not is_root():
         logging.debug("Relaunching with sudo")
-        os.execvp("sudo", ["sudo", "-E"] + sys.argv)
+        env_vars = []
+        for var in ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR",
+                    "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE"]:
+            value = os.environ.get(var)
+            if value:
+                env_vars.append(f"{var}={value}")
+
+        if env_vars:
+            sudo_cmd = ["sudo"] + [f"--preserve-env={var.split('=')[0]}" for var in env_vars] + sys.argv
+        else:
+            sudo_cmd = ["sudo"] + sys.argv
+
+        os.execvp("sudo", sudo_cmd)
 
 
 def running_ssh():

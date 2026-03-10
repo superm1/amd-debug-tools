@@ -614,10 +614,13 @@ class TestDisplayReportFile(unittest.TestCase):
         display_report_file("report.html", "html")
         mock_is_root.assert_called_once()
         mock_env_get.assert_any_call("SUDO_USER")
-        mock_env_get.assert_any_call("XDG_SESSION_TYPE")
-        mock_subprocess_call.assert_called_once_with(
-            ["sudo", "-E", "-u", "testuser", "xdg-open", "report.html"]
-        )
+        call_args = mock_subprocess_call.call_args[0][0]
+        assert call_args[0] == "sudo"
+        assert call_args[1] == "-u"
+        assert call_args[2] == "testuser"
+        assert call_args[3] == "env"
+        assert "xdg-open" in call_args
+        assert "report.html" in call_args
 
     @patch("amd_debug.s2idle.is_root", return_value=True)
     @patch("os.environ.get", side_effect=lambda key: None)
