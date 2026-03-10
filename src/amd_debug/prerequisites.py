@@ -353,8 +353,11 @@ class PrerequisiteValidator(AmdTool):
                 self.failures += [MissingDriver(slot)]
                 return False
             p = os.path.join(device.sys_path, "fw_version")
-            xdna_fw_version = read_file(p)
-            self.db.record_prereq(f"NPU loaded with firmware {xdna_fw_version}", "✅")
+            if os.path.exists(p):
+                xdna_fw_version = read_file(p)
+                self.db.record_prereq(
+                    f"NPU loaded with firmware {xdna_fw_version}", "✅"
+                )
         return True
 
     def check_amd_hsmp(self):
