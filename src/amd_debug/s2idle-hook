@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import os
 import sys
 
 
@@ -59,7 +60,10 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    if args.mode != "suspend":
+    if (
+        args.mode != "suspend"
+        and not os.getenv("SYSTEMD_SLEEP_ACTION", "").startswith("suspend")
+    ):
         sys.exit(0)
 
     if args.path:
