@@ -38,15 +38,27 @@ class Batteries:
             names.append(_get_property(dev.properties, "POWER_SUPPLY_NAME", "Unknown"))
         return names
 
-    def get_energy_unit(self, name) -> str:
-        """Get the energy unit for the given battery name"""
+    def _get_design_voltage(self, name) -> str:
+        """Get the design voltage in µV for the given battery name"""
         dev = self._get_battery(name)
         if not dev:
             return ""
-        energy = _get_property(dev.properties, "POWER_SUPPLY_ENERGY_NOW")
-        if energy:
-            return "µWh"
-        return "µAh"
+        for key in [
+            "POWER_SUPPLY_VOLTAGE_MAX_DESIGN",
+            "POWER_SUPPLY_VOLTAGE_MIN_DESIGN",
+            "POWER_SUPPLY_VOLTAGE_NOW",
+        ]:
+            voltage = _get_property(dev.properties, key)
+            if voltage:
+                return voltage
+        return ""
+
+    def _charge_to_energy(self, name, charge):
+        """Convert battery charge in μAh to energy in μWh"""
+        voltage = self._get_design_voltage(name)
+        if not charge or not voltage:
+            return ""
+        return str(round(int(charge) * int(voltage) / 1000000))
 
     def get_energy(self, name) -> int:
         """Get the current energy for the given battery name"""
@@ -55,7 +67,8 @@ class Batteries:
             return ""
         energy = _get_property(dev.properties, "POWER_SUPPLY_ENERGY_NOW")
         if not energy:
-            energy = _get_property(dev.properties, "POWER_SUPPLY_CHARGE_NOW")
+            charge = _get_property(dev.properties, "POWER_SUPPLY_CHARGE_NOW")
+            energy = self._charge_to_energy(name, charge)
         return energy
 
     def get_energy_full(self, name) -> int:
@@ -65,7 +78,8 @@ class Batteries:
             return ""
         energy = _get_property(dev.properties, "POWER_SUPPLY_ENERGY_FULL")
         if not energy:
-            energy = _get_property(dev.properties, "POWER_SUPPLY_CHARGE_FULL")
+            charge = _get_property(dev.properties, "POWER_SUPPLY_CHARGE_FULL")
+            energy = self._charge_to_energy(name, charge)
         return energy
 
     def get_description_string(self, name) -> str:
@@ -78,9 +92,10 @@ class Batteries:
         full = self.get_energy_full(name)
         full_design = _get_property(dev.properties, "POWER_SUPPLY_ENERGY_FULL_DESIGN")
         if not full_design:
-            full_design = _get_property(
+            charge_full_design = _get_property(
                 dev.properties, "POWER_SUPPLY_CHARGE_FULL_DESIGN"
             )
+            full_design = self._charge_to_energy(name, charge_full_design)
 
         percent = float(full) / int(full_design)
         return f"Battery {name} ({man} {model}) is operating at {percent:.2%} of design"

@@ -35,18 +35,6 @@ class TestBatteries(unittest.TestCase):
         result = self.batteries.get_batteries()
         self.assertEqual(result, ["BAT0"])
 
-    def test_get_energy_unit(self):
-        """Test getting energy unit for a battery"""
-        mock_device = MagicMock()
-        mock_device.device_path = "/devices/LNXSYSTM:00/device:00/PNP0C0A:00"
-        mock_device.properties = {
-            "POWER_SUPPLY_NAME": "BAT0",
-            "POWER_SUPPLY_ENERGY_NOW": "50000",
-        }
-        self.mock_context.list_devices.return_value = [mock_device]
-        result = self.batteries.get_energy_unit("BAT0")
-        self.assertEqual(result, "µWh")
-
     def test_get_energy(self):
         """Test getting current energy for a battery"""
         mock_device = MagicMock()
@@ -59,6 +47,26 @@ class TestBatteries(unittest.TestCase):
         result = self.batteries.get_energy("BAT0")
         self.assertEqual(result, "50000")
 
+    def test_get_energy_from_charge(self):
+        """Test getting current energy for a battery that only reports charge"""
+        mock_device = MagicMock()
+        mock_device.device_path = "/devices/LNXSYSTM:00/device:00/PNP0C0A:00"
+        mock_device.properties = {
+            "POWER_SUPPLY_NAME": "BAT0",
+            "POWER_SUPPLY_CHARGE_NOW": "3230",
+            "POWER_SUPPLY_VOLTAGE_NOW": "15480000",
+        }
+        self.mock_context.list_devices.return_value = [mock_device]
+        result = self.batteries.get_energy("BAT0")
+        self.assertEqual(result, "50000")
+        # Confirm precedence among possible battery voltage attributes
+        mock_device.properties["POWER_SUPPLY_VOLTAGE_MIN_DESIGN"] = "15000000"
+        result = self.batteries.get_energy("BAT0")
+        self.assertEqual(result, "48450")
+        mock_device.properties["POWER_SUPPLY_VOLTAGE_MAX_DESIGN"] = "16000000"
+        result = self.batteries.get_energy("BAT0")
+        self.assertEqual(result, "51680")
+
     def test_get_energy_full(self):
         """Test getting full energy for a battery"""
         mock_device = MagicMock()
@@ -66,6 +74,21 @@ class TestBatteries(unittest.TestCase):
         mock_device.properties = {
             "POWER_SUPPLY_NAME": "BAT0",
             "POWER_SUPPLY_ENERGY_FULL": "60000",
+        }
+        self.mock_context.list_devices.return_value = [mock_device]
+
+        result = self.batteries.get_energy_full("BAT0")
+        self.assertEqual(result, "60000")
+
+    def test_get_energy_full_from_charge(self):
+        """Test getting full energy for a battery that only reports charge"""
+        """Test getting full energy for a battery"""
+        mock_device = MagicMock()
+        mock_device.device_path = "/devices/LNXSYSTM:00/device:00/PNP0C0A:00"
+        mock_device.properties = {
+            "POWER_SUPPLY_NAME": "BAT0",
+            "POWER_SUPPLY_CHARGE_FULL": "3876",
+            "POWER_SUPPLY_VOLTAGE_MIN_DESIGN": "15480000",
         }
         self.mock_context.list_devices.return_value = [mock_device]
 
@@ -82,6 +105,26 @@ class TestBatteries(unittest.TestCase):
             "POWER_SUPPLY_MODEL_NAME": "SuperBattery",
             "POWER_SUPPLY_ENERGY_FULL": "60000",
             "POWER_SUPPLY_ENERGY_FULL_DESIGN": "80000",
+        }
+        self.mock_context.list_devices.return_value = [mock_device]
+
+        result = self.batteries.get_description_string("BAT0")
+        self.assertEqual(
+            result,
+            "Battery BAT0 (ACME SuperBattery) is operating at 75.00% of design",
+        )
+
+    def test_get_description_string_from_charge(self):
+        """Test getting description string for a battery that only reports charge"""
+        mock_device = MagicMock()
+        mock_device.device_path = "/devices/LNXSYSTM:00/device:00/PNP0C0A:00"
+        mock_device.properties = {
+            "POWER_SUPPLY_NAME": "BAT0",
+            "POWER_SUPPLY_MANUFACTURER": "ACME",
+            "POWER_SUPPLY_MODEL_NAME": "SuperBattery",
+            "POWER_SUPPLY_CHARGE_FULL": "60000",
+            "POWER_SUPPLY_CHARGE_FULL_DESIGN": "80000",
+            "POWER_SUPPLY_VOLTAGE_MIN_DESIGN": "15480000",
         }
         self.mock_context.list_devices.return_value = [mock_device]
 
