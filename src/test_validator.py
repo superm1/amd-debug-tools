@@ -106,8 +106,6 @@ class TestValidator(unittest.TestCase):
         with patch.object(
             self.validator.batteries, "get_batteries", return_value=["BAT0"]
         ), patch.object(
-            self.validator.batteries, "get_energy_unit", return_value="µWh"
-        ), patch.object(
             self.validator.batteries, "get_energy", return_value=50000
         ), patch.object(
             self.validator.batteries, "get_energy_full", return_value=60000
