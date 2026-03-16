@@ -51,7 +51,7 @@ class Batteries:
         return ""
 
     def _charge_to_energy(self, dev, charge):
-        """Convert battery charge in μAh to energy in μWh"""
+        """Convert battery charge in µAh to energy in µWh"""
         voltage = self._get_design_voltage(dev)
         if not charge or not voltage:
             return ""
