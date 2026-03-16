@@ -47,6 +47,17 @@ class TestBatteries(unittest.TestCase):
         result = self.batteries.get_energy("BAT0")
         self.assertEqual(result, "50000")
 
+    def test_get_energy_no_attrs(self):
+        """Test graceful failure for a battery with no energy information"""
+        mock_device = MagicMock()
+        mock_device.device_path = "/devices/LNXSYSTM:00/device:00/PNP0C0A:00"
+        mock_device.properties = {
+            "POWER_SUPPLY_NAME": "BAT0",
+        }
+        self.mock_context.list_devices.return_value = [mock_device]
+        result = self.batteries.get_energy("BAT0")
+        self.assertEqual(result, "")
+
     def test_get_energy_from_charge(self):
         """Test getting current energy for a battery that only reports charge"""
         mock_device = MagicMock()
@@ -54,12 +65,17 @@ class TestBatteries(unittest.TestCase):
         mock_device.properties = {
             "POWER_SUPPLY_NAME": "BAT0",
             "POWER_SUPPLY_CHARGE_NOW": "3230",
-            "POWER_SUPPLY_VOLTAGE_NOW": "15480000",
         }
         self.mock_context.list_devices.return_value = [mock_device]
+
+        # Confirm graceful handling when no design voltage available
+        result = self.batteries.get_energy("BAT0")
+        self.assertEqual(result, "")
+
+        # Confirm precedence among possible battery voltage attributes
+        mock_device.properties["POWER_SUPPLY_VOLTAGE_NOW"] = "15480000"
         result = self.batteries.get_energy("BAT0")
         self.assertEqual(result, "50000")
-        # Confirm precedence among possible battery voltage attributes
         mock_device.properties["POWER_SUPPLY_VOLTAGE_MIN_DESIGN"] = "15000000"
         result = self.batteries.get_energy("BAT0")
         self.assertEqual(result, "48450")
