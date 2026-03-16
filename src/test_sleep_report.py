@@ -194,3 +194,22 @@ class TestSleepReport(unittest.TestCase):
         self.assertTrue(
             math.isnan(self.report.df["Hardware Sleep"].iloc[0])
         )  # Hardware Sleep should be NaN
+
+    def test_battery_ave_rate(self):
+        """Test the pre_process_dataframe Battery Ave Rate calculation."""
+        self.report.df = pd.DataFrame(
+            {
+                "t0": [datetime(2023, 10, 10, 12, 0, 0).strftime("%Y%m%d%H%M%S")],
+                "t1": [datetime(2023, 10, 10, 13, 0, 0).strftime("%Y%m%d%H%M%S")],
+                "hw": [50],
+                "requested": [1],
+                "gpio": ["1, 2"],
+                "wake_irq": ["1"],
+                "b0": [90000000],
+                "b1": [85000000],
+                "full": [100000000],
+            }
+        )
+        self.report.pre_process_dataframe()
+        batt_ave_rate = self.report.df["Battery Ave Rate"].iloc[0]
+        self.assertAlmostEqual(batt_ave_rate, -5, places=3)

@@ -163,7 +163,8 @@ class SleepReport(AmdTool):
                 (self.df["b1"] - self.df["b0"]) / self.df["full"] * 100
             )
             self.df["Battery Ave Rate"] = (
-                (self.df["b1"] - self.df["b0"]) / self.df["Duration"] / 360
+                (self.df["b1"] - self.df["b0"]) / 1000000
+                / (self.df["Duration"] / 3600)
             )
 
         # Wake sources
