@@ -2504,12 +2504,12 @@ class TestPrerequisiteValidator(unittest.TestCase):
     def test_check_isp4_driver_bound_but_module_not_loaded(
         self, _mock_readlink, mock_path_exists
     ):
-        """Test check_isp4 when driver is bound but amd_capture module is not loaded"""
+        """Test check_isp4 when driver is bound but amd_capture or amd_isp4_capture modules are not loaded"""
 
         def exists_side_effect(path):
             if "path" in path or "driver" in path:
                 return True
-            if "amd_capture" in path:
+            if "amd_capture" in path or "amd_isp4_capture" in path:
                 return False
             return True
 
@@ -2523,7 +2523,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "ISP4 platform camera driver 'amd-isp4' bound to OMNI5C10:00", "✅"
         )
         self.mock_db.record_prereq.assert_any_call(
-            "Camera driver module 'amd_capture' not loaded", "❌"
+            "Camera driver module 'amd_capture'/'amd_isp4_capture' not loaded", "❌"
         )
         self.assertTrue(
             any(isinstance(f, MissingAmdCaptureModule) for f in self.validator.failures)
@@ -2546,7 +2546,7 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "ISP4 platform camera driver 'amd-isp4' bound to OMNI5C10:00", "✅"
         )
         self.mock_db.record_prereq.assert_any_call(
-            "Camera driver module 'amd_capture' loaded", "✅"
+            "Camera driver module 'amd_capture'/'amd_isp4_capture' loaded", "✅"
         )
 
     @patch("amd_debug.prerequisites.os.path.exists")
