@@ -35,25 +35,38 @@
             letter-spacing: 0.02em;
             background-color: #ffffff;
             color: #000000;
-            margin: 0em 5.5em 0em 5.5em;
+            margin: 2em auto;
+            max-width: 1200px;
+            padding: 0 2em;
 
         }
 
         table,
         th,
         td {
-            border-width: 1;
+            border: 1px solid #ddd;
             border-collapse: collapse;
             table-layout: fixed;
             font-family: sans-serif;
             letter-spacing: 0.02em;
             color: #000000;
             text-align: left;
-            padding: 3px;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
         }
 
         tr:hover {
-            background-color: #f2f2f2;
+            background-color: #f2f2f2 !important;
         }
 
         #prereqdebugdata > tbody > tr:hover,
@@ -64,7 +77,7 @@
         #cycledata > tr:hover,
         #failuredata > tr:hover,
         #debugdata > tr:hover {
-            background-color: transparent;
+            background-color: transparent !important;
         }
 
         .○ {
@@ -145,6 +158,44 @@
             background-color: #ffd5d1;
             text-align: center;
             cursor: pointer;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #121212;
+                color: #e0e0e0;
+            }
+            table, th, td {
+                border-color: #333;
+                color: #e0e0e0;
+            }
+            th {
+                background-color: #1e1e1e;
+            }
+            tr:nth-child(even) {
+                background-color: #1a1a1a;
+            }
+            tr:hover {
+                background-color: #2a2a2a !important;
+            }
+            .row-low { background-color: #1b4d1b; }
+            .row-low:hover { background-color: #266b26; }
+            .row-neutral { background-color: #333; }
+            .row-neutral:hover { background-color: #444; }
+            .row-high { background-color: #611a14; }
+            .row-high:hover { background-color: #8a251d; }
+            .○ { color: #e0e0e0; }
+            .🦟 { color: #aaa; }
+            #prereqdebugdata > tbody > tr:hover,
+            #cycledata > tbody > tr:hover,
+            #failuredata > tbody > tr:hover,
+            #debugdata > tbody > tr:hover,
+            #prereqdebugdata > tr:hover,
+            #cycledata > tr:hover,
+            #failuredata > tr:hover,
+            #debugdata > tr:hover {
+                background-color: transparent !important;
+            }
         }
     </style>
 </head>
