@@ -632,9 +632,10 @@ class MissingAmdCaptureModule(S0i3Failure):
         super().__init__()
         self.description = "AMD Capture module is missing"
         self.explanation = (
-            "The amd_capture module is required for the camera interface included "
-            "with the SOC to enter the proper power states. "
-            "Be sure that the amd_capture module is loaded."
+            "The amd_capture/amd_isp4_capture module is required for the "
+            "camera interface included with the SOC to enter the proper "
+            "power states. Be sure that the amd_capture or amd_isp4_capture "
+            "modules are loaded."
             ""
             "If the module is not available, disable the camera in the BIOS to prevent issues."
         )

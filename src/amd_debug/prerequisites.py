@@ -1028,15 +1028,16 @@ class PrerequisiteValidator(AmdTool):
             self.db.record_prereq(
                 f"ISP4 platform camera driver 'amd-isp4' bound to {dev.sys_name}", "✅"
             )
-            # check if `amd_capture` module is loaded
-            p = os.path.join("/", "sys", "module", "amd_capture")
-            if not os.path.exists(p):
+            # check if `amd_capture` or `amd_isp4_capture` modules are loaded
+            p1 = os.path.join("/", "sys", "module", "amd_capture")
+            p2 = os.path.join("/", "sys", "module", "amd_isp4_capture")
+            if not os.path.exists(p1) and not os.path.exists(p2):
                 self.db.record_prereq(
-                    "Camera driver module 'amd_capture' not loaded", "❌"
+                    "Camera driver module 'amd_capture'/'amd_isp4_capture' not loaded", "❌"
                 )
                 self.failures += [MissingAmdCaptureModule()]
                 return False
-            self.db.record_prereq("Camera driver module 'amd_capture' loaded", "✅")
+            self.db.record_prereq("Camera driver module 'amd_capture'/'amd_isp4_capture' loaded", "✅")
         return True
 
     def map_acpi_path(self):
