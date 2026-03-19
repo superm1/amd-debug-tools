@@ -61,7 +61,7 @@
             z-index: 10;
         }
 
-        tr:nth-child(even) {
+        tr:not(.row-low):not(.row-neutral):not(.row-high):nth-child(even) {
             background-color: #f9f9f9;
         }
 
@@ -102,9 +102,20 @@
 
         .hidden-by-default {
             display: none;
-            border: 0px;
-            border-spacing: 0px;
-            border-collapse: collapse;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .collapsible-wrapper {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s ease-out, opacity 0.3s ease;
+        }
+
+        .collapsible-wrapper.expanded {
+            max-height: 2000px; /* Large enough to hold table */
+            opacity: 1;
         }
 
         .hide-borders {
@@ -114,50 +125,31 @@
 
         .row-disabled {
             display: none;
-            border: 0px;
-            border-collapse: collapse;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .row-active {
+            display: table-row !important;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .arrow {
+            cursor: pointer;
+            display: inline-block;
         }
 
         .arrow::before {
             content: "\23f5";
+            margin-right: 5px;
         }
 
         .arrow-expanded::before {
             content: "\23F7";
-
-        }
-
-        .row-low {
-            background-color: #ace3ac;
-            text-align: center;
-        }
-
-        .row-low:hover {
-            background-color: #caedca;
-            text-align: center;
-            cursor: pointer;
-        }
-
-        .row-neutral {
-            background-color: #e0e0e0;
-            text-align: center;
-        }
-
-        .row-neutral:hover {
-            background-color: #f0f0f0;
-            text-align: center;
-            cursor: pointer;
-        }
-
-        .row-high {
-            background-color: #ffb2aa;
-            text-align: center;
-        }
-
-        .row-high:hover {
-            background-color: #ffd5d1;
-            text-align: center;
-            cursor: pointer;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -172,7 +164,7 @@
             th {
                 background-color: #1e1e1e;
             }
-            tr:nth-child(even) {
+            tr:not(.row-low):not(.row-neutral):not(.row-high):nth-child(even) {
                 background-color: #1a1a1a;
             }
             tr:hover {
@@ -204,13 +196,15 @@
     <script>
         function select_changed(selector, row) {
             var x = document.getElementById(selector).value;
-            var y;
             var rows = document.querySelectorAll(row + " tr.row-disabled");
             for (var i = 0; i < rows.length; i++) {
-                rows[i].style.display = "none";
+                rows[i].classList.remove("row-active");
             }
             if (x != "0") {
-                document.querySelector(row + x).style.display = "table-row";
+                var target = document.querySelector(row + x);
+                if (target) {
+                    target.classList.add("row-active");
+                }
                 if (row == row + x)
                     document.getElementById(selector).value = 0;
             }
@@ -225,22 +219,25 @@
 
         function debug_data_changed() {
             select_changed("debug", "#debugdata")
+            var label = document.getElementById("debug_label");
             if (document.getElementById("debug").value != "0") {
-                document.getElementById("debug_label").style.display = "";
+                label.style.display = "block";
+                setTimeout(() => label.style.opacity = "1", 10);
             } else {
-                document.getElementById("debug_label").style.display = "none";
+                label.style.opacity = "0";
+                setTimeout(() => label.style.display = "none", 300);
             }
         }
 
         function prereq_debug_data_changed() {
-            var table = document.getElementById("prereqdebugdata");
-            var arrow = document.getElementById("prereqdata-arrow")
-            if (table.classList.contains("hidden-by-default")) {
-                table.className = "hide-borders";
-                arrow.className = "arrow-expanded";
+            var wrapper = document.getElementById("prereqdebugdata-wrapper");
+            var arrow = document.getElementById("prereqdata-arrow");
+            if (wrapper.classList.contains("expanded")) {
+                wrapper.classList.remove("expanded");
+                arrow.classList.remove("arrow-expanded");
             } else {
-                table.className = "hidden-by-default";
-                arrow.className = "arrow"
+                wrapper.classList.add("expanded");
+                arrow.classList.add("arrow-expanded");
             }
         }
 
@@ -268,19 +265,15 @@
             {% endif %}
         }
 
-        function summary_data_changed() {
+        function summary_data_changed(ev) {
             var table = document.getElementById("summary");
             const start_select = document.getElementById('start_select');
             const end_select = document.getElementById('end_select');
+            
+            if (!start_select || !end_select) return;
+
             var start = parseInt(start_select.value);
             var end = parseInt(end_select.value);
-            var min_duration = 0;
-
-            // if duration filter activated, hide rows that don't match
-            if (document.getElementById('med_duration').checked)
-                min_duration = document.getElementById("med_duration").value;
-            else if (document.getElementById('min_duration').checked)
-                min_duration = document.getElementById("min_duration").value;
 
             // reset end if start was picked bigger than end
             if (start > end) {
@@ -288,11 +281,22 @@
                 end = start;
             }
 
+            var min_duration = 0;
+            if (document.getElementById('med_duration').checked)
+                min_duration = document.getElementById("med_duration").value;
+            else if (document.getElementById('min_duration').checked)
+                min_duration = document.getElementById("min_duration").value;
+
             // show all rows between start and end
-            for (var i = 1; i < table.rows.length; i++) {
-                var row = table.rows[i];
-                var index = parseInt(row.cells[0].textContent);
-                var row_duration = parseTimeToSeconds(row.cells[2].textContent);
+            var rows = table.tBodies[0].rows;
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var index_cell = row.cells[0];
+                if (!index_cell) continue;
+                
+                var index = parseInt(index_cell.textContent);
+                var duration_cell = row.cells[2];
+                var row_duration = duration_cell ? parseTimeToSeconds(duration_cell.textContent) : 0;
 
                 if (row_duration >= min_duration &&
                     index >= start && index <= end) {
@@ -304,74 +308,83 @@
 
             // reset other tables if we now show more than one cycle
             if (end - start > 0) {
-                // reset cycle data selector
-                document.getElementById("cycles").selectedIndex = 0;
-                cycle_data_changed();
+                var cycles_select = document.getElementById("cycles");
+                if (cycles_select) {
+                    cycles_select.selectedIndex = 0;
+                    cycle_data_changed();
+                }
                 {% if failures %}
-                //reset failure data selector
-                document.getElementById("failures").value = 0;
-                failure_data_changed();
+                var failures_select = document.getElementById("failures");
+                if (failures_select) {
+                    failures_select.value = 0;
+                    failure_data_changed();
+                }
                 {% endif %}
                 {% if debug_data %}
-                //reset debug data selector
-                document.getElementById("debug").selectedIndex = 0;
-                debug_data_changed();
+                var debug_select = document.getElementById("debug");
+                if (debug_select) {
+                    debug_select.selectedIndex = 0;
+                    debug_data_changed();
+                }
                 {% endif %}
-            } else if (start = end)
-                pick_data_for_cycle(start)
+            } else if (start == end) {
+                pick_data_for_cycle(start);
+            }
         }
 
         function populate_summary_selectors() {
             const table = document.getElementById('summary');
             const start_select = document.getElementById('start_select');
             const end_select = document.getElementById('end_select');
+            
+            if (!start_select || !end_select || !table || !table.tBodies || !table.tBodies[0]) return;
 
-            for (let i = 0; i < table.rows.length; i++) {
+            var rows = table.tBodies[0].rows;
+            for (let i = 0; i < rows.length; i++) {
                 const start_option = document.createElement('option');
                 const end_option = document.createElement('option');
-                var columns = table.rows[i].getElementsByTagName("td");
+                var columns = rows[i].getElementsByTagName("td");
 
                 //Populate all start/end selector values
-                if (i != table.rows.length - 1) {
-                    start_option.text = `Cycle ${i}`;
-                    start_option.value = i
-                    end_option.text = `Cycle ${i}`;
-                    end_option.value = i
-                    start_select.add(start_option);
-                    end_select.add(end_option);
-                }
+                start_option.text = `Cycle ${i}`;
+                start_option.value = i;
+                end_option.text = `Cycle ${i}`;
+                end_option.value = i;
+                start_select.add(start_option);
+                end_select.add(end_option);
 
-                //apply coloring to hardware sleep
-                if (i != 0) {
+                if (columns.length > 2) {
+                    //apply coloring to hardware sleep
                     if (parseFloat(columns[2].innerHTML) < 85)
-                        table.rows[i].className = "row-high";
+                        rows[i].className = "row-high";
                 }
             }
 
             // Pick the end selector for last column
-            end_select.selectedIndex = table.rows.length - 2;
+            end_select.selectedIndex = rows.length - 1;
 
-            // if we only have one selector then pick it
-            if (start_select.selectedIndex == end_select.selectedIndex) {
-                pick_summary_cycle(start_select.selectedIndex)
+            summary_data_changed(event);
+
+            // if we only have one cycle then pick it
+            if (rows.length == 1) {
+                pick_summary_cycle(0)
             }
         }
 
         function pick_summary_cycle(num) {
-            //narrow down filter to just the selected cycle
             document.getElementById('start_select').selectedIndex = num;
             document.getElementById('end_select').selectedIndex = num;
-            summary_data_changed();
+            summary_data_changed(event);
             pick_data_for_cycle(num);
         }
 
         function reset_clicked() {
             const table = document.getElementById('summary');
+            var rows = table.tBodies[0].rows;
             document.getElementById('start_select').selectedIndex = 0;
-            console.log(table.rows.length);
-            document.getElementById('end_select').selectedIndex = table.rows.length - 2;
+            document.getElementById('end_select').selectedIndex = rows.length - 1;
             document.getElementById('all_time').checked = true;
-            summary_data_changed();
+            summary_data_changed(event);
         }
 
         window.addEventListener('load', populate_summary_selectors);
@@ -390,18 +403,19 @@
     {% endif %}
     {% if prereq_debug_data %}
     <h3>
-        <label id="prereqdata-arrow" for="prereqdebugdata" onclick="prereq_debug_data_changed()"
-            class="arrow">Prerequisites</label>
+        <span id="prereqdata-arrow" onclick="prereq_debug_data_changed()" class="arrow">Prerequisites</span>
     </h3>
-    <table id="prereqdebugdata" class="hidden-by-default">
-        {% for obj in prereq_debug_data %}
-        <TR>
-            <TD>
-                <pre>{{obj.data}}</pre>
-            </TD>
-        </TR>
-        {% endfor %}
-    </table>
+    <div id="prereqdebugdata-wrapper" class="collapsible-wrapper">
+        <table id="prereqdebugdata" class="hide-borders">
+            {% for obj in prereq_debug_data %}
+            <TR>
+                <TD>
+                    <pre>{{obj.data}}</pre>
+                </TD>
+            </TR>
+            {% endfor %}
+        </table>
+    </div>
     {% endif %}
     <h2>Summary</h2>
     {% if battery_svg %}
@@ -417,16 +431,16 @@
     <p>Choose a single cycle to see messages and data for that cycle.</p>
     <button type="button" onclick="reset_clicked()">Reset</button>
     <h4>Filter cycle range</h4>
-    <select id="start_select" onchange="summary_data_changed()"></select>
+    <select id="start_select" onchange="summary_data_changed(event)"></select>
     and
-    <select id="end_select" onchange="summary_data_changed()"></select>
+    <select id="end_select" onchange="summary_data_changed(event)"></select>
     <h4>Filter minimum session length</h4>
-    <input type="radio" name="session1" id="all_time" value="all_time" onchange="js:summary_data_changed()"
+    <input type="radio" name="session1" id="all_time" value="all_time" onchange="summary_data_changed(event)"
         checked="" />
     <label>All</label>
-    <input type="radio" name="session1" id="med_duration" value="600" onchange="js:summary_data_changed()" />
+    <input type="radio" name="session1" id="med_duration" value="600" onchange="summary_data_changed(event)" />
     <label>&gt;10 min</label>
-    <input type="radio" name="session1" id="min_duration" value="60" onchange="js:summary_data_changed()" />
+    <input type="radio" name="session1" id="min_duration" value="60" onchange="summary_data_changed(event)" />
     <label>&gt;1 min</label>
     {% else %}
     <select id="start_select" class="hidden-by-default"></select>
@@ -472,7 +486,7 @@
     </table>
     {% endif %}
     {% if debug_data %}
-    <h3 id="debug_label" style="display:none;">Debugging 🦟</h3>
+    <h3 id="debug_label" style="display:none; transition: opacity 0.3s ease; opacity: 0;">Debugging 🦟</h3>
     <p><label for="debug" class="hidden-by-default">Choose a cycle:</label>
         <select id="debug" onchange="debug_data_changed()" class="hidden-by-default">
             <option value="0">Disabled</option>
