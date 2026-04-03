@@ -265,6 +265,59 @@ class TestCommon(unittest.TestCase):
             with self.assertRaises(TypeError):
                 minimum_kernel(None, None)
 
+    def test_minimum_kernel_with_suffix(self):
+        """Test minimum_kernel function with version strings containing suffixes"""
+        with patch("platform.uname") as mock_uname:
+            # Test with +unreleased suffix (the bug case)
+            mock_uname.return_value = uname_result(
+                system="Linux",
+                node="foo",
+                release="7.18+unreleased-amd64",
+                version="baz",
+                machine="x86_64",
+            )
+            self.assertTrue(minimum_kernel(7, 18))
+            self.assertTrue(minimum_kernel(7, 17))
+            self.assertFalse(minimum_kernel(7, 19))
+            self.assertTrue(minimum_kernel(6, 10))
+            self.assertFalse(minimum_kernel(8, 0))
+
+            # Test with -rc suffix
+            mock_uname.return_value = uname_result(
+                system="Linux",
+                node="foo",
+                release="6.10-rc1-amd64",
+                version="baz",
+                machine="x86_64",
+            )
+            self.assertTrue(minimum_kernel(6, 10))
+            self.assertTrue(minimum_kernel(6, 9))
+            self.assertFalse(minimum_kernel(6, 11))
+
+            # Test with custom build suffix
+            mock_uname.return_value = uname_result(
+                system="Linux",
+                node="foo",
+                release="5.15+custom-build",
+                version="baz",
+                machine="x86_64",
+            )
+            self.assertTrue(minimum_kernel(5, 15))
+            self.assertTrue(minimum_kernel(5, 14))
+            self.assertFalse(minimum_kernel(5, 16))
+
+            # Test with -generic suffix (Ubuntu-style)
+            mock_uname.return_value = uname_result(
+                system="Linux",
+                node="foo",
+                release="5.4.0-generic",
+                version="baz",
+                machine="x86_64",
+            )
+            self.assertTrue(minimum_kernel(5, 4))
+            self.assertTrue(minimum_kernel(5, 3))
+            self.assertFalse(minimum_kernel(5, 5))
+
     def test_systemd_in_use(self):
         """Test systemd_in_use function"""
         with patch(

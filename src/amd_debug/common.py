@@ -321,9 +321,11 @@ def get_log_priority(num):
 
 def minimum_kernel(major, minor) -> bool:
     """Checks if the kernel version is at least major.minor"""
+    import re
+
     ver = platform.uname().release.split(".")
-    kmajor = int(ver[0])
-    kminor = int(ver[1])
+    kmajor = int(re.match(r"\d+", ver[0]).group())
+    kminor = int(re.match(r"\d+", ver[1]).group())
     if kmajor > int(major):
         return True
     if kmajor < int(major):
@@ -383,14 +385,24 @@ def relaunch_sudo() -> None:
     if not is_root():
         logging.debug("Relaunching with sudo")
         env_vars = []
-        for var in ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR",
-                    "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE"]:
+        for var in [
+            "DISPLAY",
+            "WAYLAND_DISPLAY",
+            "XAUTHORITY",
+            "XDG_RUNTIME_DIR",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "XDG_SESSION_TYPE",
+        ]:
             value = os.environ.get(var)
             if value:
                 env_vars.append(f"{var}={value}")
 
         if env_vars:
-            sudo_cmd = ["sudo"] + [f"--preserve-env={var.split('=')[0]}" for var in env_vars] + sys.argv
+            sudo_cmd = (
+                ["sudo"]
+                + [f"--preserve-env={var.split('=')[0]}" for var in env_vars]
+                + sys.argv
+            )
         else:
             sudo_cmd = ["sudo"] + sys.argv
 
