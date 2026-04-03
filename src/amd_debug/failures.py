@@ -146,6 +146,19 @@ class MissingXhciHcd(S0i3Failure):
         )
 
 
+class MissingPcieHotplug(S0i3Failure):
+    """PCIe hotplug driver is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "PCIe hotplug driver is missing"
+        self.explanation = (
+            "The pciehp driver is required for PCIe hotplug support. "
+            "Without this driver, PCIe devices may not be able to enter proper power states. "
+            "Be sure that you have enabled CONFIG_HOTPLUG_PCI_PCIE in your kernel."
+        )
+
+
 class MissingDriver(S0i3Failure):
     """driver is missing"""
 

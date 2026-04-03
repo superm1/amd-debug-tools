@@ -63,6 +63,7 @@ from amd_debug.failures import (
     MissingIommuACPI,
     MissingIommuPolicy,
     MissingIsp4PlatformDriver,
+    MissingPcieHotplug,
     MissingThunderbolt,
     MissingXhciHcd,
     MSRFailure,
@@ -507,6 +508,15 @@ class PrerequisiteValidator(AmdTool):
             self.db.record_prereq(
                 f"USB4 driver `thunderbolt` bound to {', '.join(slots)}", "✅"
             )
+        return True
+
+    def check_pcie_hotplug(self):
+        """Check if PCIe hotplug support is enabled"""
+        if not os.path.exists("/sys/module/pciehp"):
+            self.db.record_prereq("PCIe hotplug driver `pciehp` missing", "❌")
+            self.failures += [MissingPcieHotplug()]
+            return False
+        self.db.record_prereq("PCIe hotplug driver `pciehp` loaded", "✅")
         return True
 
     def check_sleep_mode(self):
@@ -1033,11 +1043,14 @@ class PrerequisiteValidator(AmdTool):
             p2 = os.path.join("/", "sys", "module", "amd_isp4_capture")
             if not os.path.exists(p1) and not os.path.exists(p2):
                 self.db.record_prereq(
-                    "Camera driver module 'amd_capture'/'amd_isp4_capture' not loaded", "❌"
+                    "Camera driver module 'amd_capture'/'amd_isp4_capture' not loaded",
+                    "❌",
                 )
                 self.failures += [MissingAmdCaptureModule()]
                 return False
-            self.db.record_prereq("Camera driver module 'amd_capture'/'amd_isp4_capture' loaded", "✅")
+            self.db.record_prereq(
+                "Camera driver module 'amd_capture'/'amd_isp4_capture' loaded", "✅"
+            )
         return True
 
     def map_acpi_path(self):
@@ -1381,6 +1394,7 @@ class PrerequisiteValidator(AmdTool):
                 self.check_amd_pmc,
                 self.check_amd_cpu_hpet_wa,
                 self.check_port_pm_override,
+                self.check_pcie_hotplug,
                 self.check_usb3,
                 self.check_usb4,
                 self.check_sleep_mode,
