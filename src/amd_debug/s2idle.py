@@ -62,7 +62,7 @@ def display_report_file(fname, fmt) -> None:
     if user:
         env_vars = []
         for var in ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR",
-                    "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE"]:
+                    "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE", "XDG_DATA_DIRS"]:
             value = os.environ.get(var)
             if value:
                 env_vars.append(f"{var}={value}")
