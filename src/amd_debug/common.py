@@ -392,6 +392,7 @@ def relaunch_sudo() -> None:
             "XDG_RUNTIME_DIR",
             "DBUS_SESSION_BUS_ADDRESS",
             "XDG_SESSION_TYPE",
+            "XDG_DATA_DIRS"
         ]:
             value = os.environ.get(var)
             if value:
