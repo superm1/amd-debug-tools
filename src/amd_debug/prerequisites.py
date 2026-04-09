@@ -352,7 +352,6 @@ class PrerequisiteValidator(AmdTool):
             if not driver:
                 self.db.record_prereq(f"NPU device in {slot} missing driver", "🚦")
                 self.failures += [MissingDriver(slot)]
-                return False
             p = os.path.join(device.sys_path, "fw_version")
             if os.path.exists(p):
                 xdna_fw_version = read_file(p)
