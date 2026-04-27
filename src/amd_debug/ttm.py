@@ -4,6 +4,8 @@
 import asyncio
 import os
 import argparse
+import glob
+import subprocess
 from amd_debug.common import (
     AmdTool,
     bytes_to_gb,
@@ -27,6 +29,93 @@ def maybe_reboot() -> bool:
     if response in ("y", "yes"):
         return reboot()
     return True
+
+def is_ttm_in_initramfs(initramfs_path: str) -> bool:
+    """
+    Check if the ttm module is included in the initramfs.
+
+    Args:
+        initramfs_path: Path to the initramfs image (e.g., "/boot/initrd.img-6.12.74-amd64")
+
+    Returns:
+        bool: True if "gpu/drm/ttm/ttm.ko" is found, False otherwise
+    """
+    try:
+        # Run lsinitramfs and search for "ttm" in the output
+        result = subprocess.run(
+            ["lsinitramfs", initramfs_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Check if "gpu/drm/ttm/ttm.ko" appears in the output
+        return "gpu/drm/ttm/ttm.ko" in result.stdout.lower()
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error running lsinitramfs: {e}")
+        return False
+    except FileNotFoundError:
+        print("Error: 'lsinitramfs' command not found. Is initramfs-tools installed?")
+        return False
+
+def check_initramfs_images() -> bool:
+    """Check if initramfs images exist in /boot/"""
+    print_color("Checking if the initramfs image needs to be regenerated", "🐧")
+    if not os.path.exists("/boot"):
+        print_color("Warning: /boot not found. Is it mounted?", "🚦")
+        return False
+
+    # Check for common initramfs patterns
+    patterns = [
+        '/boot/initrd.img-*',    # Debian/Ubuntu
+        '/boot/initramfs-*.img', # Fedora/RHEL
+        '/boot/initramfs-*'      # Arch
+    ]
+
+    for pattern in patterns:
+        initramfs_files = glob.glob(pattern)
+        if initramfs_files:
+            print_color(f"Found initramfs images: {initramfs_files}", "🐧")
+
+            latest_initramfs = max(initramfs_files)
+            if is_ttm_in_initramfs(latest_initramfs):
+                print_color(f"TTM module is included in initramfs: {latest_initramfs}", "✅")
+                print_color("The initramfs image needs to be regenerated", "🐧")
+                return True
+            else:
+                print_color(f"TTM module is not included in initramfs", "○")
+                print_color(f"The initramfs image does not need to be regenerated", "○")
+    return False
+
+def regenerate_initramfs() -> bool:
+    """Regenerate initramfs image"""
+    if not check_initramfs_images():
+        print_color("No initramfs images found, skipping regeneration", "○")
+        return True  # Not an error condition
+
+    # Supported initramfs tools
+    initramfs_tools = [
+        (["update-initramfs", "-u"], "Debian/Ubuntu"),
+        (["dracut", "--force"], "Fedora/RHEL"),
+        (["mkinitcpio", "-P"], "Arch Linux")
+    ]
+
+    for cmd, distro in initramfs_tools:
+        if os.path.exists(f"/usr/sbin/{cmd[0]}") or os.path.exists(f"/usr/bin/{cmd[0]}"):
+            print_color(f"Updating initramfs for {distro}...", "🐧")
+            try:
+                subprocess.run(cmd, check=True)
+                print_color("Initramfs updated successfully", "✅")
+                return True
+            except subprocess.CalledProcessError as e:
+                print_color(f"Failed to update initramfs: {e}", "❌")
+                continue
+            except FileNotFoundError:
+                continue
+
+    print_color("No supported initramfs tool found", "❌")
+    return False
 
 
 class AmdTtmTool(AmdTool):
@@ -96,6 +185,10 @@ class AmdTtmTool(AmdTool):
             "🐧",
         )
         print_color(f"Configuration written to {MODPROBE_CONF_PATH}", "🐧")
+
+        if not regenerate_initramfs():
+            print_color("Warning: Failed to update initramfs", "🚦")
+
         print_color("NOTE: You need to reboot for changes to take effect.", "○")
 
         return maybe_reboot()
