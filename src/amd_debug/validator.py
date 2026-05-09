@@ -693,7 +693,10 @@ class SleepValidator(AmdTool):
         """Program the RTC wakealarm to wake the system after the requested duration"""
         wakealarm = None
         for device in self.pyudev.list_devices(subsystem="rtc"):
-            wakealarm = os.path.join(device.sys_path, "wakealarm")
+            target = os.path.join(device.sys_path, "wakealarm")
+            if os.path.exists(target):
+                wakealarm = target
+                break
         if wakealarm:
             with open(wakealarm, "w", encoding="utf-8") as w:
                 w.write("0")
