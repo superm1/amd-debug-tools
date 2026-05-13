@@ -530,43 +530,16 @@ class TestCommon(unittest.TestCase):
         self.assertAlmostEqual(get_system_mem(), expected_gb)
         mock_file.assert_called_once_with("/proc/meminfo", "r", encoding="utf-8")
 
-    def test_reboot_dbus_fast_success(self):
+    @patch("amd_debug.common.asyncio.run", return_value=True)
+    def test_reboot_dbus_fast_success(self, mock_asyncio_run):
         """Test reboot returns True when reboot_dbus_fast succeeds"""
+        result = reboot()
+        self.assertTrue(result)
+        mock_asyncio_run.assert_called_once()
 
-        # Create a mock loop that properly handles coroutines
-        def mock_run_until_complete(coro):
-            # Consume the coroutine to prevent the warning
-            try:
-                # Close the coroutine to prevent the warning
-                coro.close()
-            except (AttributeError, RuntimeError):
-                pass
-            return True
-
-        mock_loop = Mock()
-        mock_loop.run_until_complete.side_effect = mock_run_until_complete
-
-        with patch("amd_debug.common.asyncio.get_event_loop", return_value=mock_loop):
-            result = reboot()
-            self.assertTrue(result)
-            mock_loop.run_until_complete.assert_called_once()
-
-    @patch("asyncio.get_event_loop")
-    def test_reboot_dbus_fast_failure_and_dbus_success(self, mock_get_event_loop):
+    @patch("amd_debug.common.asyncio.run", return_value=False)
+    def test_reboot_dbus_fast_failure_and_dbus_success(self, mock_asyncio_run):
         """Test reboot falls back to reboot_dbus when reboot_dbus_fast fails"""
-
-        # Create a mock loop that properly handles coroutines
-        def mock_run_until_complete(coro):
-            # Consume the coroutine to prevent the warning
-            try:
-                coro.close()
-            except (AttributeError, RuntimeError):
-                pass
-            return False
-
-        mock_loop = Mock()
-        mock_loop.run_until_complete.side_effect = mock_run_until_complete
-        mock_get_event_loop.return_value = mock_loop
 
         # Mock the dbus module to avoid ImportError in CI
         mock_dbus = Mock()
@@ -583,22 +556,9 @@ class TestCommon(unittest.TestCase):
             result = reboot()
             self.assertTrue(result)
 
-    @patch("asyncio.get_event_loop")
-    def test_reboot_dbus_fast_failure_and_dbus_failure(self, mock_get_event_loop):
+    @patch("amd_debug.common.asyncio.run", return_value=False)
+    def test_reboot_dbus_fast_failure_and_dbus_failure(self, mock_asyncio_run):
         """Test reboot returns False when both reboot_dbus_fast and reboot_dbus fail"""
-
-        # Create a mock loop that properly handles coroutines
-        def mock_run_until_complete(coro):
-            # Consume the coroutine to prevent the warning
-            try:
-                coro.close()
-            except (AttributeError, RuntimeError):
-                pass
-            return False
-
-        mock_loop = Mock()
-        mock_loop.run_until_complete.side_effect = mock_run_until_complete
-        mock_get_event_loop.return_value = mock_loop
 
         # Mock the import to raise ImportError when dbus is imported
         original_import = builtins.__import__
