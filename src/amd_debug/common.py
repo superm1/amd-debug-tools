@@ -273,8 +273,7 @@ def reboot():
             return False
         return True
 
-    loop = asyncio.get_event_loop()
-    result = loop.run_until_complete(reboot_dbus_fast())
+    result = asyncio.run(reboot_dbus_fast())
     if not result:
         return reboot_dbus()
 
