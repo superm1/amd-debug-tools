@@ -251,6 +251,46 @@ class SleepReport(AmdTool):
                 prereq_debug.append({"data": f"{content.strip()}"})
         return prereq, t0, prereq_debug
 
+    def format_power_rail_data(self, t0, t1_seconds):
+        """Format power rail data for display
+
+        Args:
+            t0: Timestamp of cycle start
+            t1_seconds: Duration of cycle in seconds
+
+        Returns:
+            Formatted string with power rail consumption data
+        """
+        power_rails = self.db.report_power_rails(t0)
+        if not power_rails:
+            return ""
+
+        # Build rail list first to check if we have any valid data
+        rail_lines = []
+        total_power = 0.0
+        for rail_data in power_rails:
+            _t0, label, e0, e1, scale = rail_data
+            if e0 is None or e1 is None or t1_seconds == 0:
+                continue
+
+            # Calculate energy in Joules and average power in Watts
+            energy_j = (e1 - e0) * scale
+            power_w = energy_j / t1_seconds
+            total_power += power_w
+
+            rail_lines.append(f"{label}: {power_w:.3f}W")
+
+        # Only show header if we have actual rail data
+        if not rail_lines:
+            return ""
+
+        output = "\n━━━ Power Rail Consumption ━━━\n"
+        output += "\n".join(rail_lines) + "\n"
+        output += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        output += f"Total: {total_power:.3f}W\n"
+
+        return output
+
     def get_cycle_data(self):
         """Get the cycle data"""
         cycles = []
@@ -276,6 +316,16 @@ class SleepReport(AmdTool):
                         content = self.convert_table_dataframe(content)
                     messages.append(content)
                     priorities.append(get_log_priority(row[1]))
+
+                # Add formatted power rail summary
+                cycle_row = self.df[self.df["Start Time"] == cycle]
+                if not cycle_row.empty:
+                    duration = cycle_row["Duration"].iloc[0]
+                    power_rail_summary = self.format_power_rail_data(cycle, duration)
+                    if power_rail_summary:
+                        messages.append(power_rail_summary)
+                        priorities.append(get_log_priority(6))  # Info level
+
                 debug.append(
                     {"cycle_num": num, "messages": messages, "priorities": priorities}
                 )

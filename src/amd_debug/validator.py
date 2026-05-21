@@ -14,6 +14,7 @@ from pyudev import Context
 from amd_debug.sleep_report import SleepReport
 from amd_debug.database import SleepDatabase
 from amd_debug.battery import Batteries
+from amd_debug.power_rails import PowerRails
 from amd_debug.kernel import get_kernel_log, get_kernel_command_line, sscanf_bios_args
 from amd_debug.common import (
     print_color,
@@ -87,6 +88,7 @@ class SleepValidator(AmdTool):
         self.kernel_log = get_kernel_log()
         self.db = SleepDatabase()
         self.batteries = Batteries()
+        self.power_rails = PowerRails()
         self.acpica = AcpicaTracer()
         self.bios_debug = bios_debug
         self.cpu_family = ""
@@ -164,6 +166,22 @@ class SleepValidator(AmdTool):
             full = self.batteries.get_energy_full(name)
             self.db.record_debug(f"{name} energy level is {energy} µWh")
             self.db.record_battery_energy(name, energy, full, "W")
+
+    def capture_power_rails(self):
+        """Capture power rail energy levels"""
+        if not self.power_rails.rails:
+            return  # No IIO power rails detected
+
+        for rail in self.power_rails.rails:
+            try:
+                energy = rail.read_energy_raw()
+                self.db.record_power_rail_energy(
+                    rail.label, energy, rail.energy_scale
+                )
+            except OSError as e:
+                self.db.record_debug(
+                    f"Failed to read {rail.label}: {e}", priority=1
+                )
 
     def check_rtc_cmos(self):
         """Check if the RTC is configured to use ACPI alarm"""
@@ -651,6 +669,7 @@ class SleepValidator(AmdTool):
             self.check_rtc_cmos,
             self.capture_hw_sleep,
             self.capture_battery,
+            self.capture_power_rails,
             self.capture_amdgpu_ips_status,
             self.capture_thermal,
             self.capture_input_wakeup_count,
@@ -674,6 +693,7 @@ class SleepValidator(AmdTool):
         self.kernel_duration = 0
         self.hw_sleep_duration = 0
         self.capture_battery()
+        self.capture_power_rails()
         self.check_gpes()
         self.capture_lid()
         self.capture_command_line()

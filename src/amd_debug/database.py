@@ -6,7 +6,7 @@ import os
 
 from amd_debug.common import read_file
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def migrate(cur, user_version) -> None:
@@ -17,6 +17,18 @@ def migrate(cur, user_version) -> None:
     # - add priority column
     if val == 0:
         cur.execute("ALTER TABLE debug ADD COLUMN priority INTEGER")
+    # Schema 2
+    # - add power_rails table
+    if val == 1:
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS power_rails ("
+            "t0 INTEGER, "
+            "label TEXT, "
+            "e0 REAL, "
+            "e1 REAL, "
+            "scale REAL, "
+            "PRIMARY KEY(t0, label))"
+        )
     # Update schema if necessary
     if val != user_version:
         cur.execute(f"PRAGMA user_version = {user_version}")
@@ -84,6 +96,15 @@ class SleepDatabase:
             "b1 INTEGER,"
             "full INTEGER,"
             "unit TEXT)"
+        )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS power_rails ("
+            "t0 INTEGER,"
+            "label TEXT,"
+            "e0 REAL,"
+            "e1 REAL,"
+            "scale REAL,"
+            "PRIMARY KEY(t0, label))"
         )
         self.prereq_data_cnt = 0
 
@@ -167,7 +188,7 @@ class SleepDatabase:
         else:
             cur.execute(
                 """
-                INSERT into battery (t0, name, b0, b1, full, unit) 
+                INSERT into battery (t0, name, b0, b1, full, unit)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -178,6 +199,46 @@ class SleepDatabase:
                     full,
                     unit,
                 ),
+            )
+
+    def record_power_rail_energy(self, label, energy, scale):
+        """Helper function to record power rail energy
+
+        Args:
+            label: Rail label (e.g., "CPU_VDDCR_PH1_IN_POWER_1")
+            energy: Raw energy accumulator value
+            scale: Scale factor to convert raw to Joules
+
+        First call (prep): INSERT with e0
+        Second call (post): UPDATE with e1
+        """
+        assert self.db
+        assert self.last_suspend
+        cur = self.db.cursor()
+        cur.execute(
+            "SELECT e0 FROM power_rails WHERE t0=? AND label=?",
+            (int(self.last_suspend.strftime("%Y%m%d%H%M%S")), label),
+        )
+        result = cur.fetchone()
+        if result is None:
+            # First call (prep): INSERT with e0
+            cur.execute(
+                """
+                INSERT INTO power_rails (t0, label, e0, e1, scale)
+                VALUES (?, ?, ?, NULL, ?)
+                """,
+                (
+                    int(self.last_suspend.strftime("%Y%m%d%H%M%S")),
+                    label,
+                    energy,
+                    scale,
+                ),
+            )
+        else:
+            # Second call (post): UPDATE with e1
+            cur.execute(
+                "UPDATE power_rails SET e1=? WHERE t0=? AND label=?",
+                (energy, int(self.last_suspend.strftime("%Y%m%d%H%M%S")), label),
             )
 
     def record_cycle_data(self, message, symbol) -> None:
@@ -312,6 +373,23 @@ class SleepDatabase:
         cur = self.db.cursor()
         cur.execute(
             "SELECT * FROM battery WHERE t0=?",
+            (int(t0.strftime("%Y%m%d%H%M%S")),),
+        )
+        return cur.fetchall()
+
+    def report_power_rails(self, t0=None) -> list:
+        """Helper function to report power rails for a given timestamp
+
+        Returns:
+            List of tuples: (t0, label, e0, e1, scale)
+        """
+        assert self.db
+        if t0 is None:
+            assert self.last_suspend
+            t0 = self.last_suspend
+        cur = self.db.cursor()
+        cur.execute(
+            "SELECT * FROM power_rails WHERE t0=?",
             (int(t0.strftime("%Y%m%d%H%M%S")),),
         )
         return cur.fetchall()
