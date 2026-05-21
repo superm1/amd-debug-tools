@@ -148,6 +148,35 @@ class SleepReport(AmdTool):
                 else:
                     self.failures.append([index, problem, data])
 
+    def calculate_power_rail_totals(self, t0, duration):
+        """Calculate total power from all power rails for a given cycle
+
+        Args:
+            t0: Timestamp of cycle start
+            duration: Duration of cycle in seconds
+
+        Returns:
+            Total power in watts, or None if no valid data
+        """
+        power_rails = self.db.report_power_rails(t0)
+        if not power_rails or duration == 0:
+            return None
+
+        total_power = 0.0
+        has_valid_data = False
+        for rail_data in power_rails:
+            _t0, label, e0, e1, scale = rail_data
+            if e0 is None or e1 is None:
+                continue
+
+            # Calculate energy in Joules and average power in Watts
+            energy_j = (e1 - e0) * scale
+            power_w = energy_j / duration
+            total_power += power_w
+            has_valid_data = True
+
+        return total_power if has_valid_data else None
+
     def pre_process_dataframe(self):
         """Pre-process the pandas dataframe"""
         self.df["Duration"] = self.df["t1"].apply(format_as_seconds) - self.df[
@@ -157,12 +186,24 @@ class SleepReport(AmdTool):
         self.df["Hardware Sleep"] = (self.df["hw"] / self.df["Duration"]).apply(
             parse_hw_sleep
         )
-        if not self.df["b0"].isnull().all():
+
+        # Calculate power rail totals for each cycle
+        power_rail_totals = []
+        for t0, duration in zip(self.df["t0"], self.df["Duration"]):
+            cycle_t0 = format_as_human(t0)
+            total_power = self.calculate_power_rail_totals(cycle_t0, duration)
+            power_rail_totals.append(total_power)
+
+        # Use power rail data if available, otherwise fall back to battery
+        has_power_rails = any(p is not None for p in power_rail_totals)
+        if has_power_rails:
+            self.df["Average Power"] = power_rail_totals
+        elif not self.df["b0"].isnull().all():
             self.df["Battery Start"] = self.df["b0"] / self.df["full"] * 100
             self.df["Battery Delta"] = (
                 (self.df["b1"] - self.df["b0"]) / self.df["full"] * 100
             )
-            self.df["Battery Ave Rate"] = (
+            self.df["Average Power"] = (
                 (self.df["b1"] - self.df["b0"]) / 1000000
                 / (self.df["Duration"] / 3600)
             )
@@ -202,7 +243,7 @@ class SleepReport(AmdTool):
         if "Battery Start" in self.df.columns:
             self.df["Battery Start"] = self.df["Battery Start"].apply(format_percent)
             self.df["Battery Delta"] = self.df["Battery Delta"].apply(format_percent)
-            self.df["Battery Ave Rate"] = self.df["Battery Ave Rate"].apply(
+            self.df["Average Power"] = self.df["Average Power"].apply(
                 format_watts
             )
 
@@ -444,13 +485,13 @@ class SleepReport(AmdTool):
         import seaborn as sns  # pylint: disable=import-outside-toplevel
         import io  # pylint: disable=import-outside-toplevel
 
-        if "Battery Ave Rate" not in self.df.columns:
+        if "Average Power" not in self.df.columns:
             return
 
         plt.set_loglevel("warning")
         _fig, ax1 = plt.subplots()
         ax1.plot(
-            self.df["Battery Ave Rate"], color="green", label="Charge/Discharge Rate"
+            self.df["Average Power"], color="green", label="Charge/Discharge Rate"
         )
 
         ax2 = ax1.twinx()

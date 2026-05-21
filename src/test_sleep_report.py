@@ -196,7 +196,7 @@ class TestSleepReport(unittest.TestCase):
         )  # Hardware Sleep should be NaN
 
     def test_battery_ave_rate(self):
-        """Test the pre_process_dataframe Battery Ave Rate calculation."""
+        """Test the pre_process_dataframe Average Power calculation."""
         self.report.df = pd.DataFrame(
             {
                 "t0": [datetime(2023, 10, 10, 12, 0, 0).strftime("%Y%m%d%H%M%S")],
@@ -211,5 +211,5 @@ class TestSleepReport(unittest.TestCase):
             }
         )
         self.report.pre_process_dataframe()
-        batt_ave_rate = self.report.df["Battery Ave Rate"].iloc[0]
+        batt_ave_rate = self.report.df["Average Power"].iloc[0]
         self.assertAlmostEqual(batt_ave_rate, -5, places=3)
