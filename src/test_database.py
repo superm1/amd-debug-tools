@@ -282,3 +282,103 @@ class TestSleepDatabase(unittest.TestCase):
         result = self.db.report_cycle_data(None)
         expected_result = "symbol1 Test cycle data 1\n"
         self.assertEqual(result, expected_result)
+
+    def test_record_power_rail_energy_insert(self):
+        """Test inserting power rail energy (first call in prep)"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.db.record_power_rail_energy("CPU_VDDCR_PH1", 1000000.0, 149011.611)
+        cur = self.db.db.cursor()
+        cur.execute(
+            "SELECT label, e0, e1, scale FROM power_rails WHERE t0=?",
+            (int(timestamp.strftime("%Y%m%d%H%M%S")),),
+        )
+        result = cur.fetchone()
+        self.assertEqual(result, ("CPU_VDDCR_PH1", 1000000.0, None, 149011.611))
+
+    def test_record_power_rail_energy_update(self):
+        """Test updating power rail energy (second call in post)"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        # First call (prep) - INSERT
+        self.db.record_power_rail_energy("CPU_VDDCR_PH1", 1000000.0, 149011.611)
+        # Second call (post) - UPDATE
+        self.db.record_power_rail_energy("CPU_VDDCR_PH1", 1050000.0, 149011.611)
+        cur = self.db.db.cursor()
+        cur.execute(
+            "SELECT label, e0, e1, scale FROM power_rails WHERE t0=?",
+            (int(timestamp.strftime("%Y%m%d%H%M%S")),),
+        )
+        result = cur.fetchone()
+        self.assertEqual(result, ("CPU_VDDCR_PH1", 1000000.0, 1050000.0, 149011.611))
+
+    def test_record_multiple_power_rails(self):
+        """Test recording multiple power rails per cycle"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        # Record multiple rails
+        rails = [
+            ("CPU_VDDCR_PH1", 1000000.0, 1050000.0, 149011.611),
+            ("CPU_VDDCR_PH2", 2000000.0, 2100000.0, 149011.611),
+            ("VDDIO", 3000000.0, 3150000.0, 23751.3),
+        ]
+        for label, e0, e1, scale in rails:
+            self.db.record_power_rail_energy(label, e0, scale)
+            self.db.record_power_rail_energy(label, e1, scale)
+
+        cur = self.db.db.cursor()
+        cur.execute(
+            "SELECT label, e0, e1, scale FROM power_rails WHERE t0=? ORDER BY label",
+            (int(timestamp.strftime("%Y%m%d%H%M%S")),),
+        )
+        results = cur.fetchall()
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0], ("CPU_VDDCR_PH1", 1000000.0, 1050000.0, 149011.611))
+        self.assertEqual(results[1], ("CPU_VDDCR_PH2", 2000000.0, 2100000.0, 149011.611))
+        self.assertEqual(results[2], ("VDDIO", 3000000.0, 3150000.0, 23751.3))
+
+    def test_report_power_rails(self):
+        """Test reporting power rails"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.db.record_power_rail_energy("CPU_VDDCR_PH1", 1000000.0, 149011.611)
+        self.db.record_power_rail_energy("CPU_VDDCR_PH1", 1050000.0, 149011.611)
+        result = self.db.report_power_rails(timestamp)
+        self.assertEqual(
+            result,
+            [
+                (
+                    int(timestamp.strftime("%Y%m%d%H%M%S")),
+                    "CPU_VDDCR_PH1",
+                    1000000.0,
+                    1050000.0,
+                    149011.611,
+                )
+            ],
+        )
+
+    def test_report_power_rails_no_data(self):
+        """Test reporting power rails when no data exists"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        result = self.db.report_power_rails(timestamp)
+        self.assertEqual(result, [])
+
+    def test_schema_migration_v1_to_v2(self):
+        """Test database migration from schema v1 to v2"""
+        # Create a new database (will be at v2)
+        db = SleepDatabase(dbf=":memory:")
+        cur = db.db.cursor()
+
+        # Verify power_rails table exists
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='power_rails'"
+        )
+        result = cur.fetchone()
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0], "power_rails")
+
+        # Verify schema version is 2
+        cur.execute("PRAGMA user_version")
+        version = cur.fetchone()[0]
+        self.assertEqual(version, 2)
