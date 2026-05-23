@@ -114,7 +114,6 @@
         }
 
         .collapsible-wrapper.expanded {
-            max-height: 2000px; /* Large enough to hold table */
             opacity: 1;
         }
 
@@ -235,9 +234,18 @@
             if (wrapper.classList.contains("expanded")) {
                 wrapper.classList.remove("expanded");
                 arrow.classList.remove("arrow-expanded");
+                wrapper.style.maxHeight = "0px";
             } else {
                 wrapper.classList.add("expanded");
                 arrow.classList.add("arrow-expanded");
+                wrapper.style.maxHeight = wrapper.scrollHeight + "px";
+            }
+        }
+
+        function sync_prereq_wrapper_height() {
+            var wrapper = document.getElementById("prereqdebugdata-wrapper");
+            if (wrapper && wrapper.classList.contains("expanded")) {
+                wrapper.style.maxHeight = wrapper.scrollHeight + "px";
             }
         }
 
@@ -388,6 +396,7 @@
         }
 
         window.addEventListener('load', populate_summary_selectors);
+        window.addEventListener('resize', sync_prereq_wrapper_height);
     </script>
     <h1>Linux s2idle Power Report</h1>
     <p>s2idle report created {{ date }} using amd-s2idle {{version}}</p>
