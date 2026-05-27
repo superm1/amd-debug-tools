@@ -13,6 +13,8 @@ import time
 import struct
 import subprocess
 import sys
+import stat
+import pathlib
 from ast import literal_eval
 from datetime import date, timedelta
 
@@ -133,18 +135,46 @@ def _configure_log(prefix) -> str:
         path = os.environ.get("XDG_DATA_HOME") or os.path.join(
             home, ".local", "share", "amd-debug-tools"
         )
-        os.makedirs(path, exist_ok=True)
-        log = os.path.join(
-            path,
-            f"{prefix}-{date.today()}.txt",
-        )
-        if not os.path.exists(log):
-            with open(log, "w", encoding="utf-8") as f:
-                f.write("")
+
+        # Prevent symlink attacks on log directory/file when running as root
+        path_obj = pathlib.Path(path)
+
+        try:
+            if path_obj.exists():
+                if path_obj.is_symlink():
+                    raise ValueError(f"Log directory is a symlink: {path}")
+            else:
+                os.makedirs(path, mode=0o755, exist_ok=True)
+                if path_obj.is_symlink():
+                    raise ValueError(f"Log directory became a symlink during creation: {path}")
+
             if "SUDO_UID" in os.environ:
-                os.chown(path, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
-                os.chown(log, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
-        level = logging.DEBUG
+                os.lchown(path, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+        except (ValueError, OSError) as e:
+            logging.warning(f"Cannot create safe log directory: {e}")
+            log = "/dev/null"
+            level = logging.WARNING
+        else:
+            log = os.path.join(path, f"{prefix}-{date.today()}.txt")
+
+            try:
+                fd = os.open(
+                    log,
+                    os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW,
+                    mode=stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,  # 0o644
+                )
+                try:
+                    os.close(fd)
+                    if "SUDO_UID" in os.environ:
+                        os.lchown(log, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+                except Exception:
+                    os.close(fd)
+                    raise
+            except FileExistsError:
+                if os.path.islink(log):
+                    raise ValueError(f"Log file is a symlink: {log}")
+
+            level = logging.DEBUG
     else:
         log = "/dev/null"
         level = logging.WARNING

@@ -292,13 +292,9 @@ class SleepReport(AmdTool):
                 if self.format == "html" and [
                     table for table in tables if table in content
                 ]:
-                    content = self.convert_table_dataframe(content)
-                    # Mark pandas HTML output as safe
-                    content = Markup(content)
-                else:
-                    # Escape HTML in debug messages unless already converted to HTML table
-                    if self.format == "html":
-                        content = Markup(html.escape(content))
+                    content = Markup(self.convert_table_dataframe(content))
+                elif self.format == "html":
+                    content = Markup(html.escape(content))
                 prereq_debug.append({"data": f"{content.strip()}"})
         return prereq, t0, prereq_debug
 
@@ -352,9 +348,7 @@ class SleepReport(AmdTool):
             if self.format == "html":
                 data = ""
                 for line in self.db.report_cycle_data(cycle).split("\n"):
-                    # Escape HTML to prevent injection attacks from database content
                     data += f"<p>{html.escape(line)}</p>"
-                # Mark the manually constructed HTML as safe since we've already escaped it
                 cycles.append({"cycle_num": num, "data": Markup(data)})
             else:
                 cycles.append([num, self.db.report_cycle_data(cycle)])
@@ -366,27 +360,21 @@ class SleepReport(AmdTool):
                     if self.format == "html" and [
                         table for table in tables if table in content
                     ]:
-                        content = self.convert_table_dataframe(content)
-                        # Mark pandas HTML output as safe
-                        content = Markup(content)
-                    else:
-                        # Escape HTML in debug messages unless already converted to HTML table
-                        if self.format == "html":
-                            content = Markup(html.escape(content))
+                        content = Markup(self.convert_table_dataframe(content))
+                    elif self.format == "html":
+                        content = Markup(html.escape(content))
                     messages.append(content)
                     priorities.append(get_log_priority(row[1]))
 
-                # Add formatted power rail summary
                 cycle_row = self.df[self.df["Start Time"] == cycle]
                 if not cycle_row.empty:
                     duration = cycle_row["Duration"].iloc[0]
                     power_rail_summary = self.format_power_rail_data(cycle, duration)
                     if power_rail_summary:
-                        # Escape HTML if rendering in HTML format
                         if self.format == "html":
                             power_rail_summary = Markup(html.escape(power_rail_summary))
                         messages.append(power_rail_summary)
-                        priorities.append(get_log_priority(6))  # Info level
+                        priorities.append(get_log_priority(6))
 
                 debug.append(
                     {"cycle_num": num, "messages": messages, "priorities": priorities}
@@ -402,7 +390,7 @@ class SleepReport(AmdTool):
         p = os.path.dirname(amd_debug.__file__)
         environment = Environment(
             loader=FileSystemLoader(os.path.join(p, "templates")),
-            autoescape=True  # Enable autoescaping to prevent XSS attacks
+            autoescape=True
         )
         template = environment.get_template(self.format)
 
@@ -493,15 +481,12 @@ class SleepReport(AmdTool):
             "failures": failures,
         }
         if self.fname:
-            # Validate path to prevent directory traversal attacks
             try:
                 resolved = pathlib.Path(self.fname).resolve()
             except (ValueError, OSError) as e:
                 raise ValueError(f"Invalid report file path: {self.fname}") from e
 
-            # Open file securely - fails if symlink exists or file exists
-            # This prevents symlink attacks where an attacker could pre-create
-            # a symlink and trick root into chowning an arbitrary file
+            # Prevent symlink attack when running as root
             try:
                 fd = os.open(
                     self.fname,
@@ -517,16 +502,13 @@ class SleepReport(AmdTool):
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write(template.render(context))
-                # Use fchown on the file descriptor (won't follow symlinks)
                 if "SUDO_UID" in os.environ:
                     os.fchown(fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
             except Exception:
-                # If writing fails, clean up the file descriptor if it wasn't
-                # already wrapped by fdopen
                 try:
                     os.close(fd)
                 except OSError:
-                    pass  # fd was already closed by fdopen
+                    pass
                 raise
 
             return "Report written to {f}".format(f=self.fname)
