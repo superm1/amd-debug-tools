@@ -400,7 +400,10 @@ class SleepReport(AmdTool):
 
         # Load the template
         p = os.path.dirname(amd_debug.__file__)
-        environment = Environment(loader=FileSystemLoader(os.path.join(p, "templates")))
+        environment = Environment(
+            loader=FileSystemLoader(os.path.join(p, "templates")),
+            autoescape=True  # Enable autoescaping to prevent XSS attacks
+        )
         template = environment.get_template(self.format)
 
         # Load the prereq data
