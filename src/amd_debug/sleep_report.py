@@ -5,10 +5,12 @@ import re
 import math
 import stat
 import pathlib
+import html
 from datetime import datetime, timedelta
 import numpy as np
 from tabulate import tabulate
 from jinja2 import Environment, FileSystemLoader
+from markupsafe import Markup
 import pandas as pd
 
 from amd_debug.database import SleepDatabase
@@ -291,6 +293,12 @@ class SleepReport(AmdTool):
                     table for table in tables if table in content
                 ]:
                     content = self.convert_table_dataframe(content)
+                    # Mark pandas HTML output as safe
+                    content = Markup(content)
+                else:
+                    # Escape HTML in debug messages unless already converted to HTML table
+                    if self.format == "html":
+                        content = Markup(html.escape(content))
                 prereq_debug.append({"data": f"{content.strip()}"})
         return prereq, t0, prereq_debug
 
@@ -344,8 +352,10 @@ class SleepReport(AmdTool):
             if self.format == "html":
                 data = ""
                 for line in self.db.report_cycle_data(cycle).split("\n"):
-                    data += f"<p>{line}</p>"
-                cycles.append({"cycle_num": num, "data": data})
+                    # Escape HTML to prevent injection attacks from database content
+                    data += f"<p>{html.escape(line)}</p>"
+                # Mark the manually constructed HTML as safe since we've already escaped it
+                cycles.append({"cycle_num": num, "data": Markup(data)})
             else:
                 cycles.append([num, self.db.report_cycle_data(cycle)])
             if self.debug:
@@ -357,6 +367,12 @@ class SleepReport(AmdTool):
                         table for table in tables if table in content
                     ]:
                         content = self.convert_table_dataframe(content)
+                        # Mark pandas HTML output as safe
+                        content = Markup(content)
+                    else:
+                        # Escape HTML in debug messages unless already converted to HTML table
+                        if self.format == "html":
+                            content = Markup(html.escape(content))
                     messages.append(content)
                     priorities.append(get_log_priority(row[1]))
 
@@ -366,6 +382,9 @@ class SleepReport(AmdTool):
                     duration = cycle_row["Duration"].iloc[0]
                     power_rail_summary = self.format_power_rail_data(cycle, duration)
                     if power_rail_summary:
+                        # Escape HTML if rendering in HTML format
+                        if self.format == "html":
+                            power_rail_summary = Markup(html.escape(power_rail_summary))
                         messages.append(power_rail_summary)
                         priorities.append(get_log_priority(6))  # Info level
 
