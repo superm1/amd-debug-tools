@@ -3,6 +3,8 @@
 import os
 import re
 import math
+import stat
+import pathlib
 from datetime import datetime, timedelta
 import numpy as np
 from tabulate import tabulate
@@ -469,12 +471,42 @@ class SleepReport(AmdTool):
             "failures": failures,
         }
         if self.fname:
-            with open(self.fname, "w", encoding="utf-8") as f:
-                f.write(template.render(context))
-            if "SUDO_UID" in os.environ:
-                os.chown(
-                    self.fname, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"])
+            # Validate path to prevent directory traversal attacks
+            try:
+                resolved = pathlib.Path(self.fname).resolve()
+            except (ValueError, OSError) as e:
+                raise ValueError(f"Invalid report file path: {self.fname}") from e
+
+            # Open file securely - fails if symlink exists or file exists
+            # This prevents symlink attacks where an attacker could pre-create
+            # a symlink and trick root into chowning an arbitrary file
+            try:
+                fd = os.open(
+                    self.fname,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    mode=stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,  # 0o644
                 )
+            except FileExistsError:
+                raise FileExistsError(
+                    f"Report file already exists: {self.fname}. "
+                    "Please remove it or specify a different filename."
+                ) from None
+
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(template.render(context))
+                # Use fchown on the file descriptor (won't follow symlinks)
+                if "SUDO_UID" in os.environ:
+                    os.fchown(fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+            except Exception:
+                # If writing fails, clean up the file descriptor if it wasn't
+                # already wrapped by fdopen
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass  # fd was already closed by fdopen
+                raise
+
             return "Report written to {f}".format(f=self.fname)
         else:
             return template.render(context)
