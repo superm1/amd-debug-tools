@@ -6,6 +6,8 @@ This module contains unit tests for the s2idle tool in the amd-debug-tools packa
 """
 
 import math
+import os
+import tempfile
 import unittest
 from datetime import datetime
 from unittest.mock import patch
@@ -152,6 +154,31 @@ class TestSleepReport(unittest.TestCase):
         mock_template.render.return_value = "Rendered Template"
         result = self.report.build_template(inc_prereq=False)
         self.assertEqual(result, "Rendered Template")
+
+    @patch("amd_debug.sleep_report.Environment")
+    @patch("amd_debug.sleep_report.FileSystemLoader")
+    def test_build_template_fchown_called_while_fd_open(self, _mock_fsl, mock_env):
+        """Test that fchown is called before the file descriptor is closed.
+
+        When SUDO_UID/SUDO_GID are set, os.fchown must be called inside the
+        'with os.fdopen(...)' block so that the file descriptor is still valid.
+        Calling it after the block exits causes OSError (Bad file descriptor).
+        """
+        mock_template = mock_env.return_value.get_template.return_value
+        mock_template.render.return_value = "Rendered Template"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fname = os.path.join(tmpdir, "report.txt")
+            self.report.fname = fname
+
+            with patch.dict("os.environ", {"SUDO_UID": "1000", "SUDO_GID": "1000"}):
+                with patch("os.fchown") as mock_fchown:
+                    self.report.build_template(inc_prereq=False)
+                    # fchown must have been called exactly once with the real fd
+                    mock_fchown.assert_called_once()
+                    _fd, uid, gid = mock_fchown.call_args[0]
+                    self.assertEqual(uid, 1000)
+                    self.assertEqual(gid, 1000)
 
     @patch("matplotlib.pyplot.savefig")
     def test_build_battery_chart(self, mock_savefig):
