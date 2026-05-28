@@ -502,8 +502,8 @@ class SleepReport(AmdTool):
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write(template.render(context))
-                if "SUDO_UID" in os.environ:
-                    os.fchown(fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+                    if "SUDO_UID" in os.environ:
+                        os.fchown(fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
             except Exception:
                 try:
                     os.close(fd)
