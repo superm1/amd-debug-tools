@@ -422,6 +422,7 @@ def relaunch_sudo() -> None:
             "DBUS_SESSION_BUS_ADDRESS",
             "XDG_SESSION_TYPE",
             "XDG_DATA_DIRS",
+            "KDE_SESSION_VERSION",
             "SSH_CLIENT",
             "SSH_TTY"
         ]:
