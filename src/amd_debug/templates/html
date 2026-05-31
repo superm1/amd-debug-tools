@@ -458,7 +458,7 @@
     <input type="radio" name="session1" id="med_duration" value="600" class="hidden-by-default" />
     <input type="radio" name="session1" id="min_duration" value="60" class="hidden-by-default" />
     {% endif %}
-    {{ summary }}
+    {{ summary | safe }}
     {% if cycle_data %}
     <p><label for="cycle" class="hidden-by-default">Choose a cycle:</label>
         <select id="cycles" onchange="cycle_data_changed()" class="hidden-by-default">

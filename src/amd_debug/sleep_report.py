@@ -208,8 +208,7 @@ class SleepReport(AmdTool):
                 (self.df["b1"] - self.df["b0"]) / self.df["full"] * 100
             )
             self.df["Average Power"] = (
-                (self.df["b1"] - self.df["b0"]) / 1000000
-                / (self.df["Duration"] / 3600)
+                (self.df["b1"] - self.df["b0"]) / 1000000 / (self.df["Duration"] / 3600)
             )
 
         # Wake sources
@@ -247,9 +246,7 @@ class SleepReport(AmdTool):
         if "Battery Start" in self.df.columns:
             self.df["Battery Start"] = self.df["Battery Start"].apply(format_percent)
             self.df["Battery Delta"] = self.df["Battery Delta"].apply(format_percent)
-            self.df["Average Power"] = self.df["Average Power"].apply(
-                format_watts
-            )
+            self.df["Average Power"] = self.df["Average Power"].apply(format_watts)
 
     def convert_table_dataframe(self, content):
         """Convert a table like dataframe to an HTML table"""
@@ -295,7 +292,7 @@ class SleepReport(AmdTool):
                     content = Markup(self.convert_table_dataframe(content))
                 elif self.format == "html":
                     content = Markup(html.escape(content))
-                prereq_debug.append({"data": f"{content.strip()}"})
+                prereq_debug.append({"data": content.strip()})
         return prereq, t0, prereq_debug
 
     def format_power_rail_data(self, t0, t1_seconds):
@@ -389,8 +386,7 @@ class SleepReport(AmdTool):
         # Load the template
         p = os.path.dirname(amd_debug.__file__)
         environment = Environment(
-            loader=FileSystemLoader(os.path.join(p, "templates")),
-            autoescape=True
+            loader=FileSystemLoader(os.path.join(p, "templates")), autoescape=True
         )
         template = environment.get_template(self.format)
 
@@ -491,7 +487,10 @@ class SleepReport(AmdTool):
                 fd = os.open(
                     self.fname,
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                    mode=stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,  # 0o644
+                    mode=stat.S_IRUSR
+                    | stat.S_IWUSR
+                    | stat.S_IRGRP
+                    | stat.S_IROTH,  # 0o644
                 )
             except FileExistsError:
                 raise FileExistsError(
@@ -503,7 +502,9 @@ class SleepReport(AmdTool):
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write(template.render(context))
                     if "SUDO_UID" in os.environ:
-                        os.fchown(fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+                        os.fchown(
+                            fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"])
+                        )
             except Exception:
                 try:
                     os.close(fd)
@@ -526,9 +527,7 @@ class SleepReport(AmdTool):
 
         plt.set_loglevel("warning")
         _fig, ax1 = plt.subplots()
-        ax1.plot(
-            self.df["Average Power"], color="green", label="Charge/Discharge Rate"
-        )
+        ax1.plot(self.df["Average Power"], color="green", label="Charge/Discharge Rate")
 
         ax2 = ax1.twinx()
         sns.barplot(

@@ -12,6 +12,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch
 import pandas as pd
+from markupsafe import Markup
 
 from amd_debug.sleep_report import (
     remove_duplicates,
@@ -240,3 +241,20 @@ class TestSleepReport(unittest.TestCase):
         self.report.pre_process_dataframe()
         batt_ave_rate = self.report.df["Average Power"].iloc[0]
         self.assertAlmostEqual(batt_ave_rate, -5, places=3)
+
+    def test_get_prereq_data_preserves_markup_for_html_tables(self):
+        """Ensure HTML prerequisite tables remain Markup and are not escaped."""
+        self.report.format = "html"
+        self.report.debug = True
+        self.mock_db.get_last_prereq_ts.return_value = "20231010123045"
+        self.mock_db.report_prereq.return_value = []
+        table_text = "DMI|value\nfoo|bar"
+        self.mock_db.report_debug.return_value = [(table_text, 6)]
+
+        prereq, _t0, prereq_debug = self.report.get_prereq_data()
+
+        self.assertEqual(prereq, [])
+        self.assertEqual(len(prereq_debug), 1)
+        self.assertIsInstance(prereq_debug[0]["data"], Markup)
+        self.assertIn("<table", str(prereq_debug[0]["data"]))
+        self.assertNotIn("&lt;table", str(prereq_debug[0]["data"]))
