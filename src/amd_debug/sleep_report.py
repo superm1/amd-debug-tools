@@ -388,7 +388,12 @@ class SleepReport(AmdTool):
                     power_rail_summary = self.format_power_rail_data(cycle, duration)
                     if power_rail_summary:
                         if self.format == "html":
-                            power_rail_summary = Markup(html.escape(power_rail_summary))
+                            power_rail_summary = Markup(
+                                "".join(
+                                    f"<p>{html.escape(line)}</p>"
+                                    for line in power_rail_summary.split("\n")
+                                )
+                            )
                         messages.append(power_rail_summary)
                         priorities.append(get_log_priority(6))
 
