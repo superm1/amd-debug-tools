@@ -265,6 +265,7 @@ class SleepReport(AmdTool):
         if "Battery Start" in self.df.columns:
             self.df["Battery Start"] = self.df["Battery Start"].apply(format_percent)
             self.df["Battery Delta"] = self.df["Battery Delta"].apply(format_percent)
+        if "Average Power" in self.df.columns:
             self.df["Average Power"] = self.df["Average Power"].apply(format_watts)
 
     def convert_table_dataframe(self, content):
@@ -546,7 +547,7 @@ class SleepReport(AmdTool):
         import seaborn as sns  # pylint: disable=import-outside-toplevel
         import io  # pylint: disable=import-outside-toplevel
 
-        if "Average Power" not in self.df.columns:
+        if "Average Power" not in self.df.columns or "Battery Delta" not in self.df.columns:
             return
 
         plt.set_loglevel("warning")
