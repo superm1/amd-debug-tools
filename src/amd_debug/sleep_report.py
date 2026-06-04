@@ -192,8 +192,8 @@ class SleepReport(AmdTool):
             if e0 is None or e1 is None:
                 continue
 
-            # Calculate energy in Joules and average power in Watts
-            energy_j = (e1 - e0) * scale
+            # pac194x/5x reports raw*scale in mW-seconds (millijoules)
+            energy_j = (e1 - e0) * scale / 1000.0
             power_w = energy_j / duration
             total_power += power_w
             has_valid_data = True
@@ -336,8 +336,8 @@ class SleepReport(AmdTool):
             if e0 is None or e1 is None or t1_seconds == 0:
                 continue
 
-            # Calculate energy in Joules and average power in Watts
-            energy_j = (e1 - e0) * scale
+            # pac194x/5x reports raw*scale in mW-seconds (millijoules), so
+            energy_j = (e1 - e0) * scale / 1000.0
             power_w = energy_j / t1_seconds
             total_power += power_w
 
@@ -566,6 +566,7 @@ class SleepReport(AmdTool):
             ax1.set_xticks(range(0, len(self.df.index), max_range))
         ax1.set_xlabel("Cycle")
         ax1.set_ylabel("Rate (Watts)")
+        ax1.ticklabel_format(axis="y", style="plain", useOffset=False)
         ax2.set_ylabel("Battery Change (%)")
 
         lines, labels = ax1.get_legend_handles_labels()
