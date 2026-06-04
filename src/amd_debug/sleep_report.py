@@ -25,6 +25,25 @@ from amd_debug.common import (
     print_temporary_message,
 )
 
+def confirm_overwrite_report(fname) -> bool:
+    """If fname exists, prompt to overwrite. Returns True if writing can proceed."""
+    if not fname or not os.path.lexists(fname):
+        return True
+    response = (
+        input(f"Report file already exists: {fname}. Overwrite? (y/n): ")
+        .strip()
+        .lower()
+    )
+    if response != "y":
+        return False
+    try:
+        os.unlink(fname)
+    except OSError as e:
+        print(f"Failed to remove existing report file {fname}: {e}")
+        return False
+    return True
+
+
 from amd_debug.failures import (
     SpuriousWakeup,
     LowHardwareSleepResidency,

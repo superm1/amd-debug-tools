@@ -20,7 +20,7 @@ from amd_debug.common import (
 from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
 from amd_debug.prerequisites import PrerequisiteValidator
-from amd_debug.sleep_report import SleepReport
+from amd_debug.sleep_report import SleepReport, confirm_overwrite_report
 
 
 class Defaults:
@@ -179,6 +179,9 @@ def report(since, until, fname, fmt, tool_debug, report_debug) -> bool:
         )
     except KeyboardInterrupt:
         sys.exit("\nReport generation cancelled")
+    if not confirm_overwrite_report(fname):
+        print("Report generation cancelled")
+        return False
     try:
         app = SleepReport(
             since=since,
@@ -225,6 +228,9 @@ def run_test_cycle(
         )
     except KeyboardInterrupt:
         sys.exit("\nTest cancelled")
+
+    if not confirm_overwrite_report(fname):
+        sys.exit("Test cancelled")
 
     try:
         app = PrerequisiteValidator(debug)
