@@ -162,3 +162,162 @@ class TestAmdPstateTriage(unittest.TestCase):
     def test_amd_cppc_epp_perf(self):
         """Test amd_cppc_epp_perf function"""
         self.assertEqual(amd_cppc_epp_perf(0x12345678), 0x12)
+
+    @patch("amd_debug.pstate.read_file", return_value="data")
+    @patch("amd_debug.pstate.os.path.exists", return_value=True)
+    @patch("amd_debug.pstate.print_color")
+    @patch("amd_debug.pstate.Context")
+    @patch("amd_debug.pstate.relaunch_sudo")
+    def test_gather_cpu_info(
+        self,
+        _mock_relaunch_sudo,
+        mock_context,
+        mock_print_color,
+        _mock_path_exists,
+        mock_read_file,
+    ):
+        """gather_cpu_info builds a CPU dataframe and prints it"""
+        cpu0 = MagicMock(sys_name="cpu0", sys_path="/sys/devices/system/cpu/cpu0")
+        cpu1 = MagicMock(sys_name="cpu1", sys_path="/sys/devices/system/cpu/cpu1")
+        mock_context.return_value.list_devices.return_value = [cpu1, cpu0]
+
+        # cpuinfo read needs to contain a "model name" line
+        def _read(path):
+            if path == "/proc/cpuinfo":
+                return "model name\t: AMD Test CPU\n"
+            return "1"
+
+        mock_read_file.side_effect = _read
+
+        triage = AmdPstateTriage(logging=False)
+        triage.gather_cpu_info()
+        # ensure CPU model line printed
+        mock_print_color.assert_any_call("CPU:\t\tAMD Test CPU", "💻")
+
+    @patch("amd_debug.pstate.read_msr", side_effect=FileNotFoundError())
+    @patch("amd_debug.pstate.print_color")
+    @patch("amd_debug.pstate.Context")
+    @patch("amd_debug.pstate.relaunch_sudo")
+    def test_gather_msrs_module_missing(
+        self, _mock_relaunch_sudo, mock_context, mock_print_color, _mock_read_msr
+    ):
+        """gather_msrs returns False when MSR module not loaded"""
+        mock_context.return_value.list_devices.return_value = [
+            MagicMock(sys_name="cpu0"),
+        ]
+        triage = AmdPstateTriage(logging=False)
+        result = triage.gather_msrs()
+        self.assertFalse(result)
+        mock_print_color.assert_any_call(
+            "Unable to check MSRs: MSR kernel module not loaded", "❌"
+        )
+
+    @patch("amd_debug.pstate.read_msr", side_effect=PermissionError())
+    @patch("amd_debug.pstate.print_color")
+    @patch("amd_debug.pstate.Context")
+    @patch("amd_debug.pstate.relaunch_sudo")
+    def test_gather_msrs_permission(
+        self, _mock_relaunch_sudo, mock_context, mock_print_color, _mock_read_msr
+    ):
+        """gather_msrs returns silently when MSR reads denied"""
+        mock_context.return_value.list_devices.return_value = [
+            MagicMock(sys_name="cpu0"),
+        ]
+        triage = AmdPstateTriage(logging=False)
+        result = triage.gather_msrs()
+        self.assertIsNone(result)
+        mock_print_color.assert_any_call("MSR checks unavailable", "🚦")
+
+    @patch("amd_debug.pstate.print_color")
+    @patch("amd_debug.pstate.Context")
+    @patch("amd_debug.pstate.relaunch_sudo")
+    def test_run_cpu_info_failure(
+        self, _mock_relaunch_sudo, _mock_context, mock_print_color
+    ):
+        """run returns False when gather_cpu_info raises FileNotFoundError"""
+        triage = AmdPstateTriage(logging=False)
+        with patch.object(triage, "gather_kernel_info"), \
+             patch.object(triage, "gather_amd_pstate_info"), \
+             patch.object(triage, "gather_scheduler_info"), \
+             patch.object(
+                 triage, "gather_cpu_info", side_effect=FileNotFoundError()
+             ):
+            result = triage.run()
+        self.assertFalse(result)
+        mock_print_color.assert_any_call("Unable to gather CPU information", "❌")
+
+    @patch("amd_debug.pstate.print_color")
+    @patch("amd_debug.pstate.Context")
+    @patch("amd_debug.pstate.relaunch_sudo")
+    def test_run_success(self, _mock_relaunch_sudo, _mock_context, _mock_print_color):
+        """run returns True when all gather steps succeed"""
+        triage = AmdPstateTriage(logging=False)
+        with patch.object(triage, "gather_kernel_info"), \
+             patch.object(triage, "gather_amd_pstate_info"), \
+             patch.object(triage, "gather_scheduler_info"), \
+             patch.object(triage, "gather_cpu_info"), \
+             patch.object(triage, "gather_msrs"):
+            self.assertTrue(triage.run())
+
+
+class TestPstateMain(unittest.TestCase):
+    """Test the pstate module-level main/parse_args helpers"""
+
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    @patch("amd_debug.pstate.sys.argv", ["amd_pstate"])
+    def test_parse_args_no_args_exits(self):
+        """parse_args exits when no arguments provided"""
+        from amd_debug.pstate import parse_args
+        with self.assertRaises(SystemExit):
+            parse_args()
+
+    @patch("amd_debug.pstate.sys.argv", ["amd_pstate", "--version"])
+    def test_parse_args_version(self):
+        """parse_args parses --version"""
+        from amd_debug.pstate import parse_args
+        args = parse_args()
+        self.assertTrue(args.version)
+
+    @patch("amd_debug.pstate.sys.argv", ["amd_pstate", "triage", "--tool-debug"])
+    def test_parse_args_triage(self):
+        """parse_args parses triage subcommand"""
+        from amd_debug.pstate import parse_args
+        args = parse_args()
+        self.assertEqual(args.command, "triage")
+        self.assertTrue(args.tool_debug)
+
+    @patch("amd_debug.pstate.version", return_value="1.2.3")
+    @patch("amd_debug.pstate.parse_args")
+    def test_main_version(self, mock_parse, mock_version):
+        """main prints version and returns None"""
+        from amd_debug.pstate import main
+        mock_parse.return_value = MagicMock(version=True, command=None)
+        self.assertIsNone(main())
+        mock_version.assert_called_once()
+
+    @patch("amd_debug.pstate.show_log_info")
+    @patch("amd_debug.pstate.AmdPstateTriage")
+    @patch("amd_debug.pstate.parse_args")
+    def test_main_triage_success(self, mock_parse, mock_triage_cls, _mock_show):
+        """main returns None when triage succeeds"""
+        from amd_debug.pstate import main
+        mock_parse.return_value = MagicMock(
+            version=False, command="triage", tool_debug=False
+        )
+        mock_triage_cls.return_value.run.return_value = True
+        self.assertIsNone(main())
+
+    @patch("amd_debug.pstate.show_log_info")
+    @patch("amd_debug.pstate.AmdPstateTriage")
+    @patch("amd_debug.pstate.parse_args")
+    def test_main_triage_failure(self, mock_parse, mock_triage_cls, _mock_show):
+        """main returns 1 when triage fails"""
+        from amd_debug.pstate import main
+        mock_parse.return_value = MagicMock(
+            version=False, command="triage", tool_debug=False
+        )
+        mock_triage_cls.return_value.run.return_value = False
+        self.assertEqual(main(), 1)

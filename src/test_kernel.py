@@ -4,12 +4,21 @@
 """
 This module contains unit tests for the kernel log functions in the amd-debug-tools package.
 """
-from unittest.mock import patch, mock_open
+from datetime import datetime
+from unittest.mock import patch, mock_open, MagicMock
 
+import subprocess
 import unittest
 import logging
 
-from amd_debug.kernel import sscanf_bios_args, get_kernel_command_line, DmesgLogger
+from amd_debug.kernel import (
+    sscanf_bios_args,
+    get_kernel_command_line,
+    DmesgLogger,
+    InputFile,
+    KernelLogger,
+    get_kernel_log,
+)
 
 
 class TestKernelLog(unittest.TestCase):
@@ -204,3 +213,155 @@ class TestDmesgLogger(unittest.TestCase):
 
             result = logger.match_pattern(r"nonexistent")
             self.assertEqual(result, "")
+
+    def test_dmesg_logger_seek_refreshes_if_seeked(self):
+        """seek() re-refreshes the buffer if it was previously seeked"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = b"old\n"
+            mock_run.return_value.returncode = 0
+            logger = DmesgLogger()
+            logger.seeked = True
+
+            mock_run.return_value.stdout = b"new\n"
+            logger.seek()
+            self.assertEqual(logger.buffer, "new\n")
+            self.assertFalse(logger.seeked)
+
+    def test_dmesg_logger_seek_noop_if_not_seeked(self):
+        """seek() is a no-op when not seeked"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = b"init\n"
+            mock_run.return_value.returncode = 0
+            logger = DmesgLogger()
+            logger.buffer = "untouched"
+            logger.seeked = False
+            logger.seek()
+            self.assertEqual(logger.buffer, "untouched")
+
+    def test_dmesg_logger_seek_tail_with_time_since_support(self):
+        """seek_tail with timestamp uses --since when supported"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = b"--since supported\n"
+            mock_run.return_value.returncode = 0
+            logger = DmesgLogger()
+            self.assertTrue(logger.since_support)
+
+            mock_run.reset_mock()
+            mock_run.return_value.stdout = b"sliced\n"
+            mock_run.return_value.returncode = 0
+            logger.seek_tail(datetime(2025, 1, 2, 3, 4, 5))
+
+            call_args = mock_run.call_args[0][0]
+            self.assertIn("--time-format=iso", call_args)
+            self.assertTrue(any(a.startswith("--since=") for a in call_args))
+            self.assertEqual(logger.buffer, "sliced\n")
+            self.assertTrue(logger.seeked)
+
+    def test_dmesg_logger_seek_tail_with_time_no_since_support(self):
+        """seek_tail with timestamp but without --since support runs plain dmesg"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = b"no since here\n"
+            mock_run.return_value.returncode = 0
+            logger = DmesgLogger()
+            self.assertFalse(logger.since_support)
+
+            mock_run.return_value.stdout = b"plain\n"
+            logger.seek_tail(datetime(2025, 1, 2, 3, 4, 5))
+            self.assertEqual(logger.buffer, "plain\n")
+            self.assertFalse(logger.seeked)
+
+    def test_dmesg_logger_capture_header(self):
+        """capture_header returns the first line"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = b"first\nsecond\n"
+            mock_run.return_value.returncode = 0
+            logger = DmesgLogger()
+            self.assertEqual(logger.capture_header(), "first")
+
+    def test_dmesg_logger_get_full_log(self):
+        """get_full_log returns the buffer"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stdout = b"a\nb\n"
+            mock_run.return_value.returncode = 0
+            logger = DmesgLogger()
+            self.assertEqual(logger.get_full_log(), "a\nb\n")
+
+
+class TestKernelLoggerBase(unittest.TestCase):
+    """Test the KernelLogger base class default implementations"""
+
+    def test_base_methods_return_defaults(self):
+        logger = KernelLogger()
+        self.assertIsNone(logger.seek())
+        self.assertIsNone(logger.seek_tail())
+        self.assertIsNone(logger.process_callback(lambda x, p: None))
+        self.assertEqual(logger.match_line(["foo"]), "")
+        self.assertEqual(logger.match_pattern("foo"), "")
+        self.assertEqual(logger.get_full_log(), "")
+
+
+class TestInputFile(unittest.TestCase):
+    """Test the InputFile kernel logger"""
+
+    @patch("amd_debug.kernel.read_file", return_value="alpha\nbeta\n")
+    def test_input_file_init_and_full_log(self, _mock_read):
+        f = InputFile("/path/to/log")
+        self.assertEqual(f.get_full_log(), "alpha\nbeta\n")
+        self.assertFalse(f.since_support)
+
+    @patch("amd_debug.kernel.read_file", return_value="alpha\nbeta")
+    def test_input_file_process_callback(self, _mock_read):
+        f = InputFile("/path/to/log")
+        cb = MagicMock()
+        f.process_callback(cb, priority=3)
+        cb.assert_any_call("alpha", 3)
+        cb.assert_any_call("beta", 3)
+
+
+class TestSscanfBiosArgsEdge(unittest.TestCase):
+    """Edge cases for sscanf_bios_args"""
+
+    def test_ex_trace_args_no_separator(self):
+        """ex_trace_args without ': ' separator returns None"""
+        self.assertIsNone(sscanf_bios_args("ex_trace_args nothing"))
+
+    def test_ex_trace_args_no_format_string(self):
+        """ex_trace_args present but no quoted format -> True"""
+        self.assertTrue(sscanf_bios_args("ex_trace_args: nonquoted stuff"))
+
+    def test_ex_trace_args_bad_hex(self):
+        """Non-hex argument value returns None"""
+        line = 'ex_trace_args: "value: %x", notHex'
+        self.assertIsNone(sscanf_bios_args(line))
+
+    def test_ev_queue_notify_no_separator(self):
+        """ev_queue_notify_reques without ': ' returns None"""
+        self.assertIsNone(sscanf_bios_args("ev_queue_notify_reques nothing"))
+
+
+class TestGetKernelLog(unittest.TestCase):
+    """Test get_kernel_log provider selection"""
+
+    @patch("amd_debug.kernel.read_file", return_value="x")
+    def test_input_file_branch(self, _mock_read):
+        log = get_kernel_log(input_file="/tmp/file")
+        self.assertIsInstance(log, InputFile)
+
+    @patch("amd_debug.kernel.systemd_in_use", return_value=False)
+    @patch("amd_debug.kernel.subprocess.run")
+    def test_dmesg_branch(self, mock_run, _mock_systemd):
+        mock_run.return_value.stdout = b""
+        mock_run.return_value.returncode = 0
+        log = get_kernel_log()
+        self.assertIsInstance(log, DmesgLogger)
+
+    @patch("amd_debug.kernel.fatal_error")
+    @patch("amd_debug.kernel.systemd_in_use", return_value=False)
+    @patch(
+        "amd_debug.kernel.subprocess.run",
+        side_effect=subprocess.CalledProcessError(1, "dmesg"),
+    )
+    def test_dmesg_failure_falls_back(self, _mock_run, _mock_systemd, mock_fatal):
+        log = get_kernel_log()
+        self.assertIsInstance(log, KernelLogger)
+        mock_fatal.assert_called_once()
