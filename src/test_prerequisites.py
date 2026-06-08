@@ -98,6 +98,131 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertFalse(result)
         self.assertTrue(any(isinstance(f, AmdHsmpBug) for f in self.validator.failures))
 
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_amd_xdna_no_driver(self, mock_exists):
+        """Test check_amd_xdna when driver is not loaded"""
+        mock_exists.return_value = False
+        result = self.validator.check_amd_xdna()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_amd_xdna_no_iommu(self, mock_exists):
+        """Test check_amd_xdna when IOMMU is disabled"""
+        mock_exists.side_effect = lambda p: True if "amdxdna" in p else False
+
+        def mock_list_devices(**kwargs):
+            if kwargs.get("subsystem") == "iommu":
+                return []
+            if kwargs.get("subsystem") == "pci":
+                return [
+                    MagicMock(
+                        properties={
+                            "PCI_SLOT_NAME": "0000:01:00.0",
+                            "PCI_ID": "1022:1234",
+                            "DRIVER": "amdxdna",
+                        }
+                    )
+                ]
+            return []
+
+        self.mock_pyudev.list_devices.side_effect = mock_list_devices
+
+        result = self.validator.check_amd_xdna()
+        self.assertFalse(result)
+        self.assertTrue(any(isinstance(f, NpuIommu) for f in self.validator.failures))
+        self.mock_db.record_prereq.assert_called_with(
+            "NPU is not supported with IOMMU disabled", "❌"
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_amd_xdna_missing_driver(self, mock_exists):
+        """Test check_amd_xdna when NPU is found but no driver is bound"""
+        mock_exists.side_effect = lambda p: True if "amdxdna" in p else False
+
+        def mock_list_devices(**kwargs):
+            if kwargs.get("subsystem") == "iommu":
+                return [MagicMock()]
+            if kwargs.get("subsystem") == "pci":
+                return [
+                    MagicMock(
+                        properties={
+                            "PCI_SLOT_NAME": "0000:01:00.0",
+                            "PCI_ID": "1022:1234",
+                            "DRIVER": None,
+                        }
+                    )
+                ]
+            return []
+
+        self.mock_pyudev.list_devices.side_effect = mock_list_devices
+
+        result = self.validator.check_amd_xdna()
+        self.assertTrue(result)
+        self.assertTrue(
+            any(isinstance(f, MissingDriver) for f in self.validator.failures)
+        )
+        self.mock_db.record_prereq.assert_called_with(
+            "NPU device in 0000:01:00.0 didn't bind a driver", "🚦"
+        )
+
+    @patch("amd_debug.prerequisites.read_file")
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_amd_xdna_success(self, mock_exists, mock_read_file):
+        """Test check_amd_xdna when driver is loaded, NPU is bound, and IOMMU is enabled"""
+        mock_exists.side_effect = lambda p: True
+        mock_read_file.return_value = "1.0.0"
+
+        def mock_list_devices(**kwargs):
+            if kwargs.get("subsystem") == "iommu":
+                return [MagicMock()]
+            if kwargs.get("subsystem") == "pci":
+                return [
+                    MagicMock(
+                        sys_path="/sys/devices/pci",
+                        properties={
+                            "PCI_SLOT_NAME": "0000:01:00.0",
+                            "PCI_ID": "1022:1234",
+                            "DRIVER": "amdxdna",
+                        },
+                    )
+                ]
+            return []
+
+        self.mock_pyudev.list_devices.side_effect = mock_list_devices
+
+        result = self.validator.check_amd_xdna()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "NPU loaded with firmware 1.0.0", "✅"
+        )
+
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_amd_xdna_non_amd(self, mock_exists):
+        """Test check_amd_xdna when the NPU is not an AMD device"""
+        mock_exists.side_effect = lambda p: True if "amdxdna" in p else False
+
+        def mock_list_devices(**kwargs):
+            if kwargs.get("subsystem") == "iommu":
+                return [MagicMock()]
+            if kwargs.get("subsystem") == "pci":
+                return [
+                    MagicMock(
+                        properties={
+                            "PCI_SLOT_NAME": "0000:01:00.0",
+                            "PCI_ID": "8086:abcd",
+                            "DRIVER": "amdxdna",
+                        }
+                    )
+                ]
+            return []
+
+        self.mock_pyudev.list_devices.side_effect = mock_list_devices
+
+        result = self.validator.check_amd_xdna()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_not_called()
+
     def test_check_amd_pmc_no_driver(self):
         """Test check_amd_pmc with no driver"""
         self.mock_pyudev.list_devices.return_value = []
