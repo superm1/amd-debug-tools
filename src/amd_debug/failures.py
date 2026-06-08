@@ -653,3 +653,15 @@ class MissingAmdCaptureModule(S0i3Failure):
             "If the module is not available, disable the camera in the BIOS to prevent issues."
         )
         self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/4869"
+
+
+class NpuIommu(S0i3Failure):
+    """IOMMU configuration incompatible with NPU"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "IOMMU configuration incompatible with NPU"
+        self.explanation = (
+            "The NPU requires a properly configured IOMMU to function correctly. "
+            "Ensure that the IOMMU is enabled and configured in the BIOS."
+        )

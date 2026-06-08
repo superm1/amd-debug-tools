@@ -67,6 +67,7 @@ from amd_debug.failures import (
     MissingThunderbolt,
     MissingXhciHcd,
     MSRFailure,
+    NpuIommu,
     RogAllyMcuPowerSave,
     RogAllyOldMcu,
     SleepModeWrong,
@@ -343,21 +344,39 @@ class PrerequisiteValidator(AmdTool):
 
     def check_amd_xdna(self):
         """Check for AMD XDNA driver"""
+        amdxdna_path = os.path.join("/", "sys", "module", "amdxdna")
+        driver_loaded = os.path.exists(amdxdna_path)
+        # No driver loaded means HW should be power gated, should be OK.
+        if not driver_loaded:
+            return True
+
+        # IOMMU disabled can cause problems with the NPU
+        found_iommu = False
+        for _dev in self.pyudev.list_devices(subsystem="iommu"):
+            found_iommu = True
+            break
         for device in self.pyudev.list_devices(subsystem="pci", PCI_CLASS="118000"):
             slot = device.properties["PCI_SLOT_NAME"]
             driver = device.properties.get("DRIVER")
             pci_id = device.properties.get("PCI_ID")
             if not pci_id.startswith("1022"):
                 continue
-            if not driver:
-                self.db.record_prereq(f"NPU device in {slot} missing driver", "🚦")
-                self.failures += [MissingDriver(slot)]
             p = os.path.join(device.sys_path, "fw_version")
             if os.path.exists(p):
                 xdna_fw_version = read_file(p)
                 self.db.record_prereq(
                     f"NPU loaded with firmware {xdna_fw_version}", "✅"
                 )
+            if not found_iommu and driver:
+                self.db.record_prereq("NPU is not supported with IOMMU disabled", "❌")
+                self.failures += [NpuIommu()]
+                return False
+            if not driver:
+                self.db.record_prereq(
+                    f"NPU device in {slot} didn't bind a driver", "🚦"
+                )
+                self.failures += [MissingDriver(slot)]
+
         return True
 
     def check_amd_hsmp(self):
