@@ -717,6 +717,31 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "Unable to check CPU topology: cpuid kernel module not loaded", "❌"
         )
 
+    @patch("amd_debug.prerequisites.subprocess.run")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("amd_debug.prerequisites.read_file")
+    @patch("amd_debug.prerequisites.os.path.exists")
+    def test_check_cpu_loads_cpuid_module(
+        self, mock_path_exists, mock_read_file, mock_file_open, mock_run
+    ):
+        """Test read_cpuid loads the cpuid module via an absolute path and no shell"""
+        self.validator.cpu_family = 0x19
+        self.validator.cpu_model = 0x74
+        mock_read_file.return_value = "31"  # kernel_max = 31 (32 cores)
+        # cpuid device node missing so the module load path is exercised
+        mock_path_exists.return_value = False
+        mock_file_open.return_value.read.side_effect = [
+            struct.pack("4I", 0, 0, 0x100, 0),  # subleaf 0: level_type = 1
+            struct.pack("4I", 0, 0, 0x400, 0),  # subleaf 1: level_type = 4 (socket)
+            struct.pack("4I", 0, 16, 0, 0),  # subleaf 1: cpu_count = 16
+        ]
+        result = self.validator.check_cpu()
+        self.assertTrue(result)
+        mock_run.assert_any_call(["/sbin/modprobe", "cpuid"], check=False)
+        # ensure the module load never went through a shell
+        for _, kwargs in mock_run.call_args_list:
+            self.assertNotIn("shell", kwargs)
+
     @patch("builtins.open", side_effect=PermissionError)
     @patch("amd_debug.prerequisites.read_file")
     @patch("amd_debug.prerequisites.os.path.exists")
