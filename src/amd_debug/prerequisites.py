@@ -20,7 +20,13 @@ import pyudev
 
 from amd_debug.wake import WakeIRQ
 from amd_debug.display import Display
-from amd_debug.kernel import get_kernel_log, SystemdLogger, CySystemdLogger, DmesgLogger
+from amd_debug.kernel import (
+    get_kernel_log,
+    redact_sensitive,
+    SystemdLogger,
+    CySystemdLogger,
+    DmesgLogger,
+)
 from amd_debug.common import (
     apply_prefix_wrapper,
     BIT,
@@ -1451,7 +1457,7 @@ class PrerequisiteValidator(AmdTool):
                 result = False
         if not result:
             self.db.record_prereq(Headers.BrokenPrerequisites, "🚫")
-            self.db.record_debug(self.kernel_log.get_full_log())
+            self.db.record_debug(redact_sensitive(self.kernel_log.get_full_log()))
         self.db.sync()
         clear_temporary_message(len(msg))
         return result
