@@ -128,6 +128,13 @@ def sscanf_bios_args(line):
                 else:
                     break
 
+            # Reject unexpected conversions or oversized field widths from
+            # untrusted firmware-supplied format strings.
+            if re.search(r"%(?![xXdD%])", format_string) or re.search(
+                r"%\d{4,}", format_string
+            ):
+                return None
+
             try:
                 return format_string % tuple(converted_args)
             except TypeError:

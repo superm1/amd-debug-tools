@@ -338,6 +338,21 @@ class TestSscanfBiosArgsEdge(unittest.TestCase):
         """ev_queue_notify_reques without ': ' returns None"""
         self.assertIsNone(sscanf_bios_args("ev_queue_notify_reques nothing"))
 
+    def test_ex_trace_args_oversized_width(self):
+        """An oversized field width is rejected instead of allocating memory"""
+        line = 'ex_trace_args: "%2147483646d", 1, 0, 0, 0, 0, 0'
+        self.assertIsNone(sscanf_bios_args(line))
+
+    def test_ex_trace_args_unexpected_conversion(self):
+        """A conversion outside the whitelist is rejected"""
+        line = 'ex_trace_args: "value: %s", 1, 0, 0, 0, 0, 0'
+        self.assertIsNone(sscanf_bios_args(line))
+
+    def test_ex_trace_args_valid_conversion(self):
+        """A whitelisted conversion is still applied normally"""
+        line = 'ex_trace_args: "%x", 1234'
+        self.assertEqual(sscanf_bios_args(line), "1234")
+
 
 class TestGetKernelLog(unittest.TestCase):
     """Test get_kernel_log provider selection"""
