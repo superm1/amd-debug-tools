@@ -492,6 +492,42 @@ class TestWakeIRQ(unittest.TestCase):
         irq = WakeIRQ(80)
         self.assertEqual(irq.name, "")
 
+    @patch("amd_debug.wake.read_file")
+    @patch("os.path.exists")
+    @patch("os.listdir")
+    @patch("os.walk")
+    def test_wake_irq_acpi_path_traversal(
+        self, mock_os_walk, mock_os_listdir, mock_os_path_exists, mock_read_file
+    ):
+        """A traversal sequence in actions must not escape the ACPI device dir"""
+        mock_read_file.side_effect = lambda path: {
+            "/sys/kernel/irq/82/chip_name": "",
+            "/sys/kernel/irq/82/actions": "../../foo",
+            "/sys/kernel/irq/82/wakeup": "enabled",
+        }.get(path, "")
+
+        checked = []
+
+        def exists_side_effect(path):
+            checked.append(path)
+            return False
+
+        mock_os_path_exists.side_effect = exists_side_effect
+
+        irq = WakeIRQ(82)
+
+        # The action name must be reduced to its basename before being joined
+        # under the ACPI devices directory, so no ".." component is ever used.
+        acpi_checks = [
+            p for p in checked if p.startswith("/sys/bus/acpi/devices")
+        ]
+        self.assertIn("/sys/bus/acpi/devices/foo", acpi_checks)
+        for p in acpi_checks:
+            self.assertNotIn("..", p)
+        # os.walk must never run since the sanitised path does not exist.
+        mock_os_walk.assert_not_called()
+        self.assertEqual(irq.name, "")
+
     def test_wake_irq_str(self):
         """Test __str__ of WakeIRQ"""
         with patch("amd_debug.wake.read_file", side_effect=FileNotFoundError()), \

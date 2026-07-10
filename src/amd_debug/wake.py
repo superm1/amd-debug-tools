@@ -75,29 +75,36 @@ class WakeIRQ:
 
         # "might" look like an ACPI device, try to follow it
         if not self.name and self.actions:
-            p = os.path.join("/", "sys", "bus", "acpi", "devices", self.actions)
-            if os.path.exists(p):
-                for directory in os.listdir(p):
-                    if "physical_node" not in directory:
-                        continue
+            # self.actions is a free-form string supplied to request_irq() by
+            # the kernel, so restrict it to a single path component to avoid
+            # escaping the ACPI device directory via "/" or "..".
+            comp = os.path.basename(self.actions)
+            if comp and comp not in (".", ".."):
+                p = os.path.join("/", "sys", "bus", "acpi", "devices", comp)
+                if os.path.exists(p):
+                    for directory in os.listdir(p):
+                        if "physical_node" not in directory:
+                            continue
 
-                    for root, _dirs, files in os.walk(
-                        os.path.join(p, directory), followlinks=True
-                    ):
-                        if "name" in files:
-                            try:
-                                self.name = read_file(os.path.join(root, "name"))
-                            except (PermissionError, FileNotFoundError):
-                                pass
-                            t = os.path.join(root, "driver")
-                            if os.path.exists(t):
+                        for root, _dirs, files in os.walk(
+                            os.path.join(p, directory), followlinks=False
+                        ):
+                            if "name" in files:
                                 try:
-                                    self.driver = os.path.basename(os.readlink(t))
-                                except (PermissionError, FileNotFoundError, OSError):
+                                    self.name = read_file(os.path.join(root, "name"))
+                                except (PermissionError, FileNotFoundError):
                                     pass
+                                t = os.path.join(root, "driver")
+                                if os.path.exists(t):
+                                    try:
+                                        self.driver = os.path.basename(
+                                            os.readlink(t)
+                                        )
+                                    except (PermissionError, FileNotFoundError, OSError):
+                                        pass
+                                break
+                        if self.name:
                             break
-                    if self.name:
-                        break
 
         # If the name isn't descriptive try to guess further
         if self.driver and self.actions == self.name:
