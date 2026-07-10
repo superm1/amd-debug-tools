@@ -5,15 +5,21 @@
 This module contains unit tests for the validator functions in the amd-debug-tools package.
 """
 
-from unittest.mock import patch, mock_open, Mock
+from unittest.mock import patch, mock_open, Mock, MagicMock
 
 import os
 import logging
+import subprocess
 import unittest
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from amd_debug.validator import pm_debugging, soc_needs_irq1_wa, SleepValidator
+from amd_debug.validator import (
+    pm_debugging,
+    soc_needs_irq1_wa,
+    SleepValidator,
+    toggle_pm_debug,
+)
 
 
 class TestValidatorHelpers(unittest.TestCase):
@@ -890,3 +896,309 @@ class TestValidator(unittest.TestCase):
             mock_write.assert_called_once_with(99, b"resume")
             mock_close.assert_called_once_with(99)
             mock_record_cycle_data.assert_called_once()
+
+    def test_toggle_pm_debug(self):
+        """toggle_pm_debug opens and writes '1' or '0'"""
+        m = mock_open()
+        with patch("amd_debug.validator.open", m, create=True):
+            toggle_pm_debug(True)
+            m().write.assert_called_with("1")
+        m = mock_open()
+        with patch("amd_debug.validator.open", m, create=True):
+            toggle_pm_debug(False)
+            m().write.assert_called_with("0")
+
+    def test_capture_running_compositors_skips_missing_exe(self):
+        """capture_running_compositors skips processes without exe link"""
+        with patch("glob.glob", return_value=["/proc/100", "/proc/200"]), patch(
+            "os.path.exists", side_effect=lambda p: p == "/proc/200/exe"
+        ), patch("os.readlink", return_value="/usr/bin/hyprland"), patch.object(
+            self.validator.db, "record_debug"
+        ) as mock_record:
+            self.validator.capture_running_compositors()
+            mock_record.assert_called_once_with("hyprland compositor is running")
+
+    def test_capture_power_profile_called_process_error(self):
+        """capture_power_profile records debug on CalledProcessError"""
+        err = subprocess.CalledProcessError(1, "powerprofilesctl", output=b"oops")
+        with patch("os.path.exists", return_value=True), patch(
+            "subprocess.check_output", side_effect=err
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
+            self.validator.capture_power_profile()
+            mock_record.assert_called_once()
+            self.assertIn("Failed to run", mock_record.call_args[0][0])
+
+    def test_capture_power_rails_empty(self):
+        """capture_power_rails returns early when no rails detected"""
+        self.validator.power_rails.rails = []
+        with patch.object(
+            self.validator.db, "record_power_rail_energy"
+        ) as mock_record:
+            self.validator.capture_power_rails()
+            mock_record.assert_not_called()
+
+    def test_capture_power_rails_oserror(self):
+        """capture_power_rails records debug when rail read raises OSError"""
+        rail = MagicMock(label="VDDCR_CPU", energy_scale=1.0)
+        rail.read_energy_raw.side_effect = OSError("nope")
+        self.validator.power_rails.rails = [rail]
+        with patch.object(self.validator.db, "record_debug") as mock_record:
+            self.validator.capture_power_rails()
+            mock_record.assert_called_once()
+            self.assertIn("Failed to read VDDCR_CPU", mock_record.call_args[0][0])
+
+    def test_check_gpes_tracks_changes(self):
+        """check_gpes reads gpe files and reports increases"""
+        # populate prior counts so a change is detected
+        self.validator.gpes = {"gpe01": 1}
+        m = mock_open(read_data="2")
+        with patch(
+            "os.walk",
+            return_value=[("/sys/firmware/acpi/interrupts", [], ["gpe01", "gpe_all", "irq"])],
+        ), patch("amd_debug.validator.open", m, create=True), patch.object(
+            self.validator.db, "record_debug"
+        ) as mock_record:
+            self.validator.check_gpes()
+        mock_record.assert_called_once()
+        self.assertIn("gpe01 increased from 1 to 2", mock_record.call_args[0][0])
+        self.assertEqual(self.validator.gpes["gpe01"], 2)
+
+    def test_capture_wakeup_irq_data_oserror(self):
+        """capture_wakeup_irq_data silently handles OSError"""
+        with patch(
+            "amd_debug.validator.read_file", side_effect=OSError("no irq")
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
+            self.assertTrue(self.validator.capture_wakeup_irq_data())
+            mock_record.assert_not_called()
+
+    def test_capture_thermal_no_devices(self):
+        """capture_thermal returns early when no thermal devs found"""
+        with patch.object(
+            self.validator.pyudev, "list_devices", return_value=[]
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
+            self.assertIsNone(self.validator.capture_thermal())
+            mock_record.assert_not_called()
+
+    def test_capture_thermal_past_trip(self):
+        """capture_thermal records prereq when above trip point"""
+        dev = MagicMock(
+            device_path="/devices/LNXTHERM:01", sys_path="/sys/devices/LNXTHERM:01"
+        )
+        with patch.object(self.validator.pyudev, "list_devices", return_value=[dev]), \
+             patch(
+                 "amd_debug.validator.read_file",
+                 side_effect=["90000", "critical", "50000"],
+             ), \
+             patch("os.listdir", return_value=["trip_point_0_type", "trip_point_0_temp"]), \
+             patch.object(self.validator.db, "record_debug"), \
+             patch.object(self.validator.db, "record_prereq") as mock_prereq:
+            result = self.validator.capture_thermal()
+        self.assertFalse(result)
+        mock_prereq.assert_called_once()
+
+    def test_capture_input_wakeup_count_walks_parents(self):
+        """capture_input_wakeup_count walks parent devices to find wakeup_count"""
+        parent = MagicMock(sys_path="/sys/devices/usb1")
+        parent.parent = None
+        child = MagicMock(sys_path="/sys/devices/input0")
+        child.parent = parent
+
+        def _exists(path):
+            return path.startswith("/sys/devices/usb1/")
+
+        with patch.object(
+            self.validator.pyudev, "list_devices", return_value=[child]
+        ), patch("os.path.exists", side_effect=_exists), patch(
+            "amd_debug.validator.read_file", return_value="7"
+        ):
+            self.validator.capture_input_wakeup_count()
+        self.assertEqual(self.validator.wakeup_count, {"/sys/devices/usb1": "7"})
+
+    def test_capture_input_wakeup_count_no_change(self):
+        """Unchanged wakeup_count does not produce a debug record"""
+        child = MagicMock(sys_path="/sys/devices/input0")
+        child.parent = None
+        with patch.object(
+            self.validator.pyudev, "list_devices", return_value=[child]
+        ), patch("os.path.exists", return_value=True), patch(
+            "amd_debug.validator.read_file", return_value="5"
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
+            self.validator.wakeup_count = {"/sys/devices/input0": "5"}
+            self.validator.capture_input_wakeup_count()
+            mock_record.assert_not_called()
+
+    def test_capture_command_line(self):
+        """capture_command_line records the kernel command line"""
+        with patch(
+            "amd_debug.validator.get_kernel_command_line", return_value="quiet x=1"
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
+            self.validator.capture_command_line()
+            mock_record.assert_called_once_with("/proc/cmdline: quiet x=1")
+
+    def test_analyze_kernel_log_line_bios_returns_early(self):
+        """sscanf_bios_args returning True (no string) short-circuits debug log"""
+        with patch(
+            "amd_debug.validator.sscanf_bios_args", return_value=True
+        ), patch.object(self.validator.db, "record_debug") as mock_record:
+            # pylint: disable=protected-access
+            self.validator._analyze_kernel_log_line("ex_trace_point: stuff", 6)
+            mock_record.assert_not_called()
+
+    def test_analyze_kernel_log_line_branches(self):
+        """Cover all branch arms in _analyze_kernel_log_line"""
+        with patch.object(self.validator.db, "record_debug"):
+            # _DSM AMD (no Microsoft GUID)
+            self.validator._analyze_kernel_log_line(  # pylint: disable=protected-access
+                "ACPI: _DSM function 0 invoked", 7
+            )
+            self.assertTrue(self.validator.upep)
+            self.assertFalse(self.validator.upep_microsoft)
+            # _DSM Microsoft
+            self.validator._analyze_kernel_log_line(  # pylint: disable=protected-access
+                "ACPI: _DSM function 7 invoked", 7
+            )
+            self.assertTrue(self.validator.upep_microsoft)
+            # Last suspend in deepest state
+            self.validator._analyze_kernel_log_line(  # pylint: disable=protected-access
+                "Last suspend in deepest state for 1500000us", 7
+            )
+            self.assertGreater(self.validator.hw_sleep_duration, 1.4)
+            # SMU idlemask
+            self.validator._analyze_kernel_log_line(  # pylint: disable=protected-access
+                "SMU idlemask s0i3 0xabc", 7
+            )
+            self.assertIn("0xabc", self.validator.idle_masks)
+            # GPIO active
+            self.validator._analyze_kernel_log_line(  # pylint: disable=protected-access
+                "GPIO 42 is active", 7
+            )
+            self.assertIn("42", self.validator.active_gpios)
+            # IRQ1 workaround marker
+            from amd_debug.validator import Headers as VH
+            self.validator._analyze_kernel_log_line(VH.Irq1Workaround, 7)  # pylint: disable=protected-access
+            self.assertTrue(self.validator.irq1_workaround)
+            # Successfully transitioned (AMD GUID)
+            self.validator._analyze_kernel_log_line(  # pylint: disable=protected-access
+                "Successfully transitioned to state foo", 7
+            )
+
+    def test_analyze_kernel_log_idle_mask_bit_change(self):
+        """analyze_kernel_log records idle mask bit changes"""
+        self.validator.idle_masks = ["0x3", "0x1"]  # bit 1 cleared
+        with patch.object(
+            self.validator.kernel_log, "process_callback"
+        ), patch.object(self.validator.db, "record_debug") as mock_record, patch.object(
+            self.validator.db, "record_cycle_data"
+        ):
+            self.validator.analyze_kernel_log()
+        # bit 1 changed (0x2)
+        self.assertTrue(
+            any("Idle mask bit 1" in c.args[0] for c in mock_record.call_args_list)
+        )
+
+    def test_analyze_kernel_log_irq1_workaround_used(self):
+        """IRQ1 in wakeup with workaround marker records the workaround note"""
+        self.validator.cpu_family = 0x17
+        self.validator.cpu_model = 0x68
+        self.validator.smu_version = "1.0.0"
+        self.validator.wakeup_irqs = [1]
+        self.validator.irq1_workaround = True
+        with patch.object(self.validator.kernel_log, "process_callback"), patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_record_cycle, patch.object(self.validator.db, "record_debug"):
+            self.validator.analyze_kernel_log()
+        self.assertTrue(
+            any(
+                "Kernel workaround for IRQ1" in c.args[0]
+                for c in mock_record_cycle.call_args_list
+            )
+        )
+
+    def test_analyze_kernel_log_irq1_no_workaround(self):
+        """IRQ1 in wakeup without workaround appends Irq1Workaround failure"""
+        self.validator.cpu_family = 0x17
+        self.validator.cpu_model = 0x68
+        self.validator.smu_version = "1.0.0"
+        self.validator.wakeup_irqs = [1]
+        self.validator.irq1_workaround = False
+        before = len(self.validator.failures)
+        with patch.object(self.validator.kernel_log, "process_callback"), patch.object(
+            self.validator.db, "record_cycle_data"
+        ), patch.object(self.validator.db, "record_debug"):
+            self.validator.analyze_kernel_log()
+        self.assertEqual(len(self.validator.failures), before + 1)
+
+    @patch("amd_debug.validator.print_color")
+    def test_analyze_duration_short_success(self, mock_print):
+        """Userspace duration above minimum, short cycle skips hw% check"""
+        t0 = datetime(2025, 1, 1, 0, 0, 0)
+        t1 = t0 + timedelta(seconds=20)
+        # requested=10 -> min=9s; userspace=20s ok; <60s -> symbol is always ✅
+        self.validator.analyze_duration(t0, t1, 10, kernel=15, hw=10)
+        # No SpuriousWakeup or LowHardwareSleepResidency failure
+        self.assertEqual(self.validator.failures, [])
+        self.assertTrue(mock_print.called)
+
+    @patch("amd_debug.validator.print_color")
+    def test_analyze_duration_spurious(self, _mock_print):
+        """Userspace woke too early -> SpuriousWakeup recorded"""
+        from amd_debug.failures import SpuriousWakeup
+        t0 = datetime(2025, 1, 1, 0, 0, 0)
+        t1 = t0 + timedelta(seconds=1)
+        self.validator.failures = []
+        self.validator.analyze_duration(t0, t1, requested=10, kernel=1, hw=0)
+        self.assertTrue(
+            any(isinstance(f, SpuriousWakeup) for f in self.validator.failures)
+        )
+
+    @patch("amd_debug.validator.print_color")
+    def test_analyze_duration_low_hw_residency(self, _mock_print):
+        """Long cycle with low hw% -> LowHardwareSleepResidency recorded"""
+        from amd_debug.failures import LowHardwareSleepResidency
+        t0 = datetime(2025, 1, 1, 0, 0, 0)
+        t1 = t0 + timedelta(seconds=120)
+        self.validator.failures = []
+        self.validator.analyze_duration(t0, t1, requested=60, kernel=110, hw=10)
+        self.assertTrue(
+            any(
+                isinstance(f, LowHardwareSleepResidency)
+                for f in self.validator.failures
+            )
+        )
+
+    def test_unlock_session_no_logind(self):
+        """unlock_session with logind=False short-circuits to True"""
+        self.validator.logind = False
+        self.assertTrue(self.validator.unlock_session())
+
+    def test_systemd_pre_hook(self):
+        """systemd_pre_hook calls prep, sync, and enables pm_debug"""
+        with patch.object(self.validator, "prep") as mock_prep, patch.object(
+            self.validator.db, "sync"
+        ) as mock_sync, patch(
+            "amd_debug.validator.toggle_pm_debug"
+        ) as mock_toggle:
+            self.validator.systemd_pre_hook()
+            mock_prep.assert_called_once()
+            mock_sync.assert_called_once()
+            mock_toggle.assert_called_once_with(True)
+
+    def test_systemd_post_hook(self):
+        """systemd_post_hook restores state and runs post-processing"""
+        with patch.object(self.validator, "post") as mock_post, patch.object(
+            self.validator.db, "sync"
+        ) as mock_sync, patch.object(
+            self.validator.db, "get_last_cycle", return_value=("20250101000000",)
+        ), patch.object(
+            self.validator.db, "start_cycle"
+        ) as mock_start_cycle, patch.object(
+            self.validator.kernel_log, "seek_tail"
+        ) as mock_seek_tail, patch(
+            "amd_debug.validator.toggle_pm_debug"
+        ) as mock_toggle:
+            self.validator.systemd_post_hook()
+            mock_toggle.assert_called_once_with(False)
+            mock_seek_tail.assert_called_once()
+            mock_start_cycle.assert_called_once()
+            mock_post.assert_called_once()
+            mock_sync.assert_called_once()

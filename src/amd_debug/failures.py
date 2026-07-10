@@ -441,7 +441,7 @@ class LowHardwareSleepResidency(S0i3Failure):
         super().__init__()
         self.description = "System had low hardware sleep residency"
         self.explanation = (
-            f"The system was asleep for {timedelta(seconds=duration)}, but only spent {percent/100:.2%} "
+            f"The system was asleep for {duration}, but only spent {percent:.2%} "
             "of this time in a hardware sleep state.  In sleep cycles that are at least "
             "60 seconds long it's expected you spend above 90 percent of the cycle in "
             "hardware sleep."
@@ -653,3 +653,15 @@ class MissingAmdCaptureModule(S0i3Failure):
             "If the module is not available, disable the camera in the BIOS to prevent issues."
         )
         self.url = "https://gitlab.freedesktop.org/drm/amd/-/issues/4869"
+
+
+class NpuIommu(S0i3Failure):
+    """IOMMU configuration incompatible with NPU"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "IOMMU configuration incompatible with NPU"
+        self.explanation = (
+            "The NPU requires a properly configured IOMMU to function correctly. "
+            "Ensure that the IOMMU is enabled and configured in the BIOS."
+        )

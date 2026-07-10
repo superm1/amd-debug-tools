@@ -94,6 +94,30 @@ def get_kernel_command_line() -> str:
     return " ".join([x for x in cmdline.split() if not x.startswith(tuple(filtered))])
 
 
+def redact_sensitive(text: str) -> str:
+    """Redact high-confidence sensitive tokens from captured log text.
+
+    Only obviously-sensitive patterns are scrubbed so that the remaining
+    content keeps its diagnostic value:
+      - MAC addresses
+      - UUIDs (e.g. LUKS/filesystem identifiers)
+      - key/secret/password/token assignments
+    """
+    text = re.sub(r"([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", "<redacted-mac>", text)
+    text = re.sub(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+        r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        "<redacted-uuid>",
+        text,
+    )
+    text = re.sub(
+        r"(?i)\b(key|secret|password|passwd|token)=\S+",
+        r"\1=<redacted>",
+        text,
+    )
+    return text
+
+
 def sscanf_bios_args(line):
     """Extracts the format string and arguments from a BIOS trace line"""
     if re.search(r"ex_trace_point", line):
@@ -127,6 +151,13 @@ def sscanf_bios_args(line):
                     arg_index += 1
                 else:
                     break
+
+            # Reject unexpected conversions or oversized field widths from
+            # untrusted firmware-supplied format strings.
+            if re.search(r"%(?![xXdD%])", format_string) or re.search(
+                r"%\d{4,}", format_string
+            ):
+                return None
 
             try:
                 return format_string % tuple(converted_args)

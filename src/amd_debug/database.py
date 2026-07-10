@@ -44,12 +44,8 @@ class SleepDatabase:
         self.debug_cnt = 0
 
         if not dbf:
-            # if we were packaged we would have a directory in /var/lib
             path = os.path.join("/", "var", "lib", "amd-s2idle")
-            if not os.path.exists(path):
-                path = os.path.join("/", "var", "local", "lib", "amd-s2idle")
-            os.makedirs(path, exist_ok=True)
-
+            os.makedirs(path, mode=0o700, exist_ok=True)
             dbf = os.path.join(path, "data.db")
         new = not os.path.exists(dbf)
         self.db = sqlite3.connect(dbf)

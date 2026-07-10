@@ -25,6 +25,25 @@ from amd_debug.common import (
     print_temporary_message,
 )
 
+def confirm_overwrite_report(fname) -> bool:
+    """If fname exists, prompt to overwrite. Returns True if writing can proceed."""
+    if not fname or not os.path.lexists(fname):
+        return True
+    response = (
+        input(f"Report file already exists: {fname}. Overwrite? (y/n): ")
+        .strip()
+        .lower()
+    )
+    if response != "y":
+        return False
+    try:
+        os.unlink(fname)
+    except OSError as e:
+        print(f"Failed to remove existing report file {fname}: {e}")
+        return False
+    return True
+
+
 from amd_debug.failures import (
     SpuriousWakeup,
     LowHardwareSleepResidency,
@@ -173,8 +192,8 @@ class SleepReport(AmdTool):
             if e0 is None or e1 is None:
                 continue
 
-            # Calculate energy in Joules and average power in Watts
-            energy_j = (e1 - e0) * scale
+            # pac194x/5x reports raw*scale in mW-seconds (millijoules)
+            energy_j = (e1 - e0) * scale / 1000.0
             power_w = energy_j / duration
             total_power += power_w
             has_valid_data = True
@@ -208,8 +227,7 @@ class SleepReport(AmdTool):
                 (self.df["b1"] - self.df["b0"]) / self.df["full"] * 100
             )
             self.df["Average Power"] = (
-                (self.df["b1"] - self.df["b0"]) / 1000000
-                / (self.df["Duration"] / 3600)
+                (self.df["b1"] - self.df["b0"]) / 1000000 / (self.df["Duration"] / 3600)
             )
 
         # Wake sources
@@ -247,9 +265,8 @@ class SleepReport(AmdTool):
         if "Battery Start" in self.df.columns:
             self.df["Battery Start"] = self.df["Battery Start"].apply(format_percent)
             self.df["Battery Delta"] = self.df["Battery Delta"].apply(format_percent)
-            self.df["Average Power"] = self.df["Average Power"].apply(
-                format_watts
-            )
+        if "Average Power" in self.df.columns:
+            self.df["Average Power"] = self.df["Average Power"].apply(format_watts)
 
     def convert_table_dataframe(self, content):
         """Convert a table like dataframe to an HTML table"""
@@ -295,7 +312,7 @@ class SleepReport(AmdTool):
                     content = Markup(self.convert_table_dataframe(content))
                 elif self.format == "html":
                     content = Markup(html.escape(content))
-                prereq_debug.append({"data": f"{content.strip()}"})
+                prereq_debug.append({"data": content.strip()})
         return prereq, t0, prereq_debug
 
     def format_power_rail_data(self, t0, t1_seconds):
@@ -320,8 +337,8 @@ class SleepReport(AmdTool):
             if e0 is None or e1 is None or t1_seconds == 0:
                 continue
 
-            # Calculate energy in Joules and average power in Watts
-            energy_j = (e1 - e0) * scale
+            # pac194x/5x reports raw*scale in mW-seconds (millijoules), so
+            energy_j = (e1 - e0) * scale / 1000.0
             power_w = energy_j / t1_seconds
             total_power += power_w
 
@@ -372,7 +389,12 @@ class SleepReport(AmdTool):
                     power_rail_summary = self.format_power_rail_data(cycle, duration)
                     if power_rail_summary:
                         if self.format == "html":
-                            power_rail_summary = Markup(html.escape(power_rail_summary))
+                            power_rail_summary = Markup(
+                                "".join(
+                                    f"<p>{html.escape(line)}</p>"
+                                    for line in power_rail_summary.split("\n")
+                                )
+                            )
                         messages.append(power_rail_summary)
                         priorities.append(get_log_priority(6))
 
@@ -389,8 +411,7 @@ class SleepReport(AmdTool):
         # Load the template
         p = os.path.dirname(amd_debug.__file__)
         environment = Environment(
-            loader=FileSystemLoader(os.path.join(p, "templates")),
-            autoescape=True
+            loader=FileSystemLoader(os.path.join(p, "templates")), autoescape=True
         )
         template = environment.get_template(self.format)
 
@@ -491,7 +512,10 @@ class SleepReport(AmdTool):
                 fd = os.open(
                     self.fname,
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                    mode=stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,  # 0o644
+                    mode=stat.S_IRUSR
+                    | stat.S_IWUSR
+                    | stat.S_IRGRP
+                    | stat.S_IROTH,  # 0o644
                 )
             except FileExistsError:
                 raise FileExistsError(
@@ -503,7 +527,9 @@ class SleepReport(AmdTool):
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write(template.render(context))
                     if "SUDO_UID" in os.environ:
-                        os.fchown(fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
+                        os.fchown(
+                            fd, int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"])
+                        )
             except Exception:
                 try:
                     os.close(fd)
@@ -521,14 +547,12 @@ class SleepReport(AmdTool):
         import seaborn as sns  # pylint: disable=import-outside-toplevel
         import io  # pylint: disable=import-outside-toplevel
 
-        if "Average Power" not in self.df.columns:
+        if "Average Power" not in self.df.columns or "Battery Delta" not in self.df.columns:
             return
 
         plt.set_loglevel("warning")
         _fig, ax1 = plt.subplots()
-        ax1.plot(
-            self.df["Average Power"], color="green", label="Charge/Discharge Rate"
-        )
+        ax1.plot(self.df["Average Power"], color="green", label="Charge/Discharge Rate")
 
         ax2 = ax1.twinx()
         sns.barplot(
@@ -543,6 +567,7 @@ class SleepReport(AmdTool):
             ax1.set_xticks(range(0, len(self.df.index), max_range))
         ax1.set_xlabel("Cycle")
         ax1.set_ylabel("Rate (Watts)")
+        ax1.ticklabel_format(axis="y", style="plain", useOffset=False)
         ax2.set_ylabel("Battery Change (%)")
 
         lines, labels = ax1.get_legend_handles_labels()

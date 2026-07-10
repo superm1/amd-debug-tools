@@ -34,6 +34,7 @@ from amd_debug.common import (
     is_root,
     minimum_kernel,
     print_color,
+    read_msr,
     reboot,
     run_countdown,
     systemd_in_use,
@@ -232,6 +233,21 @@ class TestCommon(unittest.TestCase):
         self.assertFalse(is_root())
         mock_geteuid.assert_called_once()
         self.assertEqual(mock_geteuid.call_count, 1)
+
+    @patch("amd_debug.common.os.open", side_effect=OSError)
+    @patch("amd_debug.common.subprocess.run")
+    @patch("amd_debug.common.is_root", return_value=True)
+    @patch("amd_debug.common.os.path.exists", return_value=False)
+    def test_read_msr_loads_module(
+        self, mock_exists, mock_is_root, mock_run, mock_open_fd
+    ):
+        """Test read_msr loads the msr module via an absolute path and no shell"""
+        with self.assertRaises(PermissionError):
+            read_msr(0xC0010292, 0)
+        mock_run.assert_called_once_with(["/sbin/modprobe", "msr"], check=False)
+        # ensure the module load never went through a shell
+        _, kwargs = mock_run.call_args
+        self.assertNotIn("shell", kwargs)
 
     def test_get_log_priority(self):
         """Test get_log_priority works for expected values"""
