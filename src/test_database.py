@@ -7,6 +7,7 @@ This module contains unit tests for the datbase functions in the amd-debug-tools
 import unittest
 
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 
 from amd_debug.database import SleepDatabase
 
@@ -363,6 +364,23 @@ class TestSleepDatabase(unittest.TestCase):
         self.db.start_cycle(timestamp)
         result = self.db.report_power_rails(timestamp)
         self.assertEqual(result, [])
+
+    def test_default_db_path_uses_var_lib_restrictive(self):
+        """Test the default database path is created securely in /var/lib"""
+        with patch("amd_debug.database.os.makedirs") as makedirs, patch(
+            "amd_debug.database.os.path.exists", return_value=False
+        ), patch("amd_debug.database.sqlite3.connect", return_value=MagicMock()):
+            SleepDatabase()
+
+            # Directory is created in /var/lib with a restrictive mode
+            makedirs.assert_called_once_with(
+                "/var/lib/amd-s2idle", mode=0o700, exist_ok=True
+            )
+
+            # The insecure /var/local fallback is never referenced
+            for call in makedirs.call_args_list:
+                for arg in call.args:
+                    self.assertNotIn("/var/local", str(arg))
 
     def test_schema_migration_v1_to_v2(self):
         """Test database migration from schema v1 to v2"""
