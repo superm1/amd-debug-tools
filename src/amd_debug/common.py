@@ -394,7 +394,7 @@ def read_msr(msr, cpu):
     """Read a Model-Specific Register (MSR) value from the CPU."""
     p = f"/dev/cpu/{cpu}/msr"
     if not os.path.exists(p) and is_root():
-        os.system("modprobe msr")
+        subprocess.run(["/sbin/modprobe", "msr"], check=False)
     try:
         f = os.open(p, os.O_RDONLY)
     except OSError as exc:

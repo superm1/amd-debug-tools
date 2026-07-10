@@ -1177,7 +1177,7 @@ class PrerequisiteValidator(AmdTool):
             """Read CPUID using kernel userspace interface"""
             p = os.path.join("/", "dev", "cpu", f"{cpu}", "cpuid")
             if not os.path.exists(p):
-                os.system("modprobe cpuid")
+                subprocess.run(["/sbin/modprobe", "cpuid"], check=False)
             with open(p, "rb") as f:
                 position = (subleaf << 32) | leaf
                 f.seek(position)
