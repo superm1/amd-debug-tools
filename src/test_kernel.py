@@ -14,6 +14,7 @@ import logging
 from amd_debug.kernel import (
     sscanf_bios_args,
     get_kernel_command_line,
+    redact_sensitive,
     DmesgLogger,
     InputFile,
     KernelLogger,
@@ -66,6 +67,31 @@ class TestKernelLog(unittest.TestCase):
         ) as _mock_file:
             result = get_kernel_command_line()
             self.assertEqual(result, expected_output)
+
+    def test_redact_sensitive(self):
+        """Test redact_sensitive function"""
+
+        # MAC addresses are redacted
+        result = redact_sensitive("wlan0: link up 00:11:22:33:44:55 detected")
+        self.assertEqual(result, "wlan0: link up <redacted-mac> detected")
+
+        # UUIDs are redacted
+        result = redact_sensitive(
+            "cryptsetup: 12345678-90ab-cdef-1234-567890abcdef mounted"
+        )
+        self.assertEqual(result, "cryptsetup: <redacted-uuid> mounted")
+
+        # key/secret/password/token assignments are redacted
+        self.assertEqual(
+            redact_sensitive("luks key=abcd1234"), "luks key=<redacted>"
+        )
+        self.assertEqual(
+            redact_sensitive("token=deadbeef"), "token=<redacted>"
+        )
+
+        # Ordinary log text is preserved
+        line = "amd_pmc AMDI0009:00: SMU idlemask s0i3: 0x1234abcd"
+        self.assertEqual(redact_sensitive(line), line)
 
     def test_sscanf_bios_args(self):
         """Test sscanf_bios_args function"""
