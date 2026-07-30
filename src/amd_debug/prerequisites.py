@@ -942,6 +942,14 @@ class PrerequisiteValidator(AmdTool):
 
     def check_aspm(self):
         """Check if ASPM has been overridden"""
+        # pcie_aspm=off disables ASPM entirely but leaves the reported
+        # policy at [default], so the sysfs check below can't catch it
+        if "pcie_aspm=off" in self.cmdline.split():
+            self.db.record_prereq(
+                "ASPM disabled on kernel command line (pcie_aspm=off)", "❌"
+            )
+            self.failures += [ASpmWrong()]
+            return False
         p = os.path.join("/", "sys", "module", "pcie_aspm", "parameters", "policy")
         contents = read_file(p)
         policy = ""
