@@ -1028,6 +1028,27 @@ class TestPrerequisiteValidator(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.validator.check_aspm()
 
+    def test_check_aspm_disabled_on_cmdline(self):
+        """Test check_aspm when pcie_aspm=off is on the kernel command line"""
+        self.validator.cmdline = "quiet pcie_aspm=off rw"
+        result = self.validator.check_aspm()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "ASPM disabled on kernel command line (pcie_aspm=off)", "❌"
+        )
+        self.assertTrue(any(isinstance(f, ASpmWrong) for f in self.validator.failures))
+
+    @patch("amd_debug.prerequisites.read_file")
+    def test_check_aspm_cmdline_without_aspm_off(self, mock_read_file):
+        """Test check_aspm still reads the policy when cmdline is clean"""
+        self.validator.cmdline = "quiet splash rw"
+        mock_read_file.return_value = "[default]"
+        result = self.validator.check_aspm()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "ASPM policy set to 'default'", "✅"
+        )
+
     @patch("amd_debug.prerequisites.os.path.exists")
     @patch("amd_debug.prerequisites.read_file")
     def test_check_i2c_hid_no_devices(self, mock_read_file, mock_path_exists):
