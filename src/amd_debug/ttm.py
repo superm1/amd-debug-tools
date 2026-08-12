@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: MIT
 """TTM configuration tool"""
 
-import asyncio
-import os
 import argparse
 import glob
+import os
 import subprocess
+
 from amd_debug.common import (
     AmdTool,
     bytes_to_gb,
     gb_to_pages,
     get_system_mem,
-    relaunch_sudo,
     print_color,
     reboot,
+    relaunch_sudo,
     version,
 )
 
@@ -30,6 +30,7 @@ def maybe_reboot() -> bool:
         return reboot()
     return True
 
+
 def is_ttm_in_initramfs(initramfs_path: str) -> bool:
     """
     Check if the ttm module is included in the initramfs.
@@ -40,79 +41,107 @@ def is_ttm_in_initramfs(initramfs_path: str) -> bool:
     Returns:
         bool: True if "gpu/drm/ttm/ttm.ko" is found, False otherwise
     """
-    try:
-        # Run lsinitramfs and search for "ttm" in the output
-        result = subprocess.run(
-            ["lsinitramfs", initramfs_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+    # Supported initramfs inspection tools
+    inspector_tools = [
+        (["lsinitramfs", initramfs_path], "initramfs-tools"),
+        (["lsinitcpio", initramfs_path], "mkinitcpio"),
+        (["lsinitrd", initramfs_path], "dracut"),
+    ]
 
-        # Check if "gpu/drm/ttm/ttm.ko" appears in the output
-        return "gpu/drm/ttm/ttm.ko" in result.stdout.lower()
+    # Check if "gpu/drm/ttm/ttm.ko" appears in the output
+    for cmd, _package in inspector_tools:
+        tool = cmd[0]
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return "gpu/drm/ttm/ttm.ko" in result.stdout.lower()
+        except FileNotFoundError:
+            continue
+        except subprocess.CalledProcessError as e:
+            print_color(f"Error running {tool}: {e}", "❌")
+            return False
 
-    except subprocess.CalledProcessError as e:
-        print_color(f"Error running lsinitramfs: {e}", "❌")
-        return False
-    except FileNotFoundError:
-        print_color("Error: 'lsinitramfs' command not found. Is initramfs-tools installed?", "❌")
-        return False
+    print_color(
+        "Error: no supported initramfs inspection tool found "
+        "(tried: lsinitramfs, lsinitcpio, lsinitrd). "
+        "Install initramfs-tools, mkinitcpio, or dracut.",
+        "❌",
+    )
+    return False
+
 
 def check_initramfs_images() -> bool:
-    """Check if initramfs images exist in /boot/"""
+    """Check if any initramfs image contains the TTM module.
+
+    Returns:
+        True if TTM is included in at least one initramfs image (regeneration needed).
+        False if no initramfs images are found or TTM is not in any of them.
+    """
     print_color("Checking if the initramfs image needs to be regenerated", "🐧")
     if not os.path.exists("/boot"):
         print_color("Warning: /boot not found. Is it mounted?", "🚦")
         return False
 
-    # Check for common initramfs patterns
+    # Collect initramfs images across all patterns, deduplicated by realpath
     patterns = [
-        '/boot/initrd.img-*',    # Debian/Ubuntu
-        '/boot/initramfs-*.img', # Fedora/RHEL
-        '/boot/initramfs-*'      # Arch
+        "/boot/initrd.img-*",  # Debian/Ubuntu
+        "/boot/initramfs-*.img",  # Fedora/RHEL
+        "/boot/initramfs-*",  # Arch (broadest, catches remaining)
     ]
-
+    seen = set()
+    all_images = []
     for pattern in patterns:
-        initramfs_files = glob.glob(pattern)
-        if initramfs_files:
-            print_color(f"Found initramfs images: {initramfs_files}", "🐧")
+        for img in sorted(glob.glob(pattern)):
+            real = os.path.realpath(img)
+            if real not in seen:
+                seen.add(real)
+                all_images.append(img)
 
-            latest_initramfs = max(initramfs_files)
-            if is_ttm_in_initramfs(latest_initramfs):
-                print_color(f"TTM module is included in initramfs: {latest_initramfs}", "✅")
-                print_color("The initramfs image needs to be regenerated", "🐧")
-                return True
-            else:
-                print_color(f"TTM module is not included in initramfs", "○")
-                print_color(f"The initramfs image does not need to be regenerated", "○")
+    if not all_images:
+        print_color("No initramfs images found in /boot", "○")
+        return False
+
+    print_color(f"Found initramfs images: {all_images}", "🐧")
+
+    for img in all_images:
+        if is_ttm_in_initramfs(img):
+            print_color(f"TTM module is included in initramfs: {img}", "✅")
+            print_color("The initramfs image needs to be regenerated", "🐧")
+            return True
+
+    print_color("TTM module is not included in any initramfs image", "○")
+    print_color("TTM loads from rootfs; initramfs regeneration not required", "○")
     return False
+
 
 def regenerate_initramfs():
     """Regenerate initramfs image"""
     if not check_initramfs_images():
-        print_color("No initramfs images found, skipping regeneration", "○")
+        print_color("Skipping initramfs regeneration", "○")
         return
 
-    # Supported initramfs tools
+    # Supported initramfs tools: (command, display_name)
     initramfs_tools = [
-        ["update-initramfs", "-u"],
-        ["dracut", "--force"],
-        ["mkinitcpio", "-P"]
+        (["update-initramfs", "-u"], "update-initramfs"),
+        (["dracut", "--force"], "dracut"),
+        (["mkinitcpio", "-P"], "mkinitcpio"),
     ]
 
-    for cmd in initramfs_tools:
-        tool = cmd[0]
-        if os.path.exists(f"/usr/sbin/{cmd[0]}") or os.path.exists(f"/usr/bin/{cmd[0]}"):
-            print_color(f"Updating initramfs using {tool}", "🐧")
+    for cmd, name in initramfs_tools:
+        if os.path.exists(f"/usr/sbin/{cmd[0]}") or os.path.exists(
+            f"/usr/bin/{cmd[0]}"
+        ):
+            print_color(f"Updating initramfs using {name}", "🐧")
             try:
                 subprocess.run(cmd, check=True)
                 print_color("Initramfs updated successfully", "✅")
                 return
-            except subprocess.CalledProcessError as e:
-                print_color(f"Failed to update initramfs: {e}", "❌")
-                continue
-            except FileNotFoundError:
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                print_color(f"Failed to update initramfs using {name}: {e}", "❌")
                 continue
 
     print_color("No supported initramfs tool found", "❌")
