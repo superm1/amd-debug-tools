@@ -25,6 +25,7 @@ from amd_debug.common import (
     print_temporary_message,
 )
 
+
 def confirm_overwrite_report(fname) -> bool:
     """If fname exists, prompt to overwrite. Returns True if writing can proceed."""
     if not fname or not os.path.lexists(fname):
@@ -365,7 +366,7 @@ class SleepReport(AmdTool):
             if self.format == "html":
                 data = ""
                 for line in self.db.report_cycle_data(cycle).split("\n"):
-                    data += f"<p>{html.escape(line)}</p>"
+                    data += f"<p>{html.escape(line, quote=False)}</p>"
                 cycles.append({"cycle_num": num, "data": Markup(data)})
             else:
                 cycles.append([num, self.db.report_cycle_data(cycle)])
@@ -379,7 +380,7 @@ class SleepReport(AmdTool):
                     ]:
                         content = Markup(self.convert_table_dataframe(content))
                     elif self.format == "html":
-                        content = Markup(html.escape(content))
+                        content = Markup(html.escape(content, quote=False))
                     messages.append(content)
                     priorities.append(get_log_priority(row[1]))
 
@@ -547,7 +548,10 @@ class SleepReport(AmdTool):
         import seaborn as sns  # pylint: disable=import-outside-toplevel
         import io  # pylint: disable=import-outside-toplevel
 
-        if "Average Power" not in self.df.columns or "Battery Delta" not in self.df.columns:
+        if (
+            "Average Power" not in self.df.columns
+            or "Battery Delta" not in self.df.columns
+        ):
             return
 
         plt.set_loglevel("warning")
