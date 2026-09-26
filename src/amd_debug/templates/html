@@ -471,7 +471,7 @@
     <table id="cycledata" class="hide-borders">
         {% for obj in cycle_data %}
         <TR class="row-disabled" id="cycledata{{obj.cycle_num + 1}}">
-            <TD>{{obj.data}}</TD>
+            <TD>{{obj.data|safe}}</TD>
         </TR>
         {% endfor %}
     </table>
