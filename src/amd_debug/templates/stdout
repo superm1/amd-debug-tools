@@ -4,7 +4,7 @@
 {% for obj in prereq_debug_data %}
 🦟{{obj.data}}
 {% endfor %}{% endif %}
-{% if cycle_data %}{{ cycle_data }}{% endif %}
+{% if cycle_data %}{{ cycle_data | safe }}{% endif %}
 {% if debug_data %}🗣️Debug Data{% for obj in debug_data %}
 
 💯Cycle {{ obj.cycle_num }}{% for index in range(obj.messages | length) %}
