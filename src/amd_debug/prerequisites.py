@@ -1352,13 +1352,59 @@ class PrerequisiteValidator(AmdTool):
             debug_str += f"IVRS: Found MSFT0201: {found_ivrs_msft0201}"
 
             self.db.record_debug(debug_str)
-            if not found_ivrs_dmar and not found_ivrs_msft0201:
+
+            if found_ivrs_dmar:
+                self.db.record_prereq("IOMMU properly configured", "✅")
+                return True
+
+            if not found_ivrs_msft0201:
                 self.db.record_prereq(
                     "IOMMU is misconfigured: Pre-boot DMA protection not enabled", "❌"
                 )
                 self.failures += [DMArNotEnabled()]
                 return False
+
+            # DMA protection disabled but MSFT0201 in IVRS - verify it has a
+            # valid memory mapping. Parse the IVRS table to find the device ID
+            # for MSFT0201 and check for a covering IVMD entry.
+            from amd_debug.ivrs import IvrsParser
+
+            try:
+                parser = IvrsParser(data)
+            except ValueError as e:
+                debug_str += f"IVRS: Failed to parse table: {e}\n"
+                self.db.record_debug(debug_str)
+                self.db.record_prereq(
+                    "IOMMU is misconfigured: Unable to parse IVRS table", "❌"
+                )
+                self.failures += [DMArNotEnabled()]
+                return False
+
+            msft_devid = parser.find_msft0201_device_id()
+            if msft_devid is None:
+                debug_str += "IVRS: MSFT0201 not found in IVHD device entries\n"
+                self.db.record_debug(debug_str)
+                self.db.record_prereq(
+                    "IOMMU is misconfigured: MSFT0201 not found in IVRS IVHD entries",
+                    "❌",
+                )
+                self.failures += [DMArNotEnabled()]
+                return False
+
+            has_mapping = parser.has_valid_msft0201_mapping(msft_devid)
+            debug_str += f"IVRS: MSFT0201 device ID: 0x{msft_devid:04x}, has_mapping: {has_mapping}\n"
+            self.db.record_debug(debug_str)
+
+            if not has_mapping:
+                self.db.record_prereq(
+                    "IOMMU is misconfigured: MSFT0201 declared in IVRS but no DMA mapping",
+                    "❌",
+                )
+                self.failures += [DMArNotEnabled()]
+                return False
+
             self.db.record_prereq("IOMMU properly configured", "✅")
+            return True
         return True
 
     def check_port_pm_override(self):
