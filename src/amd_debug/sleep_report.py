@@ -412,7 +412,8 @@ class SleepReport(AmdTool):
         # Load the template
         p = os.path.dirname(amd_debug.__file__)
         environment = Environment(
-            loader=FileSystemLoader(os.path.join(p, "templates")), autoescape=True
+            loader=FileSystemLoader(os.path.join(p, "templates")),
+            autoescape=self.format == "html",
         )
         template = environment.get_template(self.format)
 
