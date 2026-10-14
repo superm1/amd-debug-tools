@@ -72,7 +72,6 @@ from amd_debug.failures import (
     MissingPcieHotplug,
     MissingThunderbolt,
     MissingXhciHcd,
-    MSRFailure,
     NpuIommu,
     RogAllyMcuPowerSave,
     RogAllyOldMcu,
@@ -1254,32 +1253,6 @@ class PrerequisiteValidator(AmdTool):
 
         return True
 
-    def check_msr(self):
-        """Check if PC6 or CC6 has been disabled"""
-
-        def check_bits(value, mask):
-            return value & mask
-
-        expect = {
-            0xC0010292: BIT(32),  # PC6
-            0xC0010296: (BIT(22) | BIT(14) | BIT(6)),  # CC6
-        }
-        try:
-            for reg, expect_val in expect.items():
-                val = read_msr(reg, 0)
-                if not check_bits(val, expect_val):
-                    self.failures += [MSRFailure()]
-                    return False
-            self.db.record_prereq("PC6 and CC6 enabled", "✅")
-        except FileNotFoundError:
-            self.db.record_prereq(
-                "Unable to check MSRs: MSR kernel module not loaded", "❌"
-            )
-            return False
-        except PermissionError:
-            self.db.record_prereq("MSR checks unavailable", "🚦")
-        return True
-
     def check_smt(self):
         """Check if SMT is enabled"""
         p = os.path.join("/", "sys", "devices", "system", "cpu", "smt", "control")
@@ -1481,7 +1454,6 @@ class PrerequisiteValidator(AmdTool):
                 self.check_amdgpu,
                 self.check_amdgpu_parameters,
                 self.check_cpu,
-                self.check_msr,
                 self.check_smt,
                 self.check_iommu,
                 self.check_asus_rog_ally,

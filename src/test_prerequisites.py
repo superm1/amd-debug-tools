@@ -721,52 +721,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(result)
         self.mock_db.record_prereq.assert_called_with("SMT enabled", "✅")
 
-    @patch("amd_debug.prerequisites.read_msr")
-    def test_check_msr_pc6_disabled(self, mock_read_msr):
-        """Test check_msr when PC6 is disabled"""
-        mock_read_msr.side_effect = lambda reg, _: (
-            0 if reg == 0xC0010292 else BIT(22) | BIT(14) | BIT(6)
-        )
-        result = self.validator.check_msr()
-        self.assertFalse(result)
-        self.assertTrue(any(isinstance(f, MSRFailure) for f in self.validator.failures))
-
-    @patch("amd_debug.prerequisites.read_msr")
-    def test_check_msr_cc6_disabled(self, mock_read_msr):
-        """Test check_msr when CC6 is disabled"""
-        mock_read_msr.side_effect = lambda reg, _: BIT(32) if reg == 0xC0010292 else 0
-        result = self.validator.check_msr()
-        self.assertFalse(result)
-        self.assertTrue(any(isinstance(f, MSRFailure) for f in self.validator.failures))
-
-    @patch("amd_debug.prerequisites.read_msr")
-    def test_check_msr_enabled(self, mock_read_msr):
-        """Test check_msr when PC6 and CC6 are enabled"""
-        mock_read_msr.side_effect = lambda reg, _: (
-            BIT(32) if reg == 0xC0010292 else (BIT(22) | BIT(14) | BIT(6))
-        )
-        result = self.validator.check_msr()
-        self.assertTrue(result)
-        self.mock_db.record_prereq.assert_called_with("PC6 and CC6 enabled", "✅")
-
-    @patch("amd_debug.prerequisites.read_msr")
-    def test_check_msr_file_not_found(self, mock_read_msr):
-        """Test check_msr when MSR file is not found"""
-        mock_read_msr.side_effect = FileNotFoundError
-        result = self.validator.check_msr()
-        self.assertFalse(result)
-        self.mock_db.record_prereq.assert_called_with(
-            "Unable to check MSRs: MSR kernel module not loaded", "❌"
-        )
-
-    @patch("amd_debug.prerequisites.read_msr")
-    def test_check_msr_permission_error(self, mock_read_msr):
-        """Test check_msr when there is a permission error"""
-        mock_read_msr.side_effect = PermissionError
-        result = self.validator.check_msr()
-        self.assertTrue(result)
-        self.mock_db.record_prereq.assert_called_with("MSR checks unavailable", "🚦")
-
     @patch("amd_debug.prerequisites.read_file")
     @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
     def test_check_cpu_unsupported_model(self, mock_path_exists, mock_read_file):
@@ -2404,7 +2358,6 @@ class TestPrerequisiteValidator(unittest.TestCase):
             "check_amdgpu",
             "check_amdgpu_parameters",
             "check_cpu",
-            "check_msr",
             "check_smt",
             "check_iommu",
             "check_asus_rog_ally",

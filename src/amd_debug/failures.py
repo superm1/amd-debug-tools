@@ -448,18 +448,6 @@ class LowHardwareSleepResidency(S0i3Failure):
         )
 
 
-class MSRFailure(S0i3Failure):
-    """MSR access failed"""
-
-    def __init__(self):
-        super().__init__()
-        self.description = "PC6 or CC6 state disabled"
-        self.explanation = (
-            "The PC6 state of the package or the CC6 state of CPU cores was disabled. "
-            "This will prevent the system from getting to the deepest sleep state over suspend."
-        )
-
-
 class TaintedKernel(S0i3Failure):
     """Kernel is tainted"""
 

@@ -106,8 +106,6 @@ class TestFailures(unittest.TestCase):
         self.assertEqual(
             cls.get_description(), "System had low hardware sleep residency"
         )
-        cls = amd_debug.failures.MSRFailure()
-        self.assertEqual(cls.get_description(), "PC6 or CC6 state disabled")
         cls = amd_debug.failures.TaintedKernel()
         self.assertEqual(cls.get_description(), "Kernel is tainted")
         cls = amd_debug.failures.DMArNotEnabled()
