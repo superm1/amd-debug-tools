@@ -23,7 +23,12 @@ from amd_debug.common import (
 
 
 class MSR:  # pylint: disable=too-few-public-methods
-    """MSR addresses for CPPC"""
+    """MSR addresses for CPPC
+
+    AMD's MSR-based implementation of ACPI CPPC (Collaborative Processor
+    Performance Control). Defined in Linux kernel at
+    arch/x86/include/asm/msr-index.h (commit 89aa94b4a218)
+    """
 
     MSR_AMD_CPPC_CAP1 = 0xC00102B0
     MSR_AMD_CPPC_ENABLE = 0xC00102B1

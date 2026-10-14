@@ -320,8 +320,8 @@ class Irq1Workaround(S0i3Failure):
         super().__init__()
         self.description = "The wakeup showed an IRQ1 wakeup source, which might be a platform firmware bug"
         self.explanation = (
-            "A number of Renoir, Lucienne, Cezanne, & Barcelo platforms have a platform firmware "
-            "bug where IRQ1 is triggered during s0i3 resume. "
+            "A number of Ryzen 4000/5000 mobile platforms (Family 17h/19h) have a platform "
+            "firmware bug where IRQ1 is triggered during s0i3 resume. "
             "You may have tripped up on this bug as IRQ1 was active during resume. "
             "If you didn't press a keyboard key to wakeup the system then this can be "
             "the cause of spurious wakeups."
