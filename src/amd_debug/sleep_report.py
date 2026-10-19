@@ -147,7 +147,7 @@ class SleepReport(AmdTool):
         """Analyze the duration of the cycle"""
         duration = t1 - t0
         if duration.total_seconds() >= 60 and hw < 90:
-            failure = LowHardwareSleepResidency(duration.seconds, hw)
+            failure = LowHardwareSleepResidency(duration.seconds, hw / 100)
             problem = failure.get_description()
             data = str(failure)
             if self.format == "html":
