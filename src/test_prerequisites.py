@@ -42,6 +42,15 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_kernel_log = mock_get_kernel_log.return_value
         self.validator = PrerequisiteValidator(tool_debug=True)
 
+    @patch("amd_debug.prerequisites.os.path.exists", return_value=True)
+    def test_capture_logind_percentage(self, _mock_exists):
+        """Test capture_logind tolerates a '%' in logind.conf values"""
+        logind = "[Login]\nRuntimeDirectorySize=20%\n"
+        with patch("builtins.open", mock_open(read_data=logind)):
+            self.validator.capture_logind()
+        self.mock_db.record_debug.assert_any_call("LOGIND: configuration changes:")
+        self.mock_db.record_debug.assert_any_call("\truntimedirectorysize: 20%")
+
     def test_check_amdgpu_no_driver(self):
         """Test check_amdgpu with no driver present"""
         self.mock_pyudev.list_devices.return_value = [

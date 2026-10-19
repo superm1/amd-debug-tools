@@ -1173,7 +1173,7 @@ class PrerequisiteValidator(AmdTool):
         if not os.path.exists(base):
             return True
 
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config.read(base)
         section = config["Login"]
         if not section.keys():
