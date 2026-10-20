@@ -657,6 +657,66 @@ class NpuIommu(S0i3Failure):
         )
 
 
+class MissingIntelPmcCore(S0i3Failure):
+    """Intel PMC core driver is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "Intel PMC core driver is missing"
+        self.explanation = (
+            "The intel_pmc_core driver is required for the platform to enter "
+            "the deeper Low Power S0 Idle substates. "
+            "Be sure that you have enabled CONFIG_INTEL_PMC_CORE in your kernel. "
+            "The driver is normally loaded automatically on supported platforms."
+        )
+
+
+class MissingIntelGraphics(S0i3Failure):
+    """Intel graphics driver is missing"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "Intel graphics driver is missing"
+        self.explanation = (
+            "The integrated GPU is used to coordinate the power states of the "
+            "display and other IP blocks on the platform. "
+            "Be sure that you have enabled CONFIG_DRM_I915 or CONFIG_DRM_XE in "
+            "your kernel. If your system has a GPU mux, enable the integrated "
+            "GPU in the BIOS."
+        )
+
+
+class IntelDmcFirmwareMissing(S0i3Failure):
+    """Intel display firmware (DMC) is missing"""
+
+    def __init__(self, status=""):
+        super().__init__()
+        self.description = "Intel display firmware is not loaded"
+        self.explanation = (
+            "The display firmware (DMC) needs to be loaded for the platform to "
+            "reach the deeper Low Power S0 Idle substates. "
+            "Ensure that the i915 DMC firmware is present in /lib/firmware/i915 "
+            "and that your initramfs includes it."
+        )
+        if status:
+            self.explanation += f" (Reported status: {status})"
+
+
+class S0ixNotReached(S0i3Failure):
+    """The platform did not reach the S0ix state"""
+
+    def __init__(self, reason=""):
+        super().__init__()
+        self.description = "Platform did not reach the S0ix state"
+        self.explanation = (
+            "The platform needs to support the Low Power S0 Idle (S0ix) state "
+            "for the system to enter a low power state during s2idle. "
+            "Check the 'Low Power S0 Idle' setting in your firmware setup."
+        )
+        if reason:
+            self.explanation += f" ({reason})"
+
+
 class NvidiaS0ixDisabled(S0i3Failure):
     """NVIDIA driver S0ix support is disabled"""
 
