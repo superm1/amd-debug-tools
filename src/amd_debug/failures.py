@@ -655,3 +655,53 @@ class NpuIommu(S0i3Failure):
             "The NPU requires a properly configured IOMMU to function correctly. "
             "Ensure that the IOMMU is enabled and configured in the BIOS."
         )
+
+
+class NvidiaS0ixDisabled(S0i3Failure):
+    """NVIDIA driver S0ix support is disabled"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "NVIDIA driver S0ix support is disabled"
+        self.explanation = (
+            "The NVIDIA driver needs the NVreg_EnableS0ixPowerManagement module "
+            "parameter to be set to 1 for the GPU to enter self refresh mode "
+            "during s2idle. Without it the GPU stays powered on and the "
+            "platform cannot reach the deeper S0ix substates."
+        )
+        self.url = (
+            "https://download.nvidia.com/XFree86/Linux-x86_64/"
+            "570.172.08/README/powermanagement.html"
+        )
+
+
+class NvidiaS0ixUnsupported(S0i3Failure):
+    """The NVIDIA GPU does not support S0ix"""
+
+    def __init__(self):
+        super().__init__()
+        self.description = "NVIDIA GPU does not support S0ix"
+        self.explanation = (
+            "The NVIDIA GPU does not support video memory self refresh, which "
+            "is required for the driver to power the GPU down during s2idle. "
+            "The GPU will remain powered on during the sleep cycle, which "
+            "increases power consumption and prevents the platform from "
+            "reaching the deeper S0ix substates."
+        )
+
+
+class NvidiaSuspendUnitsMissing(S0i3Failure):
+    """The NVIDIA systemd units are not enabled"""
+
+    def __init__(self, units=None):
+        super().__init__()
+        self.description = "NVIDIA systemd units are not enabled"
+        self.explanation = (
+            "The nvidia-suspend, nvidia-resume and nvidia-hibernate systemd "
+            "units are what notify the NVIDIA driver of the suspend and resume "
+            "events. Without them the driver doesn't get the chance to save "
+            "and restore its state, which can cause the system to fail to "
+            "resume."
+        )
+        if units:
+            self.explanation += f" Not enabled: {', '.join(units)}."

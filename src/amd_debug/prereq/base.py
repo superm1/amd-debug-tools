@@ -32,11 +32,12 @@ from amd_debug.cpu import parse_cpuinfo, CpuInfo
 from amd_debug.prereq.acpi import AcpiChecks
 from amd_debug.prereq.devices import DeviceChecks
 from amd_debug.prereq.system import SystemChecks
+from amd_debug.prereq.nvidia import NvidiaChecks
 from amd_debug.prereq.base_headers import Headers
 
 
 class PrerequisiteValidator(
-    AcpiChecks, DeviceChecks, SystemChecks, AmdTool
+    AcpiChecks, DeviceChecks, SystemChecks, NvidiaChecks, AmdTool
 ):
     """Base class to validate the prerequisites for s2idle
 
@@ -147,6 +148,7 @@ class PrerequisiteValidator(
             self.capture_pci_acpi,
             self.capture_edid,
             self.capture_nvidia,
+            self.capture_nvidia_power,
             self.capture_cstates,
         ]
         checks = []
@@ -166,6 +168,10 @@ class PrerequisiteValidator(
             self.map_acpi_path,
             self.check_device_firmware,
             self.check_network,
+            self.check_nvidia_s0ix,
+            self.check_nvidia_video_memory,
+            self.check_nvidia_suspend_units,
+            self.check_nvidia_powerd,
         ]
 
         for i in info:
