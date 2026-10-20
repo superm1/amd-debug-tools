@@ -13,15 +13,15 @@ def main(action, debug):
         from amd_debug.validator import (
             SleepValidator,
         )  # pylint: disable=import-outside-toplevel
-        from amd_debug.prerequisites import (
-            PrerequisiteValidator,
+        from amd_debug.prereq import (
+            get_validator,
         )  # pylint: disable=import-outside-toplevel
     except ModuleNotFoundError:
         return
 
     app = SleepValidator(tool_debug=debug, bios_debug=False)
     if action == "pre":
-        prereq = PrerequisiteValidator(tool_debug=debug)
+        prereq = get_validator(tool_debug=debug)
         prereq.capture_once()
         app.systemd_pre_hook()
     elif action == "post":

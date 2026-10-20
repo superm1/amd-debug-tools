@@ -19,7 +19,7 @@ from amd_debug.common import (
 
 from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
-from amd_debug.prerequisites import PrerequisiteValidator
+from amd_debug.prereq import get_validator
 from amd_debug.sleep_report import SleepReport, confirm_overwrite_report
 
 
@@ -233,7 +233,7 @@ def run_test_cycle(
         sys.exit("Test cancelled")
 
     try:
-        app = PrerequisiteValidator(debug)
+        app = get_validator(debug)
         run = app.run()
     except PermissionError as e:
         print(f"Failed to run prerequisite check: {e}")
@@ -278,7 +278,7 @@ def install(debug) -> None:
     if not installer.install_dependencies():
         sys.exit("Failed to install dependencies")
     try:
-        app = PrerequisiteValidator(debug)
+        app = get_validator(debug)
         run = app.run()
     except PermissionError as e:
         sys.exit(f"Failed to run prerequisite check: {e}")

@@ -260,7 +260,7 @@ class TestInstallFunction(unittest.TestCase):
         mock_sys_exit.assert_called_once_with("Failed to remove")
 
     @patch("amd_debug.s2idle.Installer")
-    @patch("amd_debug.s2idle.PrerequisiteValidator")
+    @patch("amd_debug.s2idle.get_validator")
     @patch("sys.exit")
     def test_install_success(
         self, mock_sys_exit, mock_prerequisite_validator, mock_installer
@@ -295,7 +295,7 @@ class TestInstallFunction(unittest.TestCase):
             install(debug=True)
 
     @patch("amd_debug.s2idle.Installer")
-    @patch("amd_debug.s2idle.PrerequisiteValidator")
+    @patch("amd_debug.s2idle.get_validator")
     @patch("sys.exit")
     def test_prerequisite_check_failure(
         self, mock_sys_exit, mock_prerequisite_validator, mock_installer
@@ -320,7 +320,7 @@ class TestInstallFunction(unittest.TestCase):
         mock_sys_exit.assert_called_once_with("Failed to meet prerequisites")
 
     @patch("amd_debug.s2idle.Installer")
-    @patch("amd_debug.s2idle.PrerequisiteValidator")
+    @patch("amd_debug.s2idle.get_validator")
     @patch("sys.exit")
     def test_install_failure(
         self, mock_sys_exit, mock_prerequisite_validator, mock_installer
@@ -354,7 +354,7 @@ class TestTestFunction(unittest.TestCase):
         logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
     @patch("amd_debug.s2idle.Installer")
-    @patch("amd_debug.s2idle.PrerequisiteValidator")
+    @patch("amd_debug.s2idle.get_validator")
     @patch("amd_debug.s2idle.SleepValidator")
     @patch("amd_debug.s2idle.SleepReport")
     @patch("amd_debug.s2idle.prompt_test_arguments")
@@ -465,7 +465,7 @@ class TestTestFunction(unittest.TestCase):
         self.assertFalse(result)
 
     @patch("amd_debug.s2idle.Installer")
-    @patch("amd_debug.s2idle.PrerequisiteValidator")
+    @patch("amd_debug.s2idle.get_validator")
     @patch("amd_debug.s2idle.SleepValidator")
     @patch("amd_debug.s2idle.SleepReport")
     @patch("amd_debug.s2idle.prompt_test_arguments")
@@ -536,9 +536,9 @@ class TestTestFunction(unittest.TestCase):
         self.assertTrue(result)
 
     @patch("amd_debug.s2idle.Installer")
-    @patch("amd_debug.s2idle.PrerequisiteValidator")
+    @patch("amd_debug.s2idle.get_validator")
     @patch("amd_debug.s2idle.prompt_test_arguments", side_effect=KeyboardInterrupt)
-    @patch("amd_debug.prerequisites.SleepDatabase")
+    @patch("amd_debug.prereq.base.SleepDatabase")
     @patch("amd_debug.validator.SleepDatabase")
     def test_test_keyboard_interrupt(
         self,
