@@ -458,15 +458,17 @@ class SleepValidator(AmdTool):
 
     def capture_hw_sleep(self) -> bool:
         """Check for hardware sleep state"""
-        # try from kernel 6.4's suspend stats interface first because it works
-        # even with kernel lockdown
         p = os.path.join("/", "sys", "power", "suspend_stats", "last_hw_sleep")
         if os.path.exists(p):
             self.hw_sleep_duration = int(read_file(p)) / 10**6
+
+        smu_fw_info_path = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
+        if os.path.exists(smu_fw_info_path):
+            self.db.record_debug_file(smu_fw_info_path)
+
         if not os.path.exists(p) and not self.hw_sleep_duration:
-            p = os.path.join("/", "sys", "kernel", "debug", "amd_pmc", "smu_fw_info")
             try:
-                val = read_file(p)
+                val = read_file(smu_fw_info_path)
                 for line in val.split("\n"):
                     if "Last S0i3 Status" in line:
                         continue
@@ -484,7 +486,7 @@ class SleepValidator(AmdTool):
                     )
                 return False
             except FileNotFoundError:
-                self.db.record_debug(f"HW sleep statistics file {p} is missing")
+                self.db.record_debug(f"HW sleep statistics file {smu_fw_info_path} is missing")
         if not self.hw_sleep_duration:
             self.db.record_cycle_data("Did not reach hardware sleep state", "❌")
         return self.hw_sleep_duration > 0

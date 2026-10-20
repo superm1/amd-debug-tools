@@ -276,16 +276,20 @@ class TestValidator(unittest.TestCase):
 
     def test_capture_hw_sleep_suspend_stats(self):
         """Test capture_hw_sleep stats method"""
-        # Case 1: Suspend stats file exists and contains valid data
         with patch(
-            "os.path.exists", side_effect=lambda path: "suspend_stats" in path
+            "os.path.exists", side_effect=lambda path: "suspend_stats" in path or "smu_fw_info" in path
         ), patch("amd_debug.validator.read_file", return_value="1000000"), patch.object(
             self.validator.db, "record_cycle_data"
-        ) as mock_record_cycle_data:
+        ) as mock_record_cycle_data, patch.object(
+            self.validator.db, "record_debug_file"
+        ) as mock_record_debug_file:
             result = self.validator.capture_hw_sleep()
             self.assertTrue(result)
             self.assertEqual(self.validator.hw_sleep_duration, 1.0)
             mock_record_cycle_data.assert_not_called()
+            mock_record_debug_file.assert_called_once_with(
+                "/sys/kernel/debug/amd_pmc/smu_fw_info"
+            )
 
     def test_capture_hw_sleep_smu_fw_info(self):
         """Test capture_hw_sleep smu_fw_info method"""
@@ -299,11 +303,17 @@ class TestValidator(unittest.TestCase):
             ],
         ), patch.object(
             self.validator.db, "record_cycle_data"
-        ) as mock_record_cycle_data:
+        ) as mock_record_cycle_data, patch.object(
+            self.validator.db, "record_debug_file"
+        ) as mock_record_debug_file:
             result = self.validator.capture_hw_sleep()
             self.assertTrue(result)
             self.assertEqual(self.validator.hw_sleep_duration, 2.0)
             mock_record_cycle_data.assert_not_called()
+            # Verify that the full smu_fw_info content is captured
+            mock_record_debug_file.assert_called_once_with(
+                "/sys/kernel/debug/amd_pmc/smu_fw_info"
+            )
 
     def test_capture_hw_sleep_smu_fw_info_lockdown(self):
         """Test capture_hw_sleep smu_fw_info method while locked down"""
