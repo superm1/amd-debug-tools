@@ -1,4 +1,5 @@
 /.vscode
+.venv
 *.txt
 __pycache__
 amd*.egg-info

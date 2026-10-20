@@ -1,8 +1,14 @@
-# Helpful tools for debugging AMD Zen systems
+# Helpful tools for debugging AMD and Intel s2idle systems
 [![codecov](https://codecov.io/github/superm1/amd-debug-tools/graph/badge.svg?token=Z9WTBZADGT)](https://codecov.io/github/superm1/amd-debug-tools)
 [![PyPI](https://img.shields.io/pypi/v/amd-debug-tools.svg)](https://pypi.org/project/amd-debug-tools/)
 
-This repository hosts open tools that are useful for debugging issues on AMD systems.
+This repository hosts open tools that are useful for debugging issues on
+systems which use the s2idle (Low Power S0 Idle) suspend state.
+
+Both AMD and Intel platforms are supported.  The prerequisites that are
+checked are selected based on the CPU vendor, and the NVIDIA proprietary
+driver is supported on both.  See
+[platform support](docs/platform-support.md) for the details.
 
 ## Installation
 ### Distro (Arch)
@@ -47,4 +53,11 @@ Each tool has its own individual documentation page:
 * [amd-bios](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-bios.md)
 * [amd-pstate](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-pstate.md)
 * [amd-ttm](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-ttm.md)
+
+## Platform support
+
+The s2idle tool supports AMD and Intel platforms, including systems using the
+NVIDIA proprietary driver.  See
+[platform support](https://github.com/superm1/amd-debug-tools/blob/master/docs/platform-support.md)
+for the details of what is checked on each platform.
 
