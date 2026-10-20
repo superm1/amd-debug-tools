@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: MIT
 
 from datetime import datetime
+import json
 import sqlite3
 import os
 
 from amd_debug.common import read_file
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def migrate(cur, user_version) -> None:
@@ -28,6 +29,15 @@ def migrate(cur, user_version) -> None:
             "e1 REAL, "
             "scale REAL, "
             "PRIMARY KEY(t0, label))"
+        )
+    # Schema 3
+    # - add s0ix table
+    if val == 2:
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS s0ix ("
+            "t0 INTEGER PRIMARY KEY, "
+            "slp_s0 INTEGER, "
+            "substates TEXT)"
         )
     # Update schema if necessary
     if val != user_version:
@@ -101,6 +111,12 @@ class SleepDatabase:
             "e1 REAL,"
             "scale REAL,"
             "PRIMARY KEY(t0, label))"
+        )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS s0ix ("
+            "t0 INTEGER PRIMARY KEY, "
+            "slp_s0 INTEGER, "
+            "substates TEXT)"
         )
         self.prereq_data_cnt = 0
 
@@ -285,6 +301,46 @@ class SleepDatabase:
                 hw_sleep_duration,
             ),
         )
+
+    def record_s0ix_baseline(self, slp_s0, substates) -> None:
+        """Store the S0ix residency counters read before a suspend
+
+        The pre-suspend counters are persisted so that the post-resume
+        capture can still calculate the delta when it runs in a different
+        process, e.g. from the systemd sleep hook.
+        """
+        assert self.last_suspend
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            """
+            REPLACE INTO s0ix (t0, slp_s0, substates)
+            VALUES (?, ?, ?)
+            """,
+            (
+                int(self.last_suspend.strftime("%Y%m%d%H%M%S")),
+                slp_s0,
+                json.dumps(substates),
+            ),
+        )
+
+    def get_s0ix_baseline(self):
+        """Fetch the S0ix residency counters stored before a suspend
+
+        Returns a tuple of (slp_s0, substates) or None when no baseline
+        was recorded for the cycle.
+        """
+        assert self.last_suspend
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            "SELECT slp_s0, substates FROM s0ix WHERE t0 = ?",
+            (int(self.last_suspend.strftime("%Y%m%d%H%M%S")),),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return (row[0], json.loads(row[1]))
 
     def record_prereq(self, message, symbol) -> None:
         """Helper function to record a message to prereq_data database"""
