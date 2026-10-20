@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
-from amd_debug.database import SleepDatabase
+from amd_debug.database import SCHEMA_VERSION, SleepDatabase
 
 
 class TestSleepDatabase(unittest.TestCase):
@@ -66,6 +66,29 @@ class TestSleepDatabase(unittest.TestCase):
         )
         result = cur.fetchone()
         self.assertEqual(result, ("Test cycle data", "symbol1"))
+
+    def test_s0ix_baseline(self):
+        """Test storing and fetching the S0ix residency baseline"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.db.record_s0ix_baseline(1000000, {"S0i3.0": 240})
+        baseline = self.db.get_s0ix_baseline()
+        self.assertEqual(baseline, (1000000, {"S0i3.0": 240}))
+
+    def test_s0ix_baseline_missing(self):
+        """Test that fetching a missing baseline returns None"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.assertIsNone(self.db.get_s0ix_baseline())
+
+    def test_s0ix_baseline_replaced(self):
+        """Test that a baseline is replaced for the same cycle"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.db.record_s0ix_baseline(1000000, {})
+        self.db.record_s0ix_baseline(2000000, {"S0i2.0": 5})
+        baseline = self.db.get_s0ix_baseline()
+        self.assertEqual(baseline, (2000000, {"S0i2.0": 5}))
 
     def test_record_cycle(self):
         """Test recording a sleep cycle"""
@@ -382,9 +405,9 @@ class TestSleepDatabase(unittest.TestCase):
                 for arg in call.args:
                     self.assertNotIn("/var/local", str(arg))
 
-    def test_schema_migration_v1_to_v2(self):
-        """Test database migration from schema v1 to v2"""
-        # Create a new database (will be at v2)
+    def test_schema_migration_v1_to_v3(self):
+        """Test database migration to the current schema"""
+        # Create a new database (will be at the current version)
         db = SleepDatabase(dbf=":memory:")
         cur = db.db.cursor()
 
@@ -396,7 +419,15 @@ class TestSleepDatabase(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result[0], "power_rails")
 
-        # Verify schema version is 2
+        # Verify s0ix table exists
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='s0ix'"
+        )
+        result = cur.fetchone()
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0], "s0ix")
+
+        # Verify schema version is current
         cur.execute("PRAGMA user_version")
         version = cur.fetchone()[0]
-        self.assertEqual(version, 2)
+        self.assertEqual(version, SCHEMA_VERSION)

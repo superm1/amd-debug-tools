@@ -568,6 +568,8 @@ class TestValidator(unittest.TestCase):
         ) as mock_capture_thermal, patch.object(
             self.validator, "capture_input_wakeup_count"
         ) as mock_capture_input_wakeup_count, patch.object(
+            self.validator, "capture_intel_s0ix_residency"
+        ) as mock_capture_intel_s0ix_residency, patch.object(
             self.validator.acpica, "restore"
         ) as mock_acpica_restore, patch.object(
             self.validator.db, "record_cycle"
@@ -584,6 +586,7 @@ class TestValidator(unittest.TestCase):
             mock_capture_amdgpu_ips_status.return_value = None
             mock_capture_thermal.return_value = None
             mock_capture_input_wakeup_count.return_value = None
+            mock_capture_intel_s0ix_residency.return_value = None
             mock_acpica_restore.return_value = None
 
             # Set attributes for record_cycle
@@ -607,6 +610,7 @@ class TestValidator(unittest.TestCase):
             mock_capture_amdgpu_ips_status.assert_called_once()
             mock_capture_thermal.assert_called_once()
             mock_capture_input_wakeup_count.assert_called_once()
+            mock_capture_intel_s0ix_residency.assert_called_once()
             mock_acpica_restore.assert_called_once()
 
             # Assert record_cycle was called with correct arguments
