@@ -10,6 +10,12 @@ For analysis of power consumption issues it can be hooked into `systemd` to
 run a command to capture data right before and after the system enters and
 exits the s2idle state.
 
+The tool supports both AMD and Intel platforms.  The prerequisites that are
+checked are selected based on the CPU vendor, so that only the checks that
+are meaningful for the platform are run.  See
+[platform support](platform-support.md) for the details of what is checked
+on each platform.
+
 4 high level commands are supported.
 
 ## `amd-s2idle install`
@@ -56,7 +62,7 @@ The following optional arguments are supported for this command:
         --until UNTIL         Date to end the report at
         --format FORMAT       Format of the report to produce (html, txt or md)
         --report-file         File to write the report to
-        --tool-debug          Enable tool debug logging
+        --tool-debug          Enable debug logging
         --report-debug
         --no-report-debug
                               Include debug messages in report (WARNING: can significantly increase report size)
