@@ -106,7 +106,7 @@ def prompt_report_arguments(since, until, fname, fmt, report_debug) -> list:
         sys.exit(f"Invalid date, use YYYY-MM-DD: {e}")
     if not until:
         default = Defaults.until
-        until = input(f"{Headers.SinceDescription} (default {default})? ")
+        until = input(f"{Headers.UntilDescription} (default {default})? ")
         if not until:
             until = default.isoformat()
     try:
