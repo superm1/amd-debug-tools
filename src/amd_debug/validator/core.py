@@ -112,6 +112,7 @@ class SleepValidator(
         self.wakeup_count = {}
         self.page_faults = []
         self.notify_devices = []
+        self.pci_power_state = {}
         self.pmc_core = None
         self.s0ix_residency = 0
         self.s0ix_residency_before = None
@@ -192,6 +193,7 @@ class SleepValidator(
             self.capture_hw_sleep,
             self.capture_intel_substate_delta,
             self.capture_intel_s0ix_blockers,
+            self.capture_pci_power_state_change,
             self.capture_battery,
             self.capture_power_rails,
             self.capture_amdgpu_ips_status,
@@ -224,6 +226,7 @@ class SleepValidator(
         self.capture_wake_sources()
         self.capture_running_compositors()
         self.capture_power_profile()
+        self.capture_pci_power_state()
         self.capture_amdgpu_ips_status()
         self.capture_thermal()
         self.capture_input_wakeup_count()

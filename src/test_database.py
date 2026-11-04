@@ -90,6 +90,24 @@ class TestSleepDatabase(unittest.TestCase):
         baseline = self.db.get_s0ix_baseline()
         self.assertEqual(baseline, (2000000, {"S0i2.0": 5}))
 
+    def test_pci_power_state(self):
+        """Test storing and fetching the PCI device power states"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        states = {
+            "0000:2b:00.0": ("iwlwifi", "suspended", "1"),
+            "0000:00:14.3": ("", "active", "1"),
+        }
+        self.db.record_pci_power_state(states)
+        result = self.db.get_pci_power_state()
+        self.assertEqual(result, states)
+
+    def test_pci_power_state_missing(self):
+        """Test that fetching missing PCI power states returns empty"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.assertEqual(self.db.get_pci_power_state(), {})
+
     def test_record_cycle(self):
         """Test recording a sleep cycle"""
         timestamp = datetime.now()

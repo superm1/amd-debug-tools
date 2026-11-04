@@ -356,6 +356,89 @@ class CaptureHelpers:
             )
         self.wakeup_count = wakeup_count
 
+    def _read_pci_power_states(self):
+        """Read the power state of all PCI devices"""
+        states = {}
+        for device in self.pyudev.list_devices(subsystem="pci"):
+            slot = device.properties.get("PCI_SLOT_NAME")
+            if not slot:
+                continue
+            p = os.path.join(device.sys_path, "power", "runtime_status")
+            runtime_status = read_file(p) if os.path.exists(p) else ""
+            p = os.path.join(device.sys_path, "d3cold_allowed")
+            d3cold_allowed = read_file(p) if os.path.exists(p) else ""
+            driver = device.properties.get("DRIVER", "")
+            states[slot] = (driver, runtime_status, d3cold_allowed)
+        return states
+
+    def capture_pci_power_state(self):
+        """Capture the power state of PCI devices
+
+        Devices that are runtime suspended with D3cold allowed will be put
+        into D3cold during s2idle.  Some device firmware is unable to
+        resume from that state, so note which devices will spend the sleep
+        cycle in D3cold.
+        """
+        states = self._read_pci_power_states()
+        debug_str = "PCI Slot|Driver|Runtime status|D3cold allowed\n"
+        for slot in sorted(states):
+            driver, runtime_status, d3cold_allowed = states[slot]
+            debug_str += f"{slot}|{driver}|{runtime_status}|{d3cold_allowed}\n"
+        self.db.record_debug(debug_str)
+        self.db.record_pci_power_state(states)
+        for slot in sorted(states):
+            driver, runtime_status, d3cold_allowed = states[slot]
+            if (
+                driver
+                and runtime_status == "suspended"
+                and d3cold_allowed == "1"
+            ):
+                self.db.record_cycle_data(
+                    f"{slot} ({driver}) is runtime suspended with D3cold "
+                    "allowed and will enter D3cold during s2idle",
+                    "💤",
+                )
+        self.pci_power_state = states
+
+    def capture_pci_power_state_change(self):
+        """Compare the PCI device power states after the resume
+
+        The pre-suspend states come from memory, or from the database when
+        this runs in a different process, e.g. from the systemd sleep
+        hook.
+        """
+        before = self.pci_power_state
+        if not before:
+            before = self.db.get_pci_power_state()
+        if not before:
+            return
+        states = self._read_pci_power_states()
+        debug_str = "PCI Slot|Driver|Runtime status|D3cold allowed\n"
+        for slot in sorted(states):
+            driver, runtime_status, d3cold_allowed = states[slot]
+            debug_str += f"{slot}|{driver}|{runtime_status}|{d3cold_allowed}\n"
+        self.db.record_debug(debug_str)
+        for slot in sorted(states):
+            driver, runtime_status, d3cold_allowed = states[slot]
+            if slot not in before:
+                continue
+            _old_driver, old_status, old_d3cold = before[slot]
+            if old_status != runtime_status:
+                self.db.record_debug(
+                    f"{slot} runtime status changed: "
+                    f"{old_status} -> {runtime_status}"
+                )
+            # devices that were runtime suspended before the suspend spend
+            # the cycle in D3cold.  They are not expected to be active
+            # again right after the resume, so only note that they made
+            # the round trip.
+            if old_status == "suspended" and old_d3cold == "1":
+                self.db.record_cycle_data(
+                    f"{slot} ({driver}) entered D3cold during s2idle",
+                    "💤",
+                )
+        self.pci_power_state = states
+
     def capture_command_line(self):
         """Capture the kernel command line to debug"""
         self.db.record_debug(f"/proc/cmdline: {get_kernel_command_line()}")

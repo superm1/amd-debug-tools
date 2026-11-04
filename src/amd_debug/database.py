@@ -7,7 +7,7 @@ import os
 
 from amd_debug.common import read_file
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def migrate(cur, user_version) -> None:
@@ -38,6 +38,18 @@ def migrate(cur, user_version) -> None:
             "t0 INTEGER PRIMARY KEY, "
             "slp_s0 INTEGER, "
             "substates TEXT)"
+        )
+    # Schema 4
+    # - add pci_power table
+    if val == 3:
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS pci_power ("
+            "t0 INTEGER, "
+            "slot TEXT, "
+            "driver TEXT, "
+            "runtime_status TEXT, "
+            "d3cold_allowed TEXT, "
+            "PRIMARY KEY(t0, slot))"
         )
     # Update schema if necessary
     if val != user_version:
@@ -117,6 +129,15 @@ class SleepDatabase:
             "t0 INTEGER PRIMARY KEY, "
             "slp_s0 INTEGER, "
             "substates TEXT)"
+        )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS pci_power ("
+            "t0 INTEGER, "
+            "slot TEXT, "
+            "driver TEXT, "
+            "runtime_status TEXT, "
+            "d3cold_allowed TEXT, "
+            "PRIMARY KEY(t0, slot))"
         )
         self.prereq_data_cnt = 0
 
@@ -341,6 +362,44 @@ class SleepDatabase:
         if row is None:
             return None
         return (row[0], json.loads(row[1]))
+
+    def record_pci_power_state(self, states) -> None:
+        """Store the PCI device power states for the cycle
+
+        The states are persisted so that the post-resume comparison can
+        still run when it happens in a different process, e.g. from the
+        systemd sleep hook.
+        """
+        assert self.last_suspend
+        assert self.db
+        cur = self.db.cursor()
+        t0 = int(self.last_suspend.strftime("%Y%m%d%H%M%S"))
+        cur.executemany(
+            """
+            REPLACE INTO pci_power (t0, slot, driver, runtime_status, d3cold_allowed)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                (t0, slot, state[0], state[1], state[2])
+                for slot, state in states.items()
+            ],
+        )
+
+    def get_pci_power_state(self):
+        """Fetch the PCI device power states stored before the suspend"""
+        assert self.last_suspend
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            """
+            SELECT slot, driver, runtime_status, d3cold_allowed
+            FROM pci_power WHERE t0 = ?
+            """,
+            (int(self.last_suspend.strftime("%Y%m%d%H%M%S")),),
+        )
+        return {
+            row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()
+        }
 
     def record_prereq(self, message, symbol) -> None:
         """Helper function to record a message to prereq_data database"""
