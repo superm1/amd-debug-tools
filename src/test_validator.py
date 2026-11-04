@@ -217,6 +217,194 @@ class TestValidator(unittest.TestCase):
                 "Woke up from IRQ 123 (chip_name_mock hw_mock-irq_name_mock actions_mock)"
             )
 
+    def _mock_pci_device(self, slot, sys_path):
+        """Create a mock PCI device for the power state tests"""
+        device = unittest.mock.Mock()
+        device.sys_path = sys_path
+        device.properties = {
+            "PCI_SLOT_NAME": slot,
+            "DRIVER": "iwlwifi",
+        }
+        return device
+
+    def _mock_pci_power_files(self, slot, runtime_status, d3cold_allowed):
+        """Mock the sysfs files backing the PCI power state"""
+        sys_path = f"/sys/devices/pci0000:00/{slot}"
+        exists_map = {
+            f"{sys_path}/power/runtime_status": True,
+            f"{sys_path}/d3cold_allowed": True,
+        }
+        content_map = {
+            f"{sys_path}/power/runtime_status": runtime_status,
+            f"{sys_path}/d3cold_allowed": d3cold_allowed,
+        }
+
+        def fake_exists(path):
+            return exists_map.get(path, False)
+
+        def fake_read(path):
+            return content_map[path]
+
+        patch("os.path.exists", side_effect=fake_exists).start()
+        patch(
+            "amd_debug.validator.capture.read_file", side_effect=fake_read
+        ).start()
+        # stop every patch the test started once it is done, so the mocks
+        # can't leak into unrelated tests
+        self.addCleanup(patch.stopall)
+        return sys_path
+
+    def test_capture_pci_power_state(self):
+        """Test capture_pci_power_state method"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+        mock_record_states = patch.object(
+            self.validator.db, "record_pci_power_state"
+        ).start()
+
+        slot = "0000:2b:00.0"
+        self._mock_pci_power_files(slot, "suspended", "1")
+        mock_pyudev.list_devices.return_value = [
+            self._mock_pci_device(slot, f"/sys/devices/pci0000:00/{slot}")
+        ]
+
+        self.validator.capture_pci_power_state()
+
+        mock_record_debug.assert_any_call(
+            "PCI Slot|Driver|Runtime status|D3cold allowed\n"
+            f"{slot}|iwlwifi|suspended|1\n"
+        )
+        mock_record_cycle_data.assert_called_once_with(
+            f"{slot} (iwlwifi) is runtime suspended with D3cold allowed "
+            "and will enter D3cold during s2idle",
+            "💤",
+        )
+        mock_record_states.assert_called_once_with(
+            {slot: ("iwlwifi", "suspended", "1")}
+        )
+        self.assertEqual(
+            self.validator.pci_power_state, {slot: ("iwlwifi", "suspended", "1")}
+        )
+
+    def test_capture_pci_power_state_active(self):
+        """Test no D3cold notice for a device that is active"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+
+        slot = "0000:2b:00.0"
+        self._mock_pci_power_files(slot, "active", "1")
+        mock_pyudev.list_devices.return_value = [
+            self._mock_pci_device(slot, f"/sys/devices/pci0000:00/{slot}")
+        ]
+
+        self.validator.capture_pci_power_state()
+
+        mock_record_cycle_data.assert_not_called()
+
+    def test_capture_pci_power_state_change(self):
+        """Test capture_pci_power_state_change method"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+
+        slot = "0000:2b:00.0"
+        self.validator.pci_power_state = {slot: ("iwlwifi", "suspended", "1")}
+        self._mock_pci_power_files(slot, "active", "1")
+        mock_pyudev.list_devices.return_value = [
+            self._mock_pci_device(slot, f"/sys/devices/pci0000:00/{slot}")
+        ]
+
+        self.validator.capture_pci_power_state_change()
+
+        mock_record_debug.assert_any_call(
+            f"{slot} runtime status changed: suspended -> active"
+        )
+        mock_record_cycle_data.assert_called_once_with(
+            f"{slot} (iwlwifi) entered D3cold during s2idle",
+            "💤",
+        )
+
+    def test_capture_pci_power_state_change_d3cold(self):
+        """Test the notice for a device that entered D3cold"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+
+        slot = "0000:2b:00.0"
+        self.validator.pci_power_state = {slot: ("iwlwifi", "suspended", "1")}
+        self._mock_pci_power_files(slot, "suspended", "1")
+        mock_pyudev.list_devices.return_value = [
+            self._mock_pci_device(slot, f"/sys/devices/pci0000:00/{slot}")
+        ]
+
+        self.validator.capture_pci_power_state_change()
+
+        mock_record_cycle_data.assert_called_once_with(
+            f"{slot} (iwlwifi) entered D3cold during s2idle",
+            "💤",
+        )
+
+    def test_capture_pci_power_state_change_restored(self):
+        """Test that the pre-suspend states are restored from the database"""
+        slot = "0000:2b:00.0"
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+        patch.object(self.validator, "pci_power_state", {}).start()
+        patch.object(
+            self.validator.db,
+            "get_pci_power_state",
+            return_value={slot: ("iwlwifi", "suspended", "1")},
+        ).start()
+
+        self._mock_pci_power_files(slot, "active", "1")
+        mock_pyudev.list_devices.return_value = [
+            self._mock_pci_device(slot, f"/sys/devices/pci0000:00/{slot}")
+        ]
+
+        self.validator.capture_pci_power_state_change()
+
+        mock_record_cycle_data.assert_called_once_with(
+            f"{slot} (iwlwifi) entered D3cold during s2idle",
+            "💤",
+        )
+
+    def test_capture_pci_power_state_change_no_baseline(self):
+        """Test that the post resume diff is skipped without any baseline"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+        patch.object(self.validator, "pci_power_state", {}).start()
+        patch.object(
+            self.validator.db,
+            "get_pci_power_state",
+            return_value={},
+        ).start()
+
+        slot = "0000:2b:00.0"
+        self._mock_pci_power_files(slot, "active", "1")
+        mock_pyudev.list_devices.return_value = [
+            self._mock_pci_device(slot, f"/sys/devices/pci0000:00/{slot}")
+        ]
+
+        self.validator.capture_pci_power_state_change()
+
+        mock_record_cycle_data.assert_not_called()
+
     def test_capture_thermal(self):
         """Test capture_thermal method"""
         # Mock pyudev devices
