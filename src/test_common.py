@@ -65,6 +65,22 @@ class TestCommon(unittest.TestCase):
     def setUpClass(cls):
         logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
 
+    def setUp(self):
+        """Pin TERM to a known value
+
+        print_color reads TERM from the environment, so the tests would
+        otherwise depend on the terminal the test suite is invoked from.
+        """
+        self.saved_term = os.environ.pop("TERM", None)
+        os.environ["TERM"] = "xterm"
+
+    def tearDown(self):
+        """Restore the original TERM value"""
+        if self.saved_term is None:
+            os.environ.pop("TERM", None)
+        else:
+            os.environ["TERM"] = self.saved_term
+
     def test_read_compare_file(self):
         """Test read_file and compare_file strip files correctly"""
 
