@@ -174,12 +174,14 @@ state during s2idle, so the following is checked:
    Status:                    Enabled
   ```
 
-When the test suspends the system by writing to `/sys/power/state`
-directly, the systemd sleep hooks don't run, so the tool notifies the
-NVIDIA driver itself through `/proc/driver/nvidia/suspend` on both the
-suspend and the resume path.
-
 When the test is run with `--logind`, logind goes through
 `systemd-suspend.service`, which runs the `nvidia-suspend` and
-`nvidia-resume` units if they are enabled; the units are what notify the
-driver in that case.
+`nvidia-resume` units if they are enabled; the units are what notify
+the driver in that case.
+
+When the test suspends the system by writing to `/sys/power/state`
+directly, the tool notifies the driver itself through
+`/proc/driver/nvidia/suspend`.  The enabled units notify the driver on
+every suspend regardless of how it was started, so when they are
+enabled the tool stays out of the way to keep the driver from being
+told about the same event twice.
