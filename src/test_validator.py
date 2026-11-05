@@ -412,6 +412,207 @@ class TestValidator(unittest.TestCase):
         self.addCleanup(patch.stopall)
         return sys_path
 
+    def test_capture_wake_sources_parent_types(self):
+        """Test the wakeup source naming for every parent type"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        self.addCleanup(patch.stopall)
+
+        def make_wake(slot, parent_type, parent_obj):
+            dev = unittest.mock.Mock()
+            dev.sys_path = f"/sys/devices/{slot}"
+            dev.find_parent.side_effect = lambda subsystem=None, device_type=None, DRIVER=None: (
+                parent_obj if subsystem == parent_type else None
+            )
+            dev.properties = {}
+            return dev
+
+        def make_parent(name, sys_name, props=None):
+            parent = unittest.mock.Mock()
+            parent.sys_name = sys_name
+            parent.driver = "button"
+            parent.properties = props if props is not None else {}
+            return parent
+
+        parents = {
+            "i2c": make_parent("", "i2c-DEV"),
+            "thunderbolt": make_parent("thunderbolt_device", "0-1",
+                                       {"USB4_TYPE": "USB4"}),
+            "serio": make_parent("", "serio0"),
+            "rtc": make_parent("", "rtc0"),
+            "mhi": make_parent("", "mhi0"),
+            "hid": make_parent(
+                "HID Device",
+                "0000:0000:0000.0001",
+                {"HID_NAME": "HID Device"},
+            ),
+            "pci": make_parent(
+                "", "0000:2b:00.0",
+                {
+                    "ID_PCI_SUBCLASS_FROM_DATABASE": "Network controller",
+                    "ID_VENDOR_FROM_DATABASE": "Intel Corporation",
+                },
+            ),
+            "acpi": make_parent("", "LID0"),
+            "pnp": make_parent("", "00:03"),
+        }
+        parents["pnp"].driver = "rtc_cmos"
+        parents["acpi"].driver = "battery"
+
+        wake_devices = []
+        for idx, (subsystem, parent) in enumerate(parents.items()):
+            dev = make_wake(f"slot{idx}", subsystem, parent)
+            wake_devices.append(dev)
+
+        def fake_list_devices(subsystem=None, parent=None, DRIVER=None):
+            if subsystem == "wakeup":
+                return wake_devices
+            if subsystem == "input":
+                inp = unittest.mock.Mock()
+                inp.properties = {"NAME": '"Some Input"'}
+                return [inp]
+            if subsystem == "platform":
+                return [unittest.mock.Mock()]
+            if subsystem == "power_supply":
+                ps = unittest.mock.Mock()
+                ps.properties = {
+                    "POWER_SUPPLY_NAME": "BAT0",
+                    "POWER_SUPPLY_TYPE": "Battery",
+                }
+                return [ps]
+            return []
+
+        mock_pyudev.list_devices.side_effect = fake_list_devices
+        patch(
+            "amd_debug.validator.capture.os.path.exists",
+            side_effect=lambda p: p.endswith("power/wakeup"),
+        ).start()
+        patch(
+            "amd_debug.validator.capture.read_file", return_value="enabled"
+        ).start()
+
+        self.validator.capture_wake_sources()
+
+        debug = mock_record_debug.call_args[0][0]
+        self.assertIn("Intel Corporation Network controller|0000:2b:00.0|enabled", debug)
+        self.assertIn("USB4 USB4 controller|0-1|enabled", debug)
+        self.assertIn("Some Input|serio0|enabled", debug)
+        self.assertIn("Real Time Clock alarm timer|rtc0|enabled", debug)
+        self.assertIn("Mobile Broadband host interface|mhi0|enabled", debug)
+        self.assertIn("HID Device|0000:0000:0000.0001|enabled", debug)
+        self.assertIn("ACPI Battery|LID0|enabled", debug)
+        self.assertIn("Plug-n-play Real Time Clock|00:03|enabled", debug)
+        self.assertIn("Some Input|i2c-DEV|enabled", debug)
+
+    def test_capture_wake_sources_no_name_input(self):
+        """Test the input sibling lookup without a NAME property"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        self.addCleanup(patch.stopall)
+
+        parent = unittest.mock.Mock()
+        parent.sys_name = "i2c-DEV"
+        parent.properties = {}
+        wake_dev = unittest.mock.Mock()
+        wake_dev.sys_path = "/sys/devices/slot0"
+        wake_dev.find_parent.side_effect = lambda subsystem=None, device_type=None, DRIVER=None: (
+            parent if subsystem == "i2c" else None
+        )
+        wake_dev.properties = {}
+
+        inp = unittest.mock.Mock()
+        inp.properties = {}
+
+        def fake_list_devices(subsystem=None, parent=None, DRIVER=None):
+            if subsystem == "wakeup":
+                return [wake_dev]
+            if subsystem == "input":
+                return [inp]
+            return []
+
+        mock_pyudev.list_devices.side_effect = fake_list_devices
+        patch(
+            "amd_debug.validator.capture.os.path.exists",
+            return_value=True,
+        ).start()
+        patch(
+            "amd_debug.validator.capture.read_file", return_value="enabled"
+        ).start()
+
+        self.validator.capture_wake_sources()
+
+        debug = mock_record_debug.call_args[0][0]
+        self.assertIn("|i2c-DEV|enabled", debug)
+
+    def test_capture_cpu_cstates_error_branches(self):
+        """Test the cpuidle reader error branches"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        self.addCleanup(patch.stopall)
+        patch(
+            "amd_debug.validator.capture.glob.glob",
+            return_value=["/sys/devices/system/cpu/cpu0"],
+        ).start()
+        patch("amd_debug.validator.capture.os.path.isdir", return_value=True).start()
+        patch(
+            "amd_debug.validator.capture.os.listdir",
+            side_effect=lambda d: ["state0", "state1", "other"],
+        ).start()
+
+        contents = {
+            "/sys/devices/system/cpu/cpu0/cpuidle/state0/name": "POLL",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state0/time": "bad",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state1/name": "C1E",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state1/usage": "bad",
+        }
+        patch("os.path.exists", side_effect=lambda p: p in contents).start()
+        patch(
+            "amd_debug.validator.capture.read_file",
+            side_effect=lambda p: contents[p],
+        ).start()
+
+        states = self.validator._read_cpuidle_states()
+
+        self.assertEqual(
+            states, {"state0": ["POLL", 0, 0], "state1": ["C1E", 0, 0]}
+        )
+        mock_pyudev.list_devices.assert_not_called()
+
+    def test_capture_cpu_cstates_delta_no_baseline(self):
+        """Test the cpuidle delta without a baseline"""
+        patch.object(self.validator.db, "record_debug").start()
+        self.addCleanup(patch.stopall)
+        self.validator.cpu_cstates = {}
+        self.validator.capture_cpu_cstates_delta()
+
+    def test_capture_pci_power_state_change_new_slot(self):
+        """Test that unknown slots are skipped in the post resume diff"""
+        mock_pyudev = patch.object(self.validator, "pyudev").start()
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        self.addCleanup(patch.stopall)
+        slot = "0000:00:00.0"
+        self.validator.pci_power_state = {slot: ("", "active", "1")}
+        patch.object(
+            self.validator,
+            "_read_pci_power_states",
+            return_value={slot: ("", "active", "1"), "0000:ff:00.0": ("x", "active", "0")},
+        ).start()
+
+        self.validator.capture_pci_power_state_change()
+
+        self.assertFalse(
+            any("0000:ff:00.0 runtime status changed" in str(c)
+                for c in mock_record_debug.call_args_list)
+        )
+
     def test_capture_pci_power_state(self):
         """Test capture_pci_power_state method"""
         mock_pyudev = patch.object(self.validator, "pyudev").start()
@@ -1316,6 +1517,109 @@ class TestValidator(unittest.TestCase):
                 "NVIDIA systemd units are enabled, not notifying the driver manually"
             )
 
+    def _fake_dbus(self, can="yes", preparing=(False,), system_bus_exc=None):
+        """Build a fake dbus module for the logind suspend paths"""
+        import types
+
+        fake = types.ModuleType("dbus")
+
+        class DBusException(Exception):
+            pass
+
+        fake.exceptions = types.SimpleNamespace(DBusException=DBusException)
+        manager = unittest.mock.MagicMock()
+        manager.CanSuspend.return_value = can
+        properties = unittest.mock.MagicMock()
+        properties.Get.side_effect = preparing
+
+        def fake_interface(obj, name):
+            if name == "org.freedesktop.DBus.Properties":
+                return properties
+            return manager
+
+        fake.Interface = fake_interface
+        bus = unittest.mock.MagicMock()
+        if system_bus_exc is not None:
+            exc = fake.exceptions.DBusException("no bus")
+            fake.SystemBus = unittest.mock.MagicMock(side_effect=exc)
+        else:
+            fake.SystemBus = unittest.mock.MagicMock(return_value=bus)
+        fake._bus = bus
+        fake._manager = manager
+        return fake
+
+    def test_suspend_system_logind_success(self):
+        """Test the logind suspend path until logind reports ready"""
+        fake = self._fake_dbus(can="yes", preparing=(False,))
+        with patch.dict("sys.modules", {"dbus": fake}), patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_cycle_data:
+            self.validator.logind = True
+            result = self.validator.suspend_system()
+            self.validator.logind = False
+        self.assertTrue(result)
+        fake._manager.Suspend.assert_called_once_with(True)
+        mock_cycle_data.assert_not_called()
+
+    def test_suspend_system_logind_cannot_suspend(self):
+        """Test the logind suspend path when suspend is not possible"""
+        fake = self._fake_dbus(can="no")
+        with patch.dict("sys.modules", {"dbus": fake}), patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_cycle_data:
+            self.validator.logind = True
+            result = self.validator.suspend_system()
+            self.validator.logind = False
+        self.assertFalse(result)
+        fake._manager.Suspend.assert_not_called()
+        mock_cycle_data.assert_called_once_with("Unable to suspend", "❌")
+
+    def test_suspend_system_logind_dbus_exception(self):
+        """Test the logind suspend path with a dbus failure"""
+        fake = self._fake_dbus(system_bus_exc=True)
+        with patch.dict("sys.modules", {"dbus": fake}), patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_cycle_data:
+            self.validator.logind = True
+            result = self.validator.suspend_system()
+            self.validator.logind = False
+        self.assertFalse(result)
+        self.assertIn(
+            "Unable to communicate with logind", mock_cycle_data.call_args[0][0]
+        )
+
+    def test_suspend_system_logind_missing_dbus(self):
+        """Test the logind suspend path without dbus"""
+        with patch.dict("sys.modules", {"dbus": None}), patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_cycle_data:
+            self.validator.logind = True
+            result = self.validator.suspend_system()
+            self.validator.logind = False
+        self.assertFalse(result)
+        self.assertEqual(mock_cycle_data.call_args[0][0], "Missing dbus")
+
+    def test_unlock_session_logind(self):
+        """Test the logind session unlock"""
+        fake = self._fake_dbus()
+        with patch.dict("sys.modules", {"dbus": fake}):
+            self.validator.logind = True
+            result = self.validator.unlock_session()
+            self.validator.logind = False
+        self.assertTrue(result)
+        fake._manager.UnlockSessions.assert_called_once_with()
+
+    def test_unlock_session_dbus_exception(self):
+        """Test the session unlock with a dbus failure"""
+        fake = self._fake_dbus(system_bus_exc=True)
+        with patch.dict("sys.modules", {"dbus": fake}), patch.object(
+            self.validator.db, "record_cycle_data"
+        ) as mock_cycle_data:
+            self.validator.logind = True
+            result = self.validator.unlock_session()
+            self.validator.logind = False
+        self.assertFalse(result)
+
     def test_toggle_pm_debug(self):
         """toggle_pm_debug opens and writes '1' or '0'"""
         m = mock_open()
@@ -1621,3 +1925,96 @@ class TestValidator(unittest.TestCase):
             mock_start_cycle.assert_called_once()
             mock_post.assert_called_once()
             mock_sync.assert_called_once()
+
+
+
+
+class TestAnalysisBranches(unittest.TestCase):
+    """Test the analysis helper branches"""
+
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    def _validator(self):
+        with patch("amd_debug.validator.core.SleepDatabase"), patch(
+            "amd_debug.validator.core.AmdTool.__init__", return_value=None
+        ), patch(
+            "amd_debug.validator.core.get_kernel_log"
+        ) as mock_log, patch(
+            "amd_debug.validator.core.check_lockdown", return_value=False
+        ), patch(
+            "amd_debug.validator.core.Batteries"
+        ), patch(
+            "amd_debug.validator.core.PowerRails"
+        ), patch(
+            "amd_debug.validator.core.AcpicaTracer"
+        ), patch("pyudev.Context"):
+            validator = SleepValidator(tool_debug=False, bios_debug=False)
+        validator.db = MagicMock()
+        validator.kernel_log = MagicMock()
+        mock_log.return_value = validator.kernel_log
+        return validator
+
+    @patch("amd_debug.validator.analysis.sscanf_bios_args")
+    def test_bios_args_string_gets_priority(self, mock_sscanf):
+        """Test that a converted BIOS argument line keeps its message"""
+        validator = self._validator()
+        mock_sscanf.return_value = "converted bios args"
+        validator._analyze_kernel_log_line("some acpi line", 3)
+        validator.db.record_debug.assert_called_with("converted bios args", 7)
+
+    def test_hw_sleep_duration_ignores_non_numeric(self):
+        """Test that non numeric words in the sleep line are skipped"""
+        validator = self._validator()
+        validator._analyze_kernel_log_line(
+            "Last suspend in deepest state for 500000us junk", 3
+        )
+        self.assertEqual(validator.hw_sleep_duration, 0.5)
+
+    def test_upep_amd_guid_message(self):
+        """Test the AMD uPEP GUID debug message"""
+        validator = self._validator()
+        validator._analyze_kernel_log_line(
+            "Successfully transitioned to state lps0 entry", 3
+        )
+        validator.analyze_kernel_log()
+        validator.db.record_debug.assert_any_call("Used AMD uPEP GUID in LPS0 _DSM")
+
+    def test_analyze_duration_short_cycle(self):
+        """Test that short cycles pass without a residency failure"""
+        validator = self._validator()
+        from amd_debug.failures import SpuriousWakeup
+
+        self.assertNotIn(
+            SpuriousWakeup,
+            [type(f) for f in validator.failures],
+        )
+        with patch("amd_debug.validator.analysis.print_color") as mock_color:
+            validator.analyze_duration(
+                datetime(2023, 1, 1, 0, 0, 0),
+                datetime(2023, 1, 1, 0, 0, 5),
+                5,
+                4.0,
+                4.0,
+            )
+        printed = [call.args[0] for call in mock_color.call_args_list]
+        self.assertTrue(any("In a hardware sleep state" in p for p in printed))
+        self.assertEqual(validator.failures, [])
+
+    def test_analyze_duration_spurious_wakeup(self):
+        """Test that an early wakeup adds a spurious wakeup failure"""
+        validator = self._validator()
+        from amd_debug.failures import SpuriousWakeup
+
+        with patch("amd_debug.validator.analysis.print_color"):
+            validator.analyze_duration(
+                datetime(2023, 1, 1, 0, 0, 0),
+                datetime(2023, 1, 1, 0, 0, 2),
+                10,
+                1.0,
+                1.0,
+            )
+        self.assertTrue(
+            any(isinstance(f, SpuriousWakeup) for f in validator.failures)
+        )

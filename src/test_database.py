@@ -4,6 +4,7 @@
 """
 This module contains unit tests for the datbase functions in the amd-debug-tools package.
 """
+import os
 import unittest
 
 from datetime import datetime
@@ -107,6 +108,76 @@ class TestSleepDatabase(unittest.TestCase):
         timestamp = datetime.now()
         self.db.start_cycle(timestamp)
         self.assertEqual(self.db.get_pci_power_state(), {})
+
+    def test_migration_from_v0(self):
+        """Test migration of a version 0 database to the current schema"""
+        import sqlite3 as sqlite3_mod
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            dbf = tmp.name
+        con = sqlite3_mod.connect(dbf)
+        con.execute(
+            "CREATE TABLE debug (t0 INTEGER, id INTEGER, message TEXT, "
+            "PRIMARY KEY(t0, id))"
+        )
+        con.execute("PRAGMA user_version = 0")
+        con.commit()
+        con.close()
+
+        db = SleepDatabase(dbf=dbf)
+        cur = db.db.cursor()
+        columns = [
+            row[1] for row in cur.execute("PRAGMA table_info(debug)").fetchall()
+        ]
+        self.assertIn("priority", columns)
+        cur.execute("PRAGMA user_version")
+        self.assertEqual(cur.fetchone()[0], SCHEMA_VERSION)
+        db.db.close()
+        os.remove(dbf)
+
+    def test_record_debug_file_permission_error(self):
+        """Test that an unreadable file is recorded as a notice"""
+        self.db.start_cycle(datetime.now())
+        with patch("amd_debug.database.read_file", side_effect=PermissionError):
+            self.db.record_debug_file("/sys/protected")
+        cur = self.db.db.cursor()
+        result = cur.execute(
+            "SELECT message FROM debug WHERE message LIKE 'Unable to capture%'"
+        ).fetchall()
+        self.assertEqual(len(result), 1)
+
+    def test_report_battery_and_power_rails(self):
+        """Test the battery and power rail report helpers"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.db.record_battery_energy("BAT0", 1000, 2000, "uWh")
+        self.db.record_power_rail_energy("rail", 10, 0.5)
+        self.assertEqual(len(self.db.report_battery()), 1)
+        self.assertEqual(len(self.db.report_battery(timestamp)), 1)
+        self.assertEqual(
+            self.db.report_power_rails(),
+            [(int(timestamp.strftime("%Y%m%d%H%M%S")), "rail", 10.0, None, 0.5)],
+        )
+
+    def test_report_battery_no_cycle(self):
+        """Test the report helpers without a started cycle"""
+        with self.assertRaises(AssertionError):
+            self.db.report_battery()
+
+    def test_report_summary_dataframe(self):
+        """Test the summary dataframe report"""
+        timestamp = datetime.now()
+        self.db.start_cycle(timestamp)
+        self.db.record_cycle(
+            requested_duration=10,
+            active_gpios="",
+            wakeup_irqs="9",
+            kernel_duration=1.0,
+            hw_sleep_duration=9.0,
+        )
+        df = self.db.report_summary_dataframe(timestamp, timestamp)
+        self.assertEqual(len(df), 1)
 
     def test_record_cycle(self):
         """Test recording a sleep cycle"""

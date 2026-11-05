@@ -1241,5 +1241,252 @@ class TestPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_debug.assert_called_with("ACPI C-state information\n")
 
 
+class TestBaseCoverageBranches(unittest.TestCase):
+    """Test the remaining base, system and device check branches"""
+
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    def setUp(self):
+        with patch("amd_debug.prereq.base.SleepDatabase") as mock_db, patch(
+            "amd_debug.prereq.base.get_kernel_log"
+        ), patch("amd_debug.prereq.base.is_root", return_value=True), patch(
+            "amd_debug.prereq.base.pyudev.Context"
+        ) as mock_pyudev, patch(
+            "amd_debug.prereq.base.get_distro", return_value="Test OS"
+        ), patch(
+            "amd_debug.prereq.base.read_file", return_value="quiet"
+        ), patch("amd_debug.prereq.base.Display"):
+            self.validator = PrerequisiteValidator(tool_debug=True)
+            self.mock_db = mock_db.return_value
+            self.mock_pyudev = mock_pyudev.return_value
+
+    def test_init_requires_root(self):
+        """Test that construction fails without root"""
+        with patch(
+            "amd_debug.prereq.base.get_kernel_log"
+        ), patch("amd_debug.prereq.base.is_root", return_value=False):
+            with self.assertRaises(PermissionError):
+                PrerequisiteValidator(tool_debug=True)
+
+    @patch("amd_debug.prereq.base.read_file", side_effect=FileNotFoundError)
+    def test_get_cpu_vendor_unreadable(self, _mock_read):
+        """Test the cpu vendor lookup with an unreadable cpuinfo"""
+        self.validator.get_cpu_vendor()
+        self.assertEqual(self.validator.cpu_family, None)
+
+    def test_capture_once_runs_without_prereq_data(self):
+        """Test that capture_once runs when there is no prereq data"""
+        self.mock_db.get_last_prereq_ts.return_value = None
+        with patch.object(self.validator, "run") as mock_run:
+            self.validator.capture_once()
+            mock_run.assert_called_once()
+
+    def test_capture_once_skips_with_prereq_data(self):
+        """Test that capture_once does not run with prereq data present"""
+        self.mock_db.get_last_prereq_ts.return_value = "20230101000000"
+        with patch.object(self.validator, "run") as mock_run:
+            self.validator.capture_once()
+            mock_run.assert_not_called()
+
+    def test_report(self):
+        """Test the prereq report output"""
+        from amd_debug.failures import SleepModeWrong
+
+        self.mock_db.get_last_prereq_ts.return_value = "20230101000000"
+        self.mock_db.report_prereq.return_value = [
+            ("20230101000000", 0, "some message", "✅")
+        ]
+        self.mock_db.report_debug.return_value = [("debug line\nsecond",)]
+        for debug in (True, False):
+            self.validator.debug = debug
+            with patch(
+                "amd_debug.prereq.base.print_color"
+            ) as mock_print, patch(
+                "amd_debug.prereq.base.logging.debug"
+            ):
+                self.validator.failures = [SleepModeWrong()]
+                self.validator.report()
+        self.assertTrue(mock_print.called)
+
+    @patch(
+        "amd_debug.prereq.system.subprocess.check_output",
+        side_effect=FileNotFoundError,
+    )
+    @patch("os.path.exists", return_value=True)
+    def test_check_network_ethtool_missing(self, _mock_exists, _mock_output):
+        """Test the wake on lan check without ethtool
+
+        A r8169 network device is returned so that the check reaches the
+        ethtool lookup and hits the missing ethtool path.
+        """
+        net_dev = MagicMock()
+        net_dev.properties = {
+            "INTERFACE": "eth0",
+            "ID_NET_DRIVER": "r8169",
+        }
+        self.mock_pyudev.list_devices.return_value = [net_dev]
+        result = self.validator.check_network()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with("ethtool is missing", "👀")
+
+    @patch("amd_debug.prereq.system.configparser.ConfigParser")
+    @patch("os.path.exists", return_value=True)
+    def test_capture_logind(self, _mock_exists, mock_config):
+        """Test the logind configuration capture"""
+        config = MagicMock()
+        config.read.return_value = None
+        section = MagicMock()
+        section.keys.return_value = ["IdleAction"]
+        section.__getitem__.side_effect = lambda key: "ignore"
+        config.__getitem__.return_value = section
+        mock_config.return_value = config
+        self.validator.capture_logind()
+        self.mock_db.record_debug.assert_any_call("LOGIND: configuration changes:")
+        self.mock_db.record_debug.assert_any_call("\tIdleAction: ignore")
+
+    @patch("amd_debug.prereq.system.configparser.ConfigParser")
+    @patch("os.path.exists", return_value=True)
+    def test_capture_logind_no_changes(self, _mock_exists, mock_config):
+        """Test the logind capture with an empty configuration"""
+        config = MagicMock()
+        config.read.return_value = None
+        section = MagicMock()
+        section.keys.return_value = []
+        config.__getitem__.return_value = section
+        mock_config.return_value = config
+        self.validator.capture_logind()
+        self.mock_db.record_debug.assert_called_once_with(
+            "LOGIND: no configuration changes"
+        )
+
+    def test_check_logger_dmesg_wrapped(self):
+        """Test the logger check with a wrapped kernel ring buffer"""
+        from amd_debug.kernel import DmesgLogger
+        from amd_debug.failures import KernelRingBufferWrapped
+
+        logger = DmesgLogger.__new__(DmesgLogger)
+        logger.capture_header = lambda: "no version here"
+        self.validator.kernel_log = logger
+        result = self.validator.check_logger()
+        self.assertFalse(result)
+        self.assertTrue(
+            any(
+                isinstance(f, KernelRingBufferWrapped)
+                for f in self.validator.failures
+            )
+        )
+
+    def test_check_logger_systemd(self):
+        """Test the logger check with the systemd journal"""
+        from amd_debug.kernel import SystemdLogger
+
+        logger = SystemdLogger.__new__(SystemdLogger)
+        self.validator.kernel_log = logger
+        result = self.validator.check_logger()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "Logs are provided via systemd", "✅"
+        )
+
+    def test_check_device_firmware_no_fwupd(self):
+        """Test the device firmware check without fwupd bindings"""
+        import amd_debug.prereq.devices as devices_module
+
+        with patch.object(devices_module, "FWUPD", False):
+            result = self.validator.check_device_firmware()
+        self.assertTrue(result)
+        self.mock_db.record_debug.assert_called_with(
+            "Device firmware checks unavailable without gobject introspection"
+        )
+
+    def test_check_device_firmware_known_bad_version(self):
+        """Test the detection of the known problematic firmware version
+
+        The fwupd bindings are injected as fake modules so that the test
+        runs on systems where the real bindings are unavailable.
+        """
+        import importlib
+        import sys
+        import types
+
+        import amd_debug.prereq.devices as devices_module
+
+        fake_fwupd = types.ModuleType("gi.repository.Fwupd")
+        fake_fwupd.Client = MagicMock
+        fake_gi = types.ModuleType("gi")
+        fake_gi.require_version = MagicMock()
+        fake_repository = types.ModuleType("gi.repository")
+        fake_repository.GLib = types.ModuleType("gi.repository.GLib")
+        fake_repository.Fwupd = fake_fwupd
+        fake_modules = {
+            "gi": fake_gi,
+            "gi.repository": fake_repository,
+            "gi.repository.GLib": fake_repository.GLib,
+            "gi.repository.Fwupd": fake_fwupd,
+        }
+
+        try:
+            with patch.dict(sys.modules, fake_modules):
+                importlib.reload(devices_module)
+                self.assertTrue(devices_module.FWUPD)
+
+                device = MagicMock()
+                device.get_guids.return_value = []
+                device.get_instance_ids.return_value = [
+                    "8c36f7ee-cc11-4a36-b090-6363f54ecac2"
+                ]
+                device.get_version.return_value = "0.1.26"
+                device.get_plugin.return_value = "nvme"
+                device.get_name.return_value = "NVME DEVICE"
+                with patch.object(
+                    devices_module.Fwupd, "Client"
+                ) as mock_client:
+                    mock_client.return_value.get_devices.return_value = [device]
+                    result = self.validator.check_device_firmware()
+        finally:
+            # restore the module with the real bindings
+            importlib.reload(devices_module)
+
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_once()
+        self.assertIn("Upgrade the firmware", self.mock_db.record_prereq.call_args[0][0])
+
+    def test_capture_pci_acpi_single_device(self):
+        """Test the pci to acpi mapping table prefixes"""
+        dev = MagicMock()
+        dev.properties = {
+            "PCI_ID": "8086:7D01",
+            "PCI_SLOT_NAME": "0000:00:00.0",
+        }
+        dev.parent.subsystem = "pci"
+        self.mock_pyudev.list_devices.return_value = [dev]
+        with patch(
+            "amd_debug.prereq.devices.get_property_pyudev", return_value=""
+        ), patch("os.path.exists", return_value=False):
+            self.validator.capture_pci_acpi()
+        debug = self.mock_db.record_debug.call_args[0][0]
+        self.assertIn("└─0000:00:00.0", debug)
+
+    def test_check_i2c_hid_no_devices(self):
+        """Test the i2c hid check with no i2c devices"""
+        dev = MagicMock()
+        dev.properties = {"NAME": "touchpad"}
+        dev.find_parent.return_value = None
+        self.mock_pyudev.list_devices.return_value = [dev]
+        result = self.validator.check_i2c_hid()
+        self.assertTrue(result)
+        self.mock_db.record_debug.assert_not_called()
+
+    @patch("os.path.exists", side_effect=lambda p: "FACP" in p or p.endswith("status"))
+    def test_map_acpi_path_missing_path(self, _mock_exists):
+        """Test the acpi path mapping with a device without a path"""
+        dev = MagicMock()
+        dev.sys_path = "/sys/devices/LNXSYSTM"
+        self.mock_pyudev.list_devices.return_value = [dev]
+        self.validator.map_acpi_path()
+
+
 if __name__ == "__main__":
     unittest.main()

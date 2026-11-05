@@ -285,5 +285,15 @@ class TestAmdStorageChecks(unittest.TestCase):
         )
 
 
+    def test_check_wcn6855_bug_no_kernel_log(self):
+        """Test the wcn6855 check without a kernel log"""
+        self.validator.kernel_log = None
+        result = self.validator.check_wcn6855_bug()
+        self.assertTrue(result)
+        self.validator.db.record_prereq.assert_called_with(
+            "Unable to test for wcn6855 bug from kernel log", "🚦"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

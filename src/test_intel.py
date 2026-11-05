@@ -17,6 +17,7 @@ from amd_debug.intel import (
     get_lps0_disabled,
     intel_pmc_core_loaded,
     IntelPmcCore,
+    parse_counter_file,
     parse_substate_requirements,
     parse_substate_residencies,
     S0IX_SUBSTATES,
@@ -473,6 +474,73 @@ class TestLps0(unittest.TestCase):
         """Test that a missing intel_pmc_core driver is detected"""
         mock_exists.return_value = False
         self.assertFalse(intel_pmc_core_loaded())
+
+
+class TestIntelReaderEdges(unittest.TestCase):
+    """Test the error branches of the intel reader helpers"""
+
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    @patch("amd_debug.intel.IntelPmcCore._read", return_value=None)
+    def test_readers_missing_file(self, _mock_read):
+        """Test that the readers return empty when the file is missing"""
+        pmc = IntelPmcCore()
+        self.assertEqual(pmc.read_substate_residencies(), {})
+        self.assertEqual(pmc.read_package_cstates(), {})
+        self.assertEqual(pmc.read_core_cstates(), {})
+        self.assertIsNone(pmc.read_die_c6_residency())
+
+    @patch("amd_debug.intel.IntelPmcCore._read", return_value="not a number")
+    def test_read_die_c6_invalid(self, _mock_read):
+        """Test that an invalid die C6 value returns None"""
+        pmc = IntelPmcCore()
+        self.assertIsNone(pmc.read_die_c6_residency())
+
+    def test_parse_counter_file(self):
+        """Test the counter file parser"""
+        counters = parse_counter_file(
+            "Package C2 : 743538\nPackage C3 : 1250\ngarbage\n"
+            "Package C6 : notanumber\n"
+        )
+        self.assertEqual(counters, {"Package C2": 743538, "Package C3": 1250})
+
+    def test_parse_counter_file_empty(self):
+        """Test the counter file parser on an empty file"""
+        self.assertEqual(parse_counter_file(""), {})
+
+    @patch("amd_debug.intel.IntelPmcCore._read")
+    def test_read_package_cstates(self, mock_read):
+        """Test the package C-state reader"""
+        mock_read.return_value = "Package C2 : 743538\n"
+        pmc = IntelPmcCore()
+        self.assertEqual(pmc.read_package_cstates(), {"Package C2": 743538})
+        mock_read.assert_called_once_with("package_cstate_show")
+
+    @patch("amd_debug.intel.IntelPmcCore._read")
+    def test_read_core_cstates(self, mock_read):
+        """Test the core C-state reader"""
+        mock_read.return_value = "Core C6 : 100\n"
+        pmc = IntelPmcCore()
+        self.assertEqual(pmc.read_core_cstates(), {"Core C6": 100})
+        mock_read.assert_called_once_with("core_residency")
+
+    @patch("amd_debug.intel.IntelPmcCore._read")
+    def test_read_substate_residencies_invalid(self, mock_read):
+        """Test that invalid substate residencies are skipped"""
+        mock_read.return_value = "S0i2.0 notanumber\nS0i2.1 5\n"
+        pmc = IntelPmcCore()
+        self.assertEqual(pmc.read_substate_residencies(), {"S0i2.1": 5})
+
+    def test_parse_substate_requirements_short_line(self):
+        """Test that lines without the requirement columns are skipped"""
+        self.assertEqual(parse_substate_requirements("no pipes here\n"), [])
+
+    def test_parse_substate_requirements_empty_element(self):
+        """Test that lines without an element name are skipped"""
+        contents = "pmc0:                      |  Required |\n"
+        self.assertEqual(parse_substate_requirements(contents), [])
 
 
 if __name__ == "__main__":
