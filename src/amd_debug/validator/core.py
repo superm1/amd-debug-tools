@@ -113,6 +113,9 @@ class SleepValidator(
         self.page_faults = []
         self.notify_devices = []
         self.pci_power_state = {}
+        self.cpu_cstates = {}
+        self.cpu_cstates_s2idle = False
+        self.intel_cstates_before = None
         self.pmc_core = None
         self.s0ix_residency = 0
         self.s0ix_residency_before = None
@@ -193,6 +196,8 @@ class SleepValidator(
             self.capture_hw_sleep,
             self.capture_intel_substate_delta,
             self.capture_intel_s0ix_blockers,
+            self.capture_intel_cstates_delta,
+            self.capture_cpu_cstates_delta,
             self.capture_pci_power_state_change,
             self.capture_battery,
             self.capture_power_rails,
@@ -227,6 +232,8 @@ class SleepValidator(
         self.capture_running_compositors()
         self.capture_power_profile()
         self.capture_pci_power_state()
+        self.capture_cpu_cstates()
+        self.capture_intel_cstates()
         self.capture_amdgpu_ips_status()
         self.capture_thermal()
         self.capture_input_wakeup_count()

@@ -116,6 +116,50 @@ class IntelCaptureHelpers:
             debug_str += f"│ {name}: {delta}\n"
         self.db.record_debug(debug_str)
 
+    def capture_intel_cstates(self):
+        """Capture the package and die C-state residency counters
+
+        The counters are read before the system suspends so that the
+        change during the cycle can be calculated after the resume.
+        """
+        pmc = self._intel_pmc()
+        if pmc is None:
+            return
+        self.intel_cstates_before = {
+            "package": pmc.read_package_cstates(),
+            "die C6": pmc.read_die_c6_residency(),
+        }
+
+    def capture_intel_cstates_delta(self):
+        """Report the package level C-states of the sleep cycle
+
+        The package and die level counters show how deep the system got
+        below the core C-states, which the cpuidle counters of the
+        individual CPUs don't cover.
+        """
+        before = getattr(self, "intel_cstates_before", None)
+        if not before:
+            return
+        pmc = self._intel_pmc()
+        if pmc is None:
+            return
+        debug_str = "Package C-state residency during the cycle\n"
+        for name, value in pmc.read_package_cstates().items():
+            old = before["package"].get(name, value)
+            delta = value - old
+            if delta > 0:
+                debug_str += f"│ {name}: {delta} usec\n"
+        die = pmc.read_die_c6_residency()
+        if die is not None:
+            old = before["die C6"]
+            if old is None:
+                old = die
+            delta = die - old
+            if delta > 0:
+                debug_str += f"│ die C6: {delta} usec\n"
+        if debug_str != "Package C-state residency during the cycle\n":
+            self.db.record_debug(debug_str)
+
     def capture_intel_s0ix_blockers(self):
         """Capture the IPs that are blocking the deeper S0ix substates"""
         pmc = self._intel_pmc()

@@ -27,6 +27,7 @@ class FakeIntelCapture(IntelCaptureHelpers):
         self.s0ix_residency = 0
         self.s0ix_residency_before = None
         self.s0ix_substates_before = {}
+        self.intel_cstates_before = None
 
 
 class TestIntelCaptureHelpers(unittest.TestCase):
@@ -199,6 +200,57 @@ class TestIntelCaptureHelpers(unittest.TestCase):
         self.validator.pmc_core = pmc
         self.validator.s0ix_substates_before = {"S0i2.0": 4}
         self.validator.capture_intel_substate_delta()
+        self.validator.db.record_debug.assert_not_called()
+
+    @patch("amd_debug.validator.intel.IntelPmcCore")
+    def test_capture_intel_cstates(self, mock_pmc):
+        """Test that the package and die C-state counters are captured"""
+        pmc = mock_pmc.return_value
+        pmc.available = True
+        pmc.read_package_cstates.return_value = {"Package C2": 743538}
+        pmc.read_die_c6_residency.return_value = 12345
+        self.validator.pmc_core = None
+
+        self.validator.capture_intel_cstates()
+
+        self.assertEqual(
+            self.validator.intel_cstates_before,
+            {"package": {"Package C2": 743538}, "die C6": 12345},
+        )
+
+    @patch("amd_debug.validator.intel.IntelPmcCore")
+    def test_capture_intel_cstates_delta(self, mock_pmc):
+        """Test that the package C-state residency delta is recorded"""
+        pmc = mock_pmc.return_value
+        pmc.available = True
+        pmc.read_package_cstates.return_value = {
+            "Package C2": 843538,
+            "Package C6": 0,
+        }
+        pmc.read_die_c6_residency.return_value = 14745
+        self.validator.pmc_core = pmc
+        self.validator.intel_cstates_before = {
+            "package": {"Package C2": 743538},
+            "die C6": 12345,
+        }
+
+        self.validator.capture_intel_cstates_delta()
+
+        self.validator.db.record_debug.assert_called_once_with(
+            "Package C-state residency during the cycle\n"
+            "│ Package C2: 100000 usec\n"
+            "│ die C6: 2400 usec\n"
+        )
+
+    @patch("amd_debug.validator.intel.IntelPmcCore")
+    def test_capture_intel_cstates_no_pmc(self, mock_pmc):
+        """Test that no C-state counters are captured without a PMC"""
+        mock_pmc.return_value.available = False
+        self.validator.pmc_core = None
+
+        self.validator.capture_intel_cstates()
+
+        self.assertIsNone(self.validator.intel_cstates_before)
         self.validator.db.record_debug.assert_not_called()
 
     @patch("amd_debug.validator.intel.IntelPmcCore")

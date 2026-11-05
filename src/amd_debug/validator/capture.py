@@ -19,6 +19,17 @@ from amd_debug.kernel import get_kernel_command_line
 from amd_debug.failures import RtcAlarmWrong
 
 
+def _cpuidle_state_index(name):
+    """Sort key that orders cpuidle states by their numeric index
+
+    A lexical sort would put state10 before state2.
+    """
+    try:
+        return int(name[len("state"):])
+    except ValueError:
+        return -1
+
+
 class CaptureHelpers:
     """Mixin providing the data capture helpers for the sleep validator"""
 
@@ -355,6 +366,105 @@ class CaptureHelpers:
                 f"Woke up from input source {device} ({self.wakeup_count[device]}->{count})",
             )
         self.wakeup_count = wakeup_count
+
+    def _read_cpuidle_states(self):
+        """Read the cpuidle state counters of every CPU
+
+        When the kernel exposes the suspend specific s2idle counters
+        inside each state directory, those are used, since they only
+        track the time spent in each state while the system is
+        suspended.  Older kernels fall back to the regular counters,
+        which accumulate across runtime and suspend alike.
+
+        The counters are per CPU, so the time and the number of entries
+        of each state are summed across all the CPUs of the system.  The
+        states are ordered by their cpuidle index, which the idle drivers
+        sort by increasing exit latency, i.e. from shallowest to deepest.
+        """
+        states = {}
+        s2idle_counters = False
+        for cpu in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*")):
+            cpuidle = os.path.join(cpu, "cpuidle")
+            if not os.path.isdir(cpuidle):
+                continue
+            for state in sorted(os.listdir(cpuidle), key=_cpuidle_state_index):
+                if not state.startswith("state"):
+                    continue
+                p = os.path.join(cpuidle, state, "name")
+                if not os.path.exists(p):
+                    continue
+                name = read_file(p)
+                time_us = 0
+                usage = 0
+                s2idle_dir = os.path.join(cpuidle, state, "s2idle")
+                if os.path.isdir(s2idle_dir):
+                    s2idle_counters = True
+                    time_path = os.path.join(s2idle_dir, "time")
+                    usage_path = os.path.join(s2idle_dir, "usage")
+                else:
+                    time_path = os.path.join(cpuidle, state, "time")
+                    usage_path = os.path.join(cpuidle, state, "usage")
+                if os.path.exists(time_path):
+                    try:
+                        time_us = int(read_file(time_path))
+                    except ValueError:
+                        pass
+                if os.path.exists(usage_path):
+                    try:
+                        usage = int(read_file(usage_path))
+                    except ValueError:
+                        pass
+                totals = states.setdefault(state, [name, 0, 0])
+                totals[1] += time_us
+                totals[2] += usage
+        self.cpu_cstates_s2idle = s2idle_counters
+        return states
+
+    def capture_cpu_cstates(self):
+        """Capture the C-state residency of the CPUs
+
+        The counters are read before the system suspends so that the
+        time spent in each C-state during the sleep cycle can be worked
+        out from the difference.
+        """
+        self.cpu_cstates = self._read_cpuidle_states()
+        source = "suspend" if self.cpu_cstates_s2idle else "runtime"
+        debug_str = f"C-state ({source} counters)|Name|Time (us)|Entries\n"
+        for state in sorted(self.cpu_cstates, key=_cpuidle_state_index):
+            name, time_us, usage = self.cpu_cstates[state]
+            debug_str += f"{state}|{name}|{time_us}|{usage}\n"
+        self.db.record_debug(debug_str)
+
+    def capture_cpu_cstates_delta(self):
+        """Report the C-states the CPUs spent the sleep cycle in"""
+        before = getattr(self, "cpu_cstates", None)
+        if not before:
+            return
+        after = self._read_cpuidle_states()
+        deepest = None
+        debug_str = "C-state residency during the cycle\n"
+        for state in sorted(after, key=_cpuidle_state_index):
+            name, time_us, usage = after[state]
+            _name, old_time, old_usage = before.get(state, (name, 0, 0))
+            delta_time = time_us - old_time
+            delta_usage = usage - old_usage
+            if delta_time <= 0 and delta_usage <= 0:
+                continue
+            debug_str += (
+                f"│ {name}: {delta_time / 10**6:.2f}s "
+                f"({delta_usage} entries)\n"
+            )
+            deepest = name
+        if deepest is None:
+            self.db.record_debug(
+                "No C-state residency change during the cycle"
+            )
+        else:
+            self.db.record_debug(debug_str)
+            self.db.record_cycle_data(
+                f"Deepest C-state entered: {deepest}", "💤"
+            )
+        self.cpu_cstates = after
 
     def _read_pci_power_states(self):
         """Read the power state of all PCI devices"""

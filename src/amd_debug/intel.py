@@ -124,6 +124,47 @@ class IntelPmcCore:
             return ""
         return contents
 
+    def read_package_cstates(self):
+        """Read the package C-state residency counters
+
+        The file has the following format::
+
+            Package C2 : 743538
+            Package C3 : 1250
+
+        The counters are cumulative and report microseconds.
+        """
+        contents = self._read("package_cstate_show")
+        if contents is None:
+            return {}
+        return parse_counter_file(contents)
+
+    def read_core_cstates(self):
+        """Read the core C-state residency counters
+
+        The counters are cumulative.  They are only exposed by older
+        generations of the PMC.
+        """
+        contents = self._read("core_residency")
+        if contents is None:
+            return {}
+        return parse_counter_file(contents)
+
+    def read_die_c6_residency(self):
+        """Read the die C6 residency counter in microseconds
+
+        The die C6 state is the tile based successor of the package C6
+        state, so this is what modern SoCs report instead of the
+        package C6 counter.
+        """
+        contents = self._read("die_c6_us_show")
+        if contents is None:
+            return None
+        try:
+            return int(contents.strip())
+        except ValueError:
+            return None
+
     def capture(self):
         """Capture all of the available PMC core data"""
         self.slp_s0_residency = self.read_slp_s0_residency()
@@ -131,6 +172,20 @@ class IntelPmcCore:
         self.substate_requirements = self.read_substate_requirements()
         self.substate_status_registers = self.read_substate_status_registers()
         self.substate_live_status_registers = self.read_substate_live_status_registers()
+
+
+def parse_counter_file(contents: str) -> dict:
+    """Parse a ``Name: value`` counter file into a dict"""
+    counters = {}
+    for line in contents.split("\n"):
+        if ":" not in line:
+            continue
+        key, _sep, value = line.partition(":")
+        try:
+            counters[key.strip()] = int(value.strip())
+        except ValueError:
+            continue
+    return counters
 
 
 def parse_substate_requirements(contents: str) -> list:
