@@ -217,6 +217,164 @@ class TestValidator(unittest.TestCase):
                 "Woke up from IRQ 123 (chip_name_mock hw_mock-irq_name_mock actions_mock)"
             )
 
+    def test_capture_cpu_cstates(self):
+        """Test capture_cpu_cstates method"""
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        patch(
+            "amd_debug.validator.capture.glob.glob",
+            return_value=[
+                "/sys/devices/system/cpu/cpu0",
+                "/sys/devices/system/cpu/cpu1",
+            ],
+        ).start()
+        patch(
+            "os.path.isdir",
+            side_effect=lambda d: not d.endswith("s2idle"),
+        ).start()
+        patch(
+            "amd_debug.validator.capture.os.listdir",
+            side_effect=lambda d: ["state1", "state0", "state10"],
+        ).start()
+
+        contents = {
+            "/sys/devices/system/cpu/cpu0/cpuidle/state0/name": "POLL",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state0/time": "10",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state0/usage": "2",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state1/name": "C1E",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state1/time": "100",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state1/usage": "4",
+            "/sys/devices/system/cpu/cpu1/cpuidle/state0/name": "POLL",
+            "/sys/devices/system/cpu/cpu1/cpuidle/state0/time": "30",
+            "/sys/devices/system/cpu/cpu1/cpuidle/state0/usage": "6",
+            "/sys/devices/system/cpu/cpu1/cpuidle/state1/name": "C1E",
+            "/sys/devices/system/cpu/cpu1/cpuidle/state1/time": "200",
+            "/sys/devices/system/cpu/cpu1/cpuidle/state1/usage": "8",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state10/name": "C10",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state10/time": "1000",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state10/usage": "16",
+        }
+        patch("os.path.exists", side_effect=lambda p: p in contents).start()
+        patch(
+            "amd_debug.validator.capture.read_file",
+            side_effect=lambda p: contents[p],
+        ).start()
+        self.addCleanup(patch.stopall)
+
+        self.validator.capture_cpu_cstates()
+
+        mock_record_debug.assert_called_once_with(
+            "C-state (runtime counters)|Name|Time (us)|Entries\n"
+            "state0|POLL|40|8\n"
+            "state1|C1E|300|12\n"
+            "state10|C10|1000|16\n"
+        )
+        self.assertFalse(self.validator.cpu_cstates_s2idle)
+        self.assertEqual(
+            self.validator.cpu_cstates,
+            {
+                "state0": ["POLL", 40, 8],
+                "state1": ["C1E", 300, 12],
+                "state10": ["C10", 1000, 16],
+            },
+        )
+
+    def test_capture_cpu_cstates_s2idle(self):
+        """Test that the suspend specific counters are preferred"""
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        self.addCleanup(patch.stopall)
+        patch(
+            "amd_debug.validator.capture.glob.glob",
+            return_value=["/sys/devices/system/cpu/cpu0"],
+        ).start()
+        patch("amd_debug.validator.capture.os.path.isdir", return_value=True).start()
+        patch(
+            "amd_debug.validator.capture.os.listdir",
+            side_effect=lambda d: ["state2", "state3"],
+        ).start()
+
+        contents = {
+            "/sys/devices/system/cpu/cpu0/cpuidle/state2/name": "C6",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state2/time": "999999",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state2/usage": "99",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state3/name": "C10",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state3/time": "7777777",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state3/usage": "77",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state2/s2idle/time": "5",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state2/s2idle/usage": "1",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state3/s2idle/time": "44387403",
+            "/sys/devices/system/cpu/cpu0/cpuidle/state3/s2idle/usage": "16",
+        }
+        patch("os.path.exists", side_effect=lambda p: p in contents).start()
+        patch(
+            "amd_debug.validator.capture.read_file",
+            side_effect=lambda p: contents[p],
+        ).start()
+
+        self.validator.capture_cpu_cstates()
+
+        mock_record_debug.assert_called_once_with(
+            "C-state (suspend counters)|Name|Time (us)|Entries\n"
+            "state2|C6|5|1\n"
+            "state3|C10|44387403|16\n"
+        )
+        self.assertTrue(self.validator.cpu_cstates_s2idle)
+
+    def test_capture_cpu_cstates_delta(self):
+        """Test capture_cpu_cstates_delta method"""
+        mock_record_debug = patch.object(
+            self.validator.db, "record_debug"
+        ).start()
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+        self.validator.cpu_cstates = {
+            "state0": ["POLL", 40, 8],
+            "state2": ["C6", 100, 4],
+            "state3": ["C10", 1000, 10],
+        }
+        patch.object(
+            self.validator,
+            "_read_cpuidle_states",
+            return_value={
+                "state0": ["POLL", 40, 8],
+                "state2": ["C6", 8100100, 14],
+                "state3": ["C10", 10000000, 12],
+            },
+        ).start()
+        self.addCleanup(patch.stopall)
+
+        self.validator.capture_cpu_cstates_delta()
+
+        mock_record_debug.assert_any_call(
+            "C-state residency during the cycle\n"
+            "│ C6: 8.10s (10 entries)\n"
+            "│ C10: 10.00s (2 entries)\n"
+        )
+        mock_record_cycle_data.assert_called_once_with(
+            "Deepest C-state entered: C10", "💤"
+        )
+
+    def test_capture_cpu_cstates_delta_no_change(self):
+        """Test the no change notice for the cpuidle counters"""
+        mock_record_cycle_data = patch.object(
+            self.validator.db, "record_cycle_data"
+        ).start()
+        self.validator.cpu_cstates = {"state2": ["C6", 100, 4]}
+        patch.object(
+            self.validator,
+            "_read_cpuidle_states",
+            return_value={"state2": ["C6", 100, 4]},
+        ).start()
+        self.addCleanup(patch.stopall)
+
+        self.validator.capture_cpu_cstates_delta()
+
+        mock_record_cycle_data.assert_not_called()
+
     def _mock_pci_device(self, slot, sys_path):
         """Create a mock PCI device for the power state tests"""
         device = unittest.mock.Mock()
