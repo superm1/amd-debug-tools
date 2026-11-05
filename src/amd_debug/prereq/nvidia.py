@@ -11,13 +11,14 @@ the S0ix state during s2idle:
     so that the driver puts the GPU into self refresh mode during s2idle.
   * The GPU has to support video memory self refresh, otherwise the driver
     cannot power the GPU down during s2idle.
-  * The systemd units that notify the driver of suspend/resume events have
-    to be enabled so that the driver can save and restore its state.
+  * The driver has to be notified of the suspend and resume events.  The
+    preferred method is the kernel sleep notifiers, active when the
+    ``NVreg_UseKernelSuspendNotifiers`` module parameter is set.  The
+    legacy method uses the ``nvidia-suspend``, ``nvidia-resume`` and
+    ``nvidia-hibernate`` systemd units.  When neither is configured the
+    tool reports the legacy method as a possible improvement rather than
+    an error.
 """
-
-import logging
-import os
-import subprocess
 
 from amd_debug.nvidia import (
     get_module_params,
@@ -25,6 +26,7 @@ from amd_debug.nvidia import (
     get_s0ix_param,
     systemd_unit_enabled,
     systemd_unit_installed,
+    KERNEL_NOTIFIERS_PARAM,
     POWERD_UNIT,
     S0IX_DISABLED,
     S0IX_ENABLED,
@@ -36,7 +38,6 @@ from amd_debug.nvidia import (
 from amd_debug.failures import (
     NvidiaS0ixDisabled,
     NvidiaS0ixUnsupported,
-    NvidiaSuspendUnitsMissing,
 )
 
 
@@ -147,24 +148,28 @@ class NvidiaChecks:
         return True
 
     def check_nvidia_suspend_units(self):
-        """Check that the NVIDIA suspend/resume systemd units are enabled
+        """Check how the NVIDIA driver is notified of the suspend events
 
-        The units are what notify the NVIDIA driver of the suspend and
-        resume events.  Without them the driver doesn't get the chance to
-        save and restore its state, which can cause the system to fail to
-        resume.
+        The preferred method is the kernel sleep notifiers, which are
+        active when the ``UseKernelSuspendNotifiers`` module parameter is
+        set.  The driver then handles saving and restoring its state
+        itself and the systemd units are not needed.
 
-        The driver can also handle the notifications itself when the
-        UseKernelSuspendNotifiers module parameter is set, in which case
-        the units are not needed.
+        The legacy method uses the ``nvidia-suspend``, ``nvidia-resume``
+        and ``nvidia-hibernate`` systemd units.  When the driver doesn't
+        use the kernel sleep notifiers and the units are not enabled, the
+        driver doesn't get the chance to save and restore its state.  This
+        is reported as a possible improvement rather than an error, since
+        recent drivers handle the suspend transitions internally.
         """
         gpus = get_nvidia_gpus()
         if not gpus:
             return True
-        if get_module_params().get("UseKernelSuspendNotifiers") == "1":
-            self.db.record_debug(
-                "NVIDIA driver kernel suspend notifiers are enabled, "
-                "the systemd units are not needed"
+        if get_module_params().get(KERNEL_NOTIFIERS_PARAM) == "1":
+            self.db.record_prereq(
+                "NVIDIA driver is notified of suspend/resume via kernel "
+                "sleep notifiers",
+                "✅",
             )
             return True
         missing = []
@@ -175,10 +180,12 @@ class NvidiaChecks:
                 missing.append(unit)
         if missing:
             self.db.record_prereq(
-                f"NVIDIA systemd units are not enabled: {', '.join(missing)}", "❌"
+                f"NVIDIA systemd units are not enabled: {', '.join(missing)} "
+                "(configure the kernel sleep notifiers or enable the units "
+                "to notify the driver of the suspend/resume events)",
+                "🚦",
             )
-            self.failures += [NvidiaSuspendUnitsMissing(missing)]
-            return False
+            return True
         self.db.record_prereq("NVIDIA systemd units are enabled", "✅")
         return True
 

@@ -748,20 +748,3 @@ class NvidiaS0ixUnsupported(S0i3Failure):
             "increases power consumption and prevents the platform from "
             "reaching the deeper S0ix substates."
         )
-
-
-class NvidiaSuspendUnitsMissing(S0i3Failure):
-    """The NVIDIA systemd units are not enabled"""
-
-    def __init__(self, units=None):
-        super().__init__()
-        self.description = "NVIDIA systemd units are not enabled"
-        self.explanation = (
-            "The nvidia-suspend, nvidia-resume and nvidia-hibernate systemd "
-            "units are what notify the NVIDIA driver of the suspend and resume "
-            "events. Without them the driver doesn't get the chance to save "
-            "and restore its state, which can cause the system to fail to "
-            "resume."
-        )
-        if units:
-            self.explanation += f" Not enabled: {', '.join(units)}."
