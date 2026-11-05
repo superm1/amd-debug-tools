@@ -243,6 +243,48 @@ class TestIntelCaptureHelpers(unittest.TestCase):
         )
 
     @patch("amd_debug.validator.intel.IntelPmcCore")
+    def test_capture_intel_cstates_delta_no_before(self, mock_pmc):
+        """Test that no delta is reported without a baseline"""
+        mock_pmc.return_value.available = True
+        self.validator.pmc_core = mock_pmc.return_value
+        self.validator.intel_cstates_before = None
+
+        self.validator.capture_intel_cstates_delta()
+
+        self.validator.db.record_debug.assert_not_called()
+
+    @patch("amd_debug.validator.intel.IntelPmcCore")
+    def test_capture_intel_cstates_delta_no_pmc(self, mock_pmc):
+        """Test that no delta is reported without a PMC core"""
+        mock_pmc.return_value.available = False
+        self.validator.pmc_core = None
+        self.validator.intel_cstates_before = {
+            "package": {},
+            "die C6": None,
+        }
+
+        self.validator.capture_intel_cstates_delta()
+
+        self.validator.db.record_debug.assert_not_called()
+
+    @patch("amd_debug.validator.intel.IntelPmcCore")
+    def test_capture_intel_cstates_delta_no_die_baseline(self, mock_pmc):
+        """Test that a missing die C6 baseline reports no change"""
+        pmc = mock_pmc.return_value
+        pmc.available = True
+        pmc.read_package_cstates.return_value = {}
+        pmc.read_die_c6_residency.return_value = 5000
+        self.validator.pmc_core = pmc
+        self.validator.intel_cstates_before = {
+            "package": {},
+            "die C6": None,
+        }
+
+        self.validator.capture_intel_cstates_delta()
+
+        self.validator.db.record_debug.assert_not_called()
+
+    @patch("amd_debug.validator.intel.IntelPmcCore")
     def test_capture_intel_cstates_no_pmc(self, mock_pmc):
         """Test that no C-state counters are captured without a PMC"""
         mock_pmc.return_value.available = False

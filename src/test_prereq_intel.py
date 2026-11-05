@@ -300,5 +300,13 @@ class TestIntelPrerequisiteValidator(unittest.TestCase):
         self.assertIn("S0i3.4", S0IX_SUBSTATES)
 
 
+    def test_vendor_lists(self):
+        """Test the intel vendor info and check lists"""
+        info = self.validator.vendor_info()
+        checks = self.validator.vendor_checks()
+        self.assertTrue(all(callable(i) for i in info))
+        self.assertTrue(all(callable(c) for c in checks))
+
+
 if __name__ == "__main__":
     unittest.main()

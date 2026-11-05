@@ -1766,5 +1766,158 @@ class TestAmdPrerequisiteValidator(unittest.TestCase):
         self.mock_db.record_prereq.assert_not_called()
 
 
+class TestAmdCoverageBranches(unittest.TestCase):
+    """Test the remaining amd prerequisite branches"""
+
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(filename="/dev/null", level=logging.DEBUG)
+
+    @patch("amd_debug.prereq.base.is_root", return_value=True)
+    @patch("amd_debug.prereq.base.get_kernel_log")
+    @patch("amd_debug.prereq.base.get_distro", return_value="Ubuntu")
+    @patch("amd_debug.prereq.base.read_file", return_value="mocked_cmdline")
+    @patch("amd_debug.prereq.base.pyudev.Context")
+    @patch("amd_debug.prereq.base.SleepDatabase")
+    def setUp(
+        self,
+        MockSleepDatabase,
+        MockPyudev,
+        _mock_read_file,
+        _mock_get_distro,
+        mock_get_kernel_log,
+        _mock_is_root,
+    ):
+        self.mock_db = MockSleepDatabase.return_value
+        self.mock_kernel_log = mock_get_kernel_log.return_value
+        self.validator = AmdPrerequisiteValidator(tool_debug=True)
+
+    @patch("amd_debug.prereq.amd_platform.minimum_kernel", return_value=False)
+    @patch("amd_debug.prereq.amd_platform.platform.uname")
+    @patch("os.path.exists", return_value=True)
+    @patch("amd_debug.prereq.amd_platform.read_file", return_value="")
+    def test_check_amd_hsmp_present(
+        self, _mock_read, _mock_exists, mock_uname, _mock_min_kernel
+    ):
+        """Test the amd_hsmp conflict detection"""
+        mock_uname.return_value.release = "6.9.0"
+        result = self.validator.check_amd_hsmp()
+        self.assertFalse(result)
+        self.assertTrue(
+            any(type(f).__name__ == "AmdHsmpBug" for f in self.validator.failures)
+        )
+
+    @patch("amd_debug.prereq.amd_platform.minimum_kernel", return_value=False)
+    @patch("os.path.exists", return_value=True)
+    @patch(
+        "amd_debug.prereq.amd_platform.read_file",
+        return_value="initcall_blacklist=hsmp_plt_init",
+    )
+    def test_check_amd_hsmp_blocked(self, _mock_read, _mock_exists, _mock_kernel):
+        """Test the amd_hsmp detection with the initcall blacklist"""
+        result = self.validator.check_amd_hsmp()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "HSMP driver `amd_hsmp` not detected (blocked: True)", "✅"
+        )
+
+    @patch("amd_debug.prereq.amd_platform.minimum_kernel", return_value=False)
+    @patch("os.path.exists", return_value=False)
+    @patch("amd_debug.prereq.amd_platform.read_file", return_value="")
+    def test_check_amd_hsmp_absent(self, _mock_read, _mock_exists, _mock_kernel):
+        """Test the amd_hsmp detection without the driver"""
+        result = self.validator.check_amd_hsmp()
+        self.assertTrue(result)
+
+    def _iommu_setup(self):
+        """Prepare the mocks for the iommu ivrs branches"""
+        self.validator.cpu_family = 0x1A
+        self.validator.cpu_model = 0x61
+        iommu_dev = MagicMock(sys_path="/sys/devices/iommu")
+        acpi_dev = MagicMock(sys_path="/sys/devices/LNXSYSTM:00/MSFT0201")
+        platform_dev = MagicMock(sys_path="/sys/devices/MSFT0201")
+        self.mock_pyudev = MagicMock()
+        self.mock_pyudev.list_devices.side_effect = lambda subsystem=None: {
+            "iommu": [iommu_dev],
+            "acpi": [acpi_dev],
+            "platform": [platform_dev],
+        }.get(subsystem, [])
+        self.validator.pyudev = self.mock_pyudev
+        data = b"\x00" * 36 + struct.pack("<I", 0) + b"MSFT0201" + b"\x00" * 8
+        return data
+
+    @patch("amd_debug.ivrs.IvrsParser", side_effect=ValueError("bad table"))
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=b"\x00" * 36 + b"\x00" + b"MSFT0201" + b"\x00" * 8,
+    )
+    def test_check_iommu_ivrs_parse_error(
+        self, _mock_open, _mock_parser
+    ):
+        """Test the iommu check with an unparsable IVRS table"""
+        data = self._iommu_setup()
+        with patch(
+            "builtins.open", mock_open(read_data=data)
+        ), patch("os.path.exists", return_value=True):
+            result = self.validator.check_iommu()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_any_call(
+            "IOMMU is misconfigured: Unable to parse IVRS table", "❌"
+        )
+
+    @patch("amd_debug.ivrs.IvrsParser")
+    def test_check_iommu_msft_device_missing(self, mock_parser):
+        """Test the iommu check without the MSFT0201 IVHD entry"""
+        mock_parser.return_value.find_msft0201_device_id.return_value = None
+        data = self._iommu_setup()
+        with patch(
+            "builtins.open", mock_open(read_data=data)
+        ), patch("os.path.exists", return_value=True):
+            result = self.validator.check_iommu()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_any_call(
+            "IOMMU is misconfigured: MSFT0201 not found in IVRS IVHD entries",
+            "❌",
+        )
+
+    @patch("os.path.exists", return_value=False)
+    def test_check_amdgpu_parameters_no_kernel_log(self, _mock_exists):
+        """Test the amdgpu parameter check without a kernel log"""
+        self.validator.kernel_log = None
+        result = self.validator.check_amdgpu_parameters()
+        self.assertTrue(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "Unable to test for amdgpu from kernel log", "🚦"
+        )
+
+    @patch("os.path.exists", return_value=True)
+    @patch("amd_debug.prereq.amd_gpu.read_file", return_value="0x123456")
+    def test_check_amdgpu_parameters_overridden(self, _mock_read, _mock_exists):
+        """Test the ppfeaturemask override detection"""
+        result = self.validator.check_amdgpu_parameters()
+        self.assertFalse(result)
+        self.mock_db.record_prereq.assert_called_with(
+            "AMDGPU ppfeaturemask overridden to 0x123456", "❌"
+        )
+
+    @patch("os.path.exists", return_value=False)
+    def test_check_amdgpu_parameters_isp_firmware_ignored(self, _mock_exists):
+        """Test that the amdgpu isp firmware failure is ignored"""
+        self.validator.kernel_log.match_pattern.return_value = (
+            "Direct firmware load for amdgpu/isp failed"
+        )
+        result = self.validator.check_amdgpu_parameters()
+        self.assertTrue(result)
+        self.assertEqual(self.validator.failures, [])
+
+    def test_vendor_lists(self):
+        """Test the amd vendor info and check lists"""
+        info = self.validator.vendor_info()
+        checks = self.validator.vendor_checks()
+        self.assertTrue(all(callable(i) for i in info))
+        self.assertTrue(all(callable(c) for c in checks))
+
+
 if __name__ == "__main__":
     unittest.main()

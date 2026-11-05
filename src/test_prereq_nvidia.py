@@ -379,5 +379,29 @@ class TestNvidiaChecks(unittest.TestCase):
             self.assertFalse(self.validator._systemd_unit_exists("foo.service"))
 
 
+    @patch("amd_debug.prereq.nvidia.get_s0ix_param", return_value="1")
+    @patch("amd_debug.prereq.nvidia.get_nvidia_gpus")
+    def test_check_nvidia_s0ix_gpu_unsupported(self, mock_gpus, _mock_param):
+        """Test the warning for a GPU that cannot support s0ix"""
+        mock_gpus.return_value = [
+            self._make_gpu(supported=True),
+            self._make_gpu(supported=False),
+        ]
+        result = self.validator.check_nvidia_s0ix()
+        self.validator.db.record_prereq.assert_any_call(
+            "NVIDIA GPU 0000:01:00.0 does not support S0ix", "🚦"
+        )
+
+    @patch("amd_debug.prereq.nvidia.get_s0ix_param", return_value="1")
+    @patch("amd_debug.prereq.nvidia.get_nvidia_gpus")
+    def test_check_nvidia_s0ix_gpu_enabled(self, mock_gpus, _mock_param):
+        """Test the success message for a GPU with s0ix enabled"""
+        mock_gpus.return_value = [self._make_gpu(supported=True, enabled=True)]
+        result = self.validator.check_nvidia_s0ix()
+        self.validator.db.record_prereq.assert_any_call(
+            "NVIDIA GPU 0000:01:00.0 has S0ix power management enabled", "✅"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
