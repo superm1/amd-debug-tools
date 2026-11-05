@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 
 from amd_debug.validator_headers import Headers
 from amd_debug.common import print_color, run_countdown
+from amd_debug.nvidia import suspend_units_enabled
 
 
 class SuspendHelpers:
@@ -44,6 +45,11 @@ class SuspendHelpers:
         """
         p = os.path.join("/", "proc", "driver", "nvidia", "suspend")
         if not os.path.exists(p):
+            return True
+        if suspend_units_enabled():
+            self.db.record_debug(
+                "NVIDIA systemd units are enabled, not notifying the driver manually"
+            )
             return True
         fd = os.open(p, os.O_WRONLY | os.O_SYNC)
         try:
