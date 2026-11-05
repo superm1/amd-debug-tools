@@ -128,7 +128,6 @@ state during s2idle, so the following is checked:
   `/proc/driver/nvidia/gpus/<BDF>/power`.  A GPU that doesn't support it
   can't be powered down during s2idle.
 
-<<<<<<< HEAD
 * The driver is notified of the suspend and resume events
 
   How this happens depends on which NVIDIA kernel modules are in use.
@@ -147,34 +146,20 @@ state during s2idle, so the following is checked:
   `/proc/driver/nvidia/suspend` notification interface.  The
   `nvidia-suspend`, `nvidia-resume` and `nvidia-hibernate` systemd
   units notify the driver through it, and they can be enabled with:
-=======
-* The `nvidia-suspend`, `nvidia-resume` and `nvidia-hibernate` systemd units
-  are enabled
-
-  These units are what notify the NVIDIA driver of the suspend and resume
-  events.  Without them the driver doesn't get the chance to save and
-  restore its state, which can cause the system to fail to resume.  They
-  are installed and enabled by the NVIDIA installer:
->>>>>>> bb22fec (Document the platform support)
 
   ```
   sudo systemctl enable nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service
   ```
 
-<<<<<<< HEAD
   When neither method is configured the tool reports the legacy method
   as a possible improvement rather than an error, since recent drivers
   handle the suspend transitions internally.
 
-=======
->>>>>>> bb22fec (Document the platform support)
 * The `nvidia-powerd` daemon is available
 
-  The `nvidia-powerd` daemon (provided by the `nvidia-laptop-power-cfg`
-  package on some distributions) manages Dynamic Boost on supported
-  laptops, shifting power between the CPU and the GPU.  It is not
-  required for s2idle; the tool only reports whether it is installed and
-  enabled:
+  The `nvidia-powerd` daemon manages Dynamic Boost on supported laptops,
+  shifting power between the CPU and the GPU.  It is not required for
+  s2idle; the tool only reports whether it is installed and enabled:
 
   ```
   sudo systemctl enable --now nvidia-powerd
@@ -189,19 +174,6 @@ state during s2idle, so the following is checked:
    Status:                    Enabled
   ```
 
-<<<<<<< HEAD
-When the test is run with `--logind`, logind goes through
-`systemd-suspend.service`, which runs the `nvidia-suspend` and
-`nvidia-resume` units if they are enabled; the units are what notify
-the driver in that case.
-
-When the test suspends the system by writing to `/sys/power/state`
-directly, the tool notifies the driver itself through
-`/proc/driver/nvidia/suspend`.  The enabled units notify the driver on
-every suspend regardless of how it was started, so when they are
-enabled the tool stays out of the way to keep the driver from being
-told about the same event twice.
-=======
 When the test suspends the system by writing to `/sys/power/state`
 directly, the systemd sleep hooks don't run, so the tool notifies the
 NVIDIA driver itself through `/proc/driver/nvidia/suspend` on both the
@@ -211,4 +183,3 @@ When the test is run with `--logind`, logind goes through
 `systemd-suspend.service`, which runs the `nvidia-suspend` and
 `nvidia-resume` units if they are enabled; the units are what notify the
 driver in that case.
->>>>>>> bb22fec (Document the platform support)

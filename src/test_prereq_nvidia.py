@@ -14,9 +14,9 @@ from amd_debug.prereq.nvidia import NvidiaChecks
 from amd_debug.failures import (
     NvidiaS0ixDisabled,
     NvidiaS0ixUnsupported,
-    NvidiaSuspendUnitsMissing,
 )
 from amd_debug.nvidia import (
+    KERNEL_NOTIFIERS_PARAM,
     POWERD_UNIT,
     S0IX_DISABLED,
     S0IX_ENABLED,
@@ -214,19 +214,44 @@ class TestNvidiaChecks(unittest.TestCase):
     @patch("amd_debug.prereq.nvidia.get_module_params", return_value={})
     @patch("amd_debug.prereq.nvidia.get_nvidia_gpus")
     def test_check_nvidia_suspend_units_missing(self, mock_gpus, _mock_params):
-        """Test that missing systemd units are a failure"""
+        """Test that missing systemd units are an improvement, not a failure
+
+        The kernel sleep notifiers are the preferred method for notifying
+        the driver of the suspend and resume events, so the legacy systemd
+        units are reported as a possible improvement rather than an error.
+        """
         mock_gpus.return_value = [self._make_gpu()]
         with patch.object(
             self.validator, "_systemd_unit_exists", return_value=True
         ), patch.object(self.validator, "_systemd_unit_enabled", return_value=False):
             result = self.validator.check_nvidia_suspend_units()
-        self.assertFalse(result)
-        self.assertTrue(
-            any(
-                isinstance(f, NvidiaSuspendUnitsMissing)
-                for f in self.validator.failures
-            )
-        )
+        self.assertTrue(result)
+        self.assertEqual(self.validator.failures, [])
+
+    @patch(
+        "amd_debug.prereq.nvidia.get_module_params",
+        return_value={KERNEL_NOTIFIERS_PARAM: "1"},
+    )
+    @patch("amd_debug.prereq.nvidia.get_nvidia_gpus")
+    def test_check_nvidia_suspend_units_kernel_notifiers(
+        self, mock_gpus, _mock_params
+    ):
+        """Test that the kernel sleep notifiers are the preferred method
+
+        When the driver handles the notifications itself the systemd units
+        are not needed and the unit checks are not run at all.
+        """
+        mock_gpus.return_value = [self._make_gpu()]
+        with patch.object(
+            self.validator, "_systemd_unit_exists", return_value=True
+        ) as mock_exists, patch.object(
+            self.validator, "_systemd_unit_enabled", return_value=True
+        ) as mock_enabled:
+            result = self.validator.check_nvidia_suspend_units()
+        self.assertTrue(result)
+        self.assertEqual(self.validator.failures, [])
+        mock_exists.assert_not_called()
+        mock_enabled.assert_not_called()
 
     @patch("amd_debug.prereq.nvidia.get_module_params", return_value={})
     @patch("amd_debug.prereq.nvidia.get_nvidia_gpus")
@@ -309,7 +334,7 @@ class TestNvidiaChecks(unittest.TestCase):
 
     def test_systemd_unit_enabled(self):
         """Test that the systemd unit enabled check works"""
-        with patch("amd_debug.prereq.nvidia.subprocess.run") as mock_run:
+        with patch("amd_debug.nvidia.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
             self.assertTrue(self.validator._systemd_unit_enabled("foo.service"))
             mock_run.assert_called_once_with(
@@ -321,14 +346,14 @@ class TestNvidiaChecks(unittest.TestCase):
 
     def test_systemd_unit_enabled_not(self):
         """Test that a disabled systemd unit is detected"""
-        with patch("amd_debug.prereq.nvidia.subprocess.run") as mock_run:
+        with patch("amd_debug.nvidia.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 1
             self.assertFalse(self.validator._systemd_unit_enabled("foo.service"))
 
     def test_systemd_unit_enabled_no_systemctl(self):
         """Test that a missing systemctl is handled"""
         with patch(
-            "amd_debug.prereq.nvidia.subprocess.run",
+            "amd_debug.nvidia.subprocess.run",
             side_effect=FileNotFoundError,
         ):
             self.assertFalse(self.validator._systemd_unit_enabled("foo.service"))
@@ -338,19 +363,19 @@ class TestNvidiaChecks(unittest.TestCase):
         import subprocess as sp
 
         with patch(
-            "amd_debug.prereq.nvidia.subprocess.run",
+            "amd_debug.nvidia.subprocess.run",
             side_effect=sp.TimeoutExpired("systemctl", 10),
         ):
             self.assertFalse(self.validator._systemd_unit_enabled("foo.service"))
 
     def test_systemd_unit_exists(self):
         """Test that the systemd unit exists check works"""
-        with patch("amd_debug.prereq.nvidia.os.path.exists", return_value=True):
+        with patch("amd_debug.nvidia.os.path.exists", return_value=True):
             self.assertTrue(self.validator._systemd_unit_exists("foo.service"))
 
     def test_systemd_unit_not_exists(self):
         """Test that a missing systemd unit is detected"""
-        with patch("amd_debug.prereq.nvidia.os.path.exists", return_value=False):
+        with patch("amd_debug.nvidia.os.path.exists", return_value=False):
             self.assertFalse(self.validator._systemd_unit_exists("foo.service"))
 
 

@@ -52,6 +52,11 @@ S0IX_THRESHOLD_PARAM = "NVreg_S0ixPowerManagementVideoMemoryThreshold"
 # Module parameter that enables runtime D3 (RTD3) power management
 DYNAMIC_PM_PARAM = "NVreg_DynamicPowerManagement"
 
+# Module parameter that makes the driver handle the suspend and resume
+# notifications itself via kernel sleep notifiers.  When it is set the
+# systemd suspend units are not needed.
+KERNEL_NOTIFIERS_PARAM = "UseKernelSuspendNotifiers"
+
 # NOTE: the NVreg_PreserveVideoMemoryAllocations module parameter is
 # deliberately not checked by this tool.  Setting it to 1 makes the driver
 # save and restore all of the video memory allocations, but on some hardware
