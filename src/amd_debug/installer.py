@@ -389,6 +389,10 @@ class Installer(AmdTool):
         if os.path.exists(t):
             os.remove(t)
             print_color(f"Removed {f} from {d}", "✅")
+        s = os.path.join(d, "s2idle")
+        if os.path.islink(s) or os.path.exists(s):
+            os.remove(s)
+            print_color(f"Removed s2idle from {d}", "✅")
         return True
 
     def install(self) -> bool:
@@ -429,6 +433,10 @@ class Installer(AmdTool):
         os.makedirs(t, exist_ok=True)
         shutil.copy(s, t)
         print_color(f"Installed {f} to {t}", "✅")
+        symlink = os.path.join(t, "s2idle")
+        if not os.path.exists(symlink):
+            os.symlink(f, symlink)
+            print_color(f"Installed s2idle -> {f}", "✅")
         return True
 
 
