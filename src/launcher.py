@@ -8,7 +8,7 @@ launching various tools within the package without installation.
 import sys
 import os
 
-URL = "git://git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git"
+URL = "https://github.com/amd/amd-linux-debug-tools"
 try:
     import amd_debug
     from amd_debug.common import fatal_error

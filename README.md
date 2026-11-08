@@ -1,5 +1,5 @@
 # Helpful tools for debugging AMD and Intel s2idle systems
-[![codecov](https://codecov.io/github/superm1/amd-debug-tools/graph/badge.svg?token=Z9WTBZADGT)](https://codecov.io/github/superm1/amd-debug-tools)
+[![codecov](https://codecov.io/github/amd/amd-linux-debug-tools/graph/badge.svg?token=Z9WTBZADGT)](https://codecov.io/github/amd/amd-linux-debug-tools)
 [![PyPI](https://img.shields.io/pypi/v/amd-debug-tools.svg)](https://pypi.org/project/amd-debug-tools/)
 
 This repository hosts open tools that are useful for debugging issues on
@@ -44,20 +44,20 @@ to set up the environment:
 This will add the `pipx` environment to your path.
 
 ## Running in-tree
-Documentation about running directly from a git checkout is available [here](https://github.com/superm1/amd-debug-tools/blob/master/docs/in-tree.md).
+Documentation about running directly from a git checkout is available [here](https://github.com/amd/amd-linux-debug-tools/blob/master/docs/in-tree.md).
 
 ## Tools
 
 Each tool has its own individual documentation page:
-* [amd-s2idle](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-s2idle.md)
-* [amd-bios](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-bios.md)
-* [amd-pstate](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-pstate.md)
-* [amd-ttm](https://github.com/superm1/amd-debug-tools/blob/master/docs/amd-ttm.md)
+* [amd-s2idle](https://github.com/amd/amd-linux-debug-tools/blob/master/docs/amd-s2idle.md)
+* [amd-bios](https://github.com/amd/amd-linux-debug-tools/blob/master/docs/amd-bios.md)
+* [amd-pstate](https://github.com/amd/amd-linux-debug-tools/blob/master/docs/amd-pstate.md)
+* [amd-ttm](https://github.com/amd/amd-linux-debug-tools/blob/master/docs/amd-ttm.md)
 
 ## Platform support
 
 The s2idle tool supports AMD and Intel platforms, including systems using the
 NVIDIA proprietary driver.  See
-[platform support](https://github.com/superm1/amd-debug-tools/blob/master/docs/platform-support.md)
+[platform support](https://github.com/amd/amd-linux-debug-tools/blob/master/docs/platform-support.md)
 for the details of what is checked on each platform.
 
