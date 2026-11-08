@@ -38,8 +38,10 @@ class TestInstaller(unittest.TestCase):
     @patch("builtins.open")
     @patch("subprocess.call", return_value=0)
     @patch("os.makedirs", return_value=None)
+    @patch("os.symlink", return_value=None)
     def test_install_hook(
         self,
+        _mock_symlink,
         _mock_mkdir,
         _mock_call,
         _mock_open,
@@ -56,8 +58,10 @@ class TestInstaller(unittest.TestCase):
     @patch("builtins.open")
     @patch("subprocess.call", return_value=0)
     @patch("os.makedirs", return_value=None)
+    @patch("os.symlink", return_value=None)
     def test_install_hook_missing_path(
         self,
+        _mock_symlink,
         _mock_mkdir,
         _mock_call,
         _mock_open,
@@ -438,9 +442,7 @@ class TestInstaller(unittest.TestCase):
     @patch("amd_debug.installer.print_color")
     @patch("amd_debug.installer.get_distro", return_value="ubuntu")
     @patch("amd_debug.installer.relaunch_sudo")
-    def test_distro_package_no_deb_returns_false(
-        self, _sudo, _distro, _print
-    ):
+    def test_distro_package_no_deb_returns_false(self, _sudo, _distro, _print):
         """Ubuntu install path returns False when deb name is missing"""
         pkg = DistroPackage(deb=None, rpm="x", arch="x", message="msg")
         self.assertFalse(pkg.install())
@@ -449,9 +451,7 @@ class TestInstaller(unittest.TestCase):
     @patch("amd_debug.installer.read_file", return_value="VARIANT_ID=workstation\n")
     @patch("amd_debug.installer.get_distro", return_value="fedora")
     @patch("amd_debug.installer.relaunch_sudo")
-    def test_distro_package_no_rpm_returns_false(
-        self, _sudo, _distro, _read, _print
-    ):
+    def test_distro_package_no_rpm_returns_false(self, _sudo, _distro, _read, _print):
         """Fedora install path returns False when rpm name is missing"""
         pkg = DistroPackage(deb="x", rpm=None, arch="x", message="msg")
         self.assertFalse(pkg.install())
@@ -460,9 +460,7 @@ class TestInstaller(unittest.TestCase):
     @patch("amd_debug.installer.read_file", return_value="VARIANT_ID=server\n")
     @patch("amd_debug.installer.get_distro", return_value="fedora")
     @patch("amd_debug.installer.relaunch_sudo")
-    def test_distro_package_fedora_wrong_variant(
-        self, _sudo, _distro, _read, _print
-    ):
+    def test_distro_package_fedora_wrong_variant(self, _sudo, _distro, _read, _print):
         """Fedora install path returns False when variant isn't workstation/kde"""
         pkg = DistroPackage(deb="x", rpm="x", arch="x", message="msg")
         self.assertFalse(pkg.install())
