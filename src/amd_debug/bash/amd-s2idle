@@ -87,3 +87,4 @@ _amd_s2idle()
 }
 
 complete -F _amd_s2idle amd-s2idle
+complete -F _amd_s2idle s2idle

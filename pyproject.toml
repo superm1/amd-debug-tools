@@ -47,6 +47,7 @@ license = "MIT"
 "Homepage" = "https://web.git.kernel.org/pub/scm/linux/kernel/git/superm1/amd-debug-tools.git/"
 
 [project.scripts]
+s2idle = "amd_debug:amd_s2idle"
 amd-s2idle = "amd_debug:amd_s2idle"
 amd-bios = "amd_debug:amd_bios"
 amd-pstate = "amd_debug:amd_pstate"
