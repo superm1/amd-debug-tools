@@ -128,10 +128,15 @@ class AmdGpuChecks:
             self.db.record_prereq(
                 f"ISP4 platform camera driver 'amd-isp4' bound to {dev.sys_name}", "✅"
             )
-            # check if `amd_capture` or `amd_isp4_capture` modules are loaded
+            # check if `amd_capture` or `amd_isp4_capture` modules are loaded.
+            # Built-in drivers don't show up in /sys/module, so also accept
+            # the capture platform driver (amd_isp_capture) being registered.
             p1 = os.path.join("/", "sys", "module", "amd_capture")
             p2 = os.path.join("/", "sys", "module", "amd_isp4_capture")
-            if not os.path.exists(p1) and not os.path.exists(p2):
+            p3 = os.path.join(
+                "/", "sys", "bus", "platform", "drivers", "amd_isp_capture"
+            )
+            if not any(os.path.exists(p) for p in (p1, p2, p3)):
                 self.db.record_prereq(
                     "Camera driver module 'amd_capture'/'amd_isp4_capture' not loaded",
                     "❌",

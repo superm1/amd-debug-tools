@@ -1668,9 +1668,7 @@ class TestAmdPrerequisiteValidator(unittest.TestCase):
         """Test check_isp4 when driver is bound but amd_capture or amd_isp4_capture modules are not loaded"""
 
         def exists_side_effect(path):
-            if "path" in path or "driver" in path:
-                return True
-            if "amd_capture" in path or "amd_isp4_capture" in path:
+            if "/sys/module/" in path or "/sys/bus/platform/" in path:
                 return False
             return True
 
@@ -1689,6 +1687,19 @@ class TestAmdPrerequisiteValidator(unittest.TestCase):
         self.assertTrue(
             any(isinstance(f, MissingAmdCaptureModule) for f in self.validator.failures)
         )
+
+    @patch("amd_debug.prereq.amd_gpu.os.path.exists")
+    @patch(
+        "amd_debug.prereq.amd_gpu.os.readlink",
+        return_value="/sys/devices/platform/drivers/amd-isp4",
+    )
+    def test_check_isp4_builtin_driver(self, _mock_readlink, mock_path_exists):
+        """Test check_isp4 when the driver is built in (no /sys/module entry)"""
+        mock_path_exists.side_effect = lambda p: not p.startswith("/sys/module/")
+        self.mock_pyudev.list_devices.return_value = [
+            MagicMock(sys_path="/sys/devices/acpi/OMNI5C10:00", sys_name="OMNI5C10:00")
+        ]
+        self.assertTrue(self.validator.check_isp4())
 
     @patch("amd_debug.prereq.amd_gpu.os.path.exists")
     @patch(
