@@ -4,6 +4,7 @@
 """
 This module contains unit tests for the s2idle tool in the amd-debug-tools package.
 """
+
 import argparse
 import sys
 import unittest
@@ -20,6 +21,7 @@ from amd_debug.s2idle import (
     run_test_cycle,
     display_report_file,
     report,
+    run_triage,
     prompt_report_arguments,
     Defaults,
 )
@@ -208,6 +210,18 @@ class TestMainFunction(unittest.TestCase):
                 None, None, "5", "txt", None, False, False, False, False, False
             )
             self.assertIsNone(result)
+
+    @patch("amd_debug.s2idle.relaunch_sudo")
+    @patch("amd_debug.s2idle.run_triage")
+    def test_main_triage(self, mock_triage, mock_relaunch_sudo):
+        """Test main function with triage action"""
+        sys.argv = ["s2idle.py", "triage"]
+        args = argparse.Namespace(action="triage")
+        with patch("amd_debug.s2idle.parse_args", return_value=args):
+            mock_triage.return_value = True
+            self.assertIsNone(main())
+            mock_relaunch_sudo.assert_called_once()
+            mock_triage.assert_called_once_with(args)
 
     @patch("amd_debug.s2idle.version")
     def test_main_version(self, mock_version):
@@ -910,3 +924,41 @@ class TestPromptReportArguments(unittest.TestCase):
         self.assertEqual(result[4], True)
         mock_get_report_file.assert_called_once_with(None, "html")
         mock_get_report_format.assert_called()
+
+
+class TestRunTriage(unittest.TestCase):
+    """Test run_triage function"""
+
+    def _args(self, restart):
+        return argparse.Namespace(
+            format="txt",
+            report_file=None,
+            tool_debug=False,
+            restart=restart,
+        )
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_run_triage(self, mock_triage):
+        """Test options are passed through"""
+        mock_triage.return_value.run.return_value = True
+        self.assertTrue(run_triage(self._args(False)))
+        mock_triage.assert_called_once_with(fmt="txt", fname=None, debug=False)
+        mock_triage.return_value.db.triage_abandon_all.assert_not_called()
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_run_triage_restart(self, mock_triage):
+        """Test --restart abandons the session in progress"""
+        mock_triage.return_value.run.return_value = False
+        self.assertFalse(run_triage(self._args(True)))
+        mock_triage.return_value.db.triage_abandon_all.assert_called_once()
+
+    def test_parse_triage_args(self):
+        """Test the triage command only takes the options it needs"""
+        with patch("sys.argv", ["s2idle.py", "triage", "--restart"]):
+            args = parse_args()
+        self.assertEqual(args.action, "triage")
+        self.assertTrue(args.restart)
+        with patch("sys.argv", ["s2idle.py", "triage", "--count", "2"]):
+            with patch("sys.stderr"):
+                with self.assertRaises(SystemExit):
+                    parse_args()

@@ -2,6 +2,7 @@ _cmd_list=(
 	'install'
 	'uninstall'
 	'test'
+	'triage'
 	'report'
 	'version'
 )
@@ -29,6 +30,13 @@ _test_opts=(
 	'--report-debug'
 )
 
+_triage_opts=(
+	'--report-file'
+	'--format'
+	'--restart'
+	'--tool-debug'
+)
+
 _format_opts=(
 	'md'
 	'html'
@@ -38,6 +46,11 @@ _format_opts=(
 _show_test_opts()
 {
 	COMPREPLY+=( $(compgen -W '${_test_opts[@]}' -- "$cur") )
+}
+
+_show_triage_opts()
+{
+	COMPREPLY+=( $(compgen -W '${_triage_opts[@]}' -- "$cur") )
 }
 
 _show_report_opts()
@@ -70,6 +83,9 @@ _amd_s2idle()
 	case $arg in
 	test)
 		_show_test_opts
+		;;
+	triage)
+		_show_triage_opts
 		;;
 	report)
 		_show_report_opts

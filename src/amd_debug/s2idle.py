@@ -21,6 +21,7 @@ from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
 from amd_debug.prereq import get_validator
 from amd_debug.sleep_report import SleepReport, confirm_overwrite_report
+from amd_debug.triage import Triage
 
 
 class Defaults:
@@ -271,6 +272,18 @@ def run_test_cycle(
     return True
 
 
+def run_triage(args) -> bool:
+    """Run the guided triage for s2idle hangs"""
+    app = Triage(
+        fmt=args.format,
+        fname=args.report_file,
+        debug=args.tool_debug,
+    )
+    if args.restart:
+        app.db.triage_abandon_all()
+    return app.run()
+
+
 def install(debug) -> None:
     """Install the tool"""
     installer = Installer(tool_debug=debug)
@@ -349,6 +362,28 @@ def parse_args():
         help="Enable BIOS debug logging instead of notify logging",
     )
     test_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
+
+    # 'triage' command
+    triage_cmd = subparsers.add_parser(
+        "triage",
+        help="Interactively triage s2idle hangs (run again after each hang)",
+    )
+    triage_cmd.add_argument(
+        "--restart",
+        action="store_true",
+        help="Abandon any triage in progress and start over",
+    )
+    triage_cmd.add_argument(
+        "--format",
+        choices=["txt", "md"],
+        help="Triage report format",
+    )
+    triage_cmd.add_argument(
+        "--tool-debug",
+        action="store_true",
+        help="Enable tool debug logging",
+    )
+    triage_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
 
     # 'report' command
     report_cmd = subparsers.add_parser(
@@ -443,6 +478,9 @@ def main() -> None | int:
             args.logind,
             args.bios_debug,
         )
+    elif args.action == "triage":
+        relaunch_sudo()
+        ret = run_triage(args)
     elif args.version:
         print(version())
         return
