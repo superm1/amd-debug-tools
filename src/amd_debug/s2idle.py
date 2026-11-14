@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 """s2idle analysis tool"""
+
 import argparse
 import sys
 import os
@@ -21,6 +22,7 @@ from amd_debug.validator import SleepValidator
 from amd_debug.installer import Installer
 from amd_debug.prereq import get_validator
 from amd_debug.sleep_report import SleepReport, confirm_overwrite_report
+from amd_debug.triage import Triage, confirm_start
 
 
 class Defaults:
@@ -271,6 +273,43 @@ def run_test_cycle(
     return True
 
 
+def confirm_triage(args) -> bool:
+    """Ask the triage question before the (password prompting) sudo relaunch
+
+    The answer is passed on to the relaunched tool so it isn't asked twice.
+    """
+    if is_root() or args.accepted:
+        return True
+    if not confirm_start():
+        if args.implicit_triage:
+            # they didn't ask for triage, so show what else the tool can do
+            build_parser().print_help(sys.stderr)
+        return False
+    if args.implicit_triage:
+        sys.argv.append("triage")
+    sys.argv.append("--accepted")
+    return True
+
+
+def run_triage(args) -> bool:
+    """Run the guided triage for s2idle hangs"""
+    app = Triage(
+        fmt=args.format,
+        fname=args.report_file,
+        debug=args.tool_debug,
+        accepted=args.accepted,
+    )
+    if args.restart:
+        app.db.triage_abandon_all()
+    ret = app.run()
+    if app.report_path:
+        display_report_file(app.report_path, app.fmt)
+    if app.declined and args.implicit_triage:
+        # they didn't ask for triage, so show what else the tool can do
+        build_parser().print_help(sys.stderr)
+    return ret
+
+
 def install(debug) -> None:
     """Install the tool"""
     installer = Installer(tool_debug=debug)
@@ -297,11 +336,13 @@ def uninstall(debug) -> None:
         sys.exit("Failed to remove")
 
 
-def parse_args():
-    """Parse command line arguments"""
+def build_parser() -> argparse.ArgumentParser:
+    """Build the command line parser"""
     parser = argparse.ArgumentParser(
         description="Swiss army knife for analyzing Linux s2idle problems",
-        epilog="The tool can run an immediate test with the 'test' command "
+        epilog="Without any command the 'triage' interview is started, which "
+        "helps narrow down s2idle hangs.\n"
+        "The tool can run an immediate test with the 'test' command "
         "or can be used to hook into systemd for building reports later.\n"
         "All optional arguments will be prompted if needed.\n"
         "To use non-interactively, please populate all optional arguments.",
@@ -349,6 +390,31 @@ def parse_args():
         help="Enable BIOS debug logging instead of notify logging",
     )
     test_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
+
+    # 'triage' command
+    triage_cmd = subparsers.add_parser(
+        "triage",
+        help="Interactively triage s2idle hangs (run again after each hang)",
+    )
+    triage_cmd.add_argument(
+        "--restart",
+        action="store_true",
+        help="Abandon any triage in progress and start over",
+    )
+    triage_cmd.add_argument(
+        "--format",
+        choices=["txt", "md", "html"],
+        help="Triage report format",
+    )
+    triage_cmd.add_argument(
+        "--tool-debug",
+        action="store_true",
+        help="Enable tool debug logging",
+    )
+    triage_cmd.add_argument("--report-file", help=Headers.ReportFileDescription)
+    triage_cmd.add_argument(
+        "--accepted", action="store_true", help=argparse.SUPPRESS
+    )
 
     # 'report' command
     report_cmd = subparsers.add_parser(
@@ -403,11 +469,22 @@ def parse_args():
         "--version", action="store_true", help="Show version information"
     )
 
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
+    return parser
 
-    return parser.parse_args()
+
+def parse_args():
+    """Parse command line arguments
+
+    Without any arguments the tool starts the triage interview.
+    """
+    parser = build_parser()
+    if len(sys.argv) == 1:
+        args = parser.parse_args(["triage"])
+        args.implicit_triage = True
+        return args
+    args = parser.parse_args()
+    args.implicit_triage = False
+    return args
 
 
 def main() -> None | int:
@@ -443,6 +520,10 @@ def main() -> None | int:
             args.logind,
             args.bios_debug,
         )
+    elif args.action == "triage":
+        if confirm_triage(args):
+            relaunch_sudo()
+            ret = run_triage(args)
     elif args.version:
         print(version())
         return
