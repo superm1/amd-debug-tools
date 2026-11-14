@@ -11,14 +11,9 @@ driver is supported on both.  See
 [platform support](docs/platform-support.md) for the details.
 
 ## Installation
-### Distro (Arch)
-`amd-debug-tools` has been [packaged for Arch Linux](https://archlinux.org/packages/extra/any/amd-debug-tools/) (and derivatives). You can install it using:
-
-    pacman -Sy amd-debug-tools
-
 ### Using a python wheel (Generic)
 It is suggested to install tools in a virtual environment either using
-`pipx` or `python3 -m venv`.
+`pipx`, `uvx`, or `python3 -m venv`.
 
 #### From PyPI
 `amd-debug-tools` is distributed as a python wheel, which is a
@@ -27,14 +22,6 @@ command:
 
     pipx install amd-debug-tools
 
-### From source
-To build the package from source, you will need to the `python3-build`
-package natively installed by your distribution package manager. Then you
-can generate and install a wheel by running the following commands:
-
-    python3 -m build
-    pipx install dist/amd-debug-tools-*.whl
-
 ### Ensuring path
 If you have not used a `pipx` environment before, you may need to run the following command
 to set up the environment:
@@ -42,6 +29,24 @@ to set up the environment:
     pipx ensurepath
 
 This will add the `pipx` environment to your path.
+
+### Distro (Arch)
+`amd-debug-tools` has been [packaged for Arch Linux](https://archlinux.org/packages/extra/any/amd-debug-tools/) (and derivatives). You can install it using:
+
+    pacman -Sy amd-debug-tools
+
+### Distro (Debian)
+`amd-debug-tools` has been [packaged for Debian Linux](https://tracker.debian.org/pkg/amd-debug-tools). You can install it using:
+
+    apt install amd-debug-tools
+
+### From source
+To build the package from source, you will need to the `python3-build`
+package natively installed by your distribution package manager. Then you
+can generate and install a wheel by running the following commands:
+
+    python3 -m build
+    pipx install dist/amd-debug-tools-*.whl
 
 ## Running in-tree
 Documentation about running directly from a git checkout is available [here](https://github.com/rocm/amd-debug-tools/blob/master/docs/in-tree.md).
