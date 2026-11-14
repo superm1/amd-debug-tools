@@ -13,6 +13,23 @@ from unittest.mock import patch, MagicMock
 from amd_debug.database import SCHEMA_VERSION, SleepDatabase
 
 
+class TestTriageMigration(unittest.TestCase):
+    """Test migrating a schema 4 database to add triage tables"""
+
+    def test_migrate_to_triage(self):
+        """Test the triage tables are created from schema 4"""
+        import sqlite3  # pylint: disable=import-outside-toplevel
+        from amd_debug.database import migrate  # pylint: disable=import-outside-toplevel
+
+        cur = sqlite3.connect(":memory:").cursor()
+        cur.execute("PRAGMA user_version = 4")
+        migrate(cur, SCHEMA_VERSION)
+        cur.execute("SELECT name FROM sqlite_master WHERE name LIKE 'triage%'")
+        self.assertEqual(sorted(r[0] for r in cur.fetchall()), ["triage", "triage_event"])
+        cur.execute("PRAGMA user_version")
+        self.assertEqual(cur.fetchone()[0], SCHEMA_VERSION)
+
+
 class TestSleepDatabase(unittest.TestCase):
     """Test SleepDatabase class"""
 

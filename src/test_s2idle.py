@@ -4,6 +4,7 @@
 """
 This module contains unit tests for the s2idle tool in the amd-debug-tools package.
 """
+
 import argparse
 import sys
 import unittest
@@ -20,6 +21,8 @@ from amd_debug.s2idle import (
     run_test_cycle,
     display_report_file,
     report,
+    run_triage,
+    confirm_triage,
     prompt_report_arguments,
     Defaults,
 )
@@ -38,12 +41,18 @@ class TestParseArgs(unittest.TestCase):
     def tearDown(self):
         sys.argv = self.default_sys_argv
 
-    @patch("sys.stderr")
-    def test_no_arguments(self, _mock_print):
-        """Test parse_args with no arguments"""
+    def test_no_arguments(self):
+        """Test parse_args with no arguments defaults to triage"""
         sys.argv = ["s2idle.py"]
-        with self.assertRaises(SystemExit):
-            parse_args()
+        args = parse_args()
+        self.assertEqual(args.action, "triage")
+        self.assertTrue(args.implicit_triage)
+        self.assertFalse(args.restart)
+
+    def test_explicit_triage_not_implicit(self):
+        """Test asking for triage isn't treated as the default mode"""
+        sys.argv = ["s2idle.py", "triage"]
+        self.assertFalse(parse_args().implicit_triage)
 
     def test_test_command_with_arguments(self):
         """Test parse_args with test command and arguments"""
@@ -208,6 +217,32 @@ class TestMainFunction(unittest.TestCase):
                 None, None, "5", "txt", None, False, False, False, False, False
             )
             self.assertIsNone(result)
+
+    @patch("amd_debug.s2idle.relaunch_sudo")
+    @patch("amd_debug.s2idle.run_triage")
+    def test_main_triage(self, mock_triage, mock_relaunch_sudo):
+        """Test main function with triage action"""
+        sys.argv = ["s2idle.py", "triage"]
+        args = argparse.Namespace(action="triage")
+        with patch("amd_debug.s2idle.parse_args", return_value=args), patch(
+            "amd_debug.s2idle.confirm_triage", return_value=True
+        ):
+            mock_triage.return_value = True
+            self.assertIsNone(main())
+            mock_relaunch_sudo.assert_called_once()
+            mock_triage.assert_called_once_with(args)
+
+    @patch("amd_debug.s2idle.relaunch_sudo")
+    @patch("amd_debug.s2idle.run_triage")
+    def test_main_triage_declined(self, mock_triage, mock_relaunch_sudo):
+        """Declining triage never relaunches with sudo"""
+        args = argparse.Namespace(action="triage")
+        with patch("amd_debug.s2idle.parse_args", return_value=args), patch(
+            "amd_debug.s2idle.confirm_triage", return_value=False
+        ):
+            self.assertEqual(main(), 1)
+        mock_relaunch_sudo.assert_not_called()
+        mock_triage.assert_not_called()
 
     @patch("amd_debug.s2idle.version")
     def test_main_version(self, mock_version):
@@ -910,3 +945,151 @@ class TestPromptReportArguments(unittest.TestCase):
         self.assertEqual(result[4], True)
         mock_get_report_file.assert_called_once_with(None, "html")
         mock_get_report_format.assert_called()
+
+
+class TestRunTriage(unittest.TestCase):
+    """Test run_triage function"""
+
+    def _args(self, restart, implicit=False):
+        return argparse.Namespace(
+            format="txt",
+            report_file=None,
+            tool_debug=False,
+            restart=restart,
+            implicit_triage=implicit,
+            accepted=False,
+        )
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_run_triage(self, mock_triage):
+        """Test options are passed through"""
+        mock_triage.return_value.run.return_value = True
+        mock_triage.return_value.report_path = None
+        self.assertTrue(run_triage(self._args(False)))
+        mock_triage.assert_called_once_with(
+            fmt="txt", fname=None, debug=False, accepted=False
+        )
+        mock_triage.return_value.db.triage_abandon_all.assert_not_called()
+
+    @patch("amd_debug.s2idle.display_report_file")
+    @patch("amd_debug.s2idle.Triage")
+    def test_run_triage_shows_report(self, mock_triage, mock_display):
+        """Test the finished report is displayed in its format"""
+        mock_triage.return_value.run.return_value = True
+        mock_triage.return_value.report_path = "r.html"
+        mock_triage.return_value.fmt = "html"
+        run_triage(self._args(False))
+        mock_display.assert_called_once_with("r.html", "html")
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_run_triage_restart(self, mock_triage):
+        """Test --restart abandons the session in progress"""
+        mock_triage.return_value.run.return_value = False
+        mock_triage.return_value.report_path = None
+        self.assertFalse(run_triage(self._args(True)))
+        mock_triage.return_value.db.triage_abandon_all.assert_called_once()
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_implicit_triage_declined_shows_help(self, mock_triage):
+        """Declining the default triage shows the help"""
+        mock_triage.return_value.run.return_value = False
+        mock_triage.return_value.declined = True
+        mock_triage.return_value.report_path = None
+        with patch("sys.stderr") as err:
+            self.assertFalse(run_triage(self._args(False, implicit=True)))
+        self.assertTrue(err.write.called)
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_explicit_triage_declined_no_help(self, mock_triage):
+        """Declining an explicit triage doesn't show the help"""
+        mock_triage.return_value.run.return_value = False
+        mock_triage.return_value.declined = True
+        mock_triage.return_value.report_path = None
+        with patch("sys.stderr") as err:
+            run_triage(self._args(False))
+        err.write.assert_not_called()
+
+    @patch("amd_debug.s2idle.Triage")
+    def test_implicit_triage_accepted_no_help(self, mock_triage):
+        """Accepting the default triage doesn't show the help"""
+        mock_triage.return_value.run.return_value = True
+        mock_triage.return_value.declined = False
+        mock_triage.return_value.report_path = None
+        with patch("sys.stderr") as err:
+            run_triage(self._args(False, implicit=True))
+        err.write.assert_not_called()
+
+    def test_parse_triage_args(self):
+        """Test the triage command only takes the options it needs"""
+        with patch("sys.argv", ["s2idle.py", "triage", "--format", "html"]):
+            self.assertEqual(parse_args().format, "html")
+        with patch("sys.argv", ["s2idle.py", "triage", "--restart"]):
+            args = parse_args()
+        self.assertEqual(args.action, "triage")
+        self.assertTrue(args.restart)
+        with patch("sys.argv", ["s2idle.py", "triage", "--count", "2"]):
+            with patch("sys.stderr"):
+                with self.assertRaises(SystemExit):
+                    parse_args()
+
+
+class TestConfirmTriage(unittest.TestCase):
+    """Test the question shown before relaunching with sudo"""
+
+    def setUp(self):
+        self.argv = sys.argv
+        sys.argv = ["s2idle"]
+
+    def tearDown(self):
+        sys.argv = self.argv
+
+    @staticmethod
+    def _args(implicit=False, accepted=False):
+        return argparse.Namespace(implicit_triage=implicit, accepted=accepted)
+
+    @patch("amd_debug.s2idle.confirm_start")
+    @patch("amd_debug.s2idle.is_root", return_value=True)
+    def test_root_not_asked(self, _root, mock_confirm):
+        """Root gets the question from the triage itself"""
+        self.assertTrue(confirm_triage(self._args()))
+        mock_confirm.assert_not_called()
+
+    @patch("amd_debug.s2idle.confirm_start")
+    @patch("amd_debug.s2idle.is_root", return_value=False)
+    def test_already_accepted(self, _root, mock_confirm):
+        """The relaunched tool isn't asked again"""
+        self.assertTrue(confirm_triage(self._args(accepted=True)))
+        mock_confirm.assert_not_called()
+        self.assertEqual(sys.argv, ["s2idle"])
+
+    @patch("amd_debug.s2idle.confirm_start", return_value=True)
+    @patch("amd_debug.s2idle.is_root", return_value=False)
+    def test_accept_explicit(self, _root, _confirm):
+        """The answer is passed to the sudo relaunch"""
+        sys.argv = ["s2idle", "triage", "--restart"]
+        self.assertTrue(confirm_triage(self._args()))
+        self.assertEqual(sys.argv, ["s2idle", "triage", "--restart", "--accepted"])
+
+    @patch("amd_debug.s2idle.confirm_start", return_value=True)
+    @patch("amd_debug.s2idle.is_root", return_value=False)
+    def test_accept_implicit(self, _root, _confirm):
+        """The default mode relaunches as an explicit triage"""
+        self.assertTrue(confirm_triage(self._args(implicit=True)))
+        self.assertEqual(sys.argv, ["s2idle", "triage", "--accepted"])
+
+    @patch("amd_debug.s2idle.confirm_start", return_value=False)
+    @patch("amd_debug.s2idle.is_root", return_value=False)
+    def test_decline_implicit_shows_help(self, _root, _confirm):
+        """Declining the default mode shows help"""
+        with patch("sys.stderr") as err:
+            self.assertFalse(confirm_triage(self._args(implicit=True)))
+        self.assertTrue(err.write.called)
+        self.assertEqual(sys.argv, ["s2idle"])
+
+    @patch("amd_debug.s2idle.confirm_start", return_value=False)
+    @patch("amd_debug.s2idle.is_root", return_value=False)
+    def test_decline_explicit_no_help(self, _root, _confirm):
+        """Declining an explicit triage doesn't"""
+        with patch("sys.stderr") as err:
+            self.assertFalse(confirm_triage(self._args()))
+        err.write.assert_not_called()

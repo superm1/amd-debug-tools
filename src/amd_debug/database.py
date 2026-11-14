@@ -7,7 +7,30 @@ import os
 
 from amd_debug.common import read_file
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
+
+
+TRIAGE_TABLE = (
+    "CREATE TABLE IF NOT EXISTS triage ("
+    "id INTEGER PRIMARY KEY, "
+    "started INTEGER, "
+    "updated INTEGER, "
+    "stage TEXT, "
+    "status TEXT, "
+    "boot_id TEXT, "
+    "outcome TEXT, "
+    "fmt TEXT)"
+)
+TRIAGE_EVENT_TABLE = (
+    "CREATE TABLE IF NOT EXISTS triage_event ("
+    "session INTEGER, "
+    "id INTEGER, "
+    "ts INTEGER, "
+    "kind TEXT, "
+    "message TEXT, "
+    "answer TEXT, "
+    "PRIMARY KEY(session, id))"
+)
 
 
 def migrate(cur, user_version) -> None:
@@ -51,6 +74,11 @@ def migrate(cur, user_version) -> None:
             "d3cold_allowed TEXT, "
             "PRIMARY KEY(t0, slot))"
         )
+    # Schema 5
+    # - add triage and triage_event tables
+    if val == 4:
+        cur.execute(TRIAGE_TABLE)
+        cur.execute(TRIAGE_EVENT_TABLE)
     # Update schema if necessary
     if val != user_version:
         cur.execute(f"PRAGMA user_version = {user_version}")
@@ -139,6 +167,8 @@ class SleepDatabase:
             "d3cold_allowed TEXT, "
             "PRIMARY KEY(t0, slot))"
         )
+        cur.execute(TRIAGE_TABLE)
+        cur.execute(TRIAGE_EVENT_TABLE)
         self.prereq_data_cnt = 0
 
         if new:
@@ -397,9 +427,7 @@ class SleepDatabase:
             """,
             (int(self.last_suspend.strftime("%Y%m%d%H%M%S")),),
         )
-        return {
-            row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()
-        }
+        return {row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()}
 
     def record_prereq(self, message, symbol) -> None:
         """Helper function to record a message to prereq_data database"""
@@ -502,6 +530,127 @@ class SleepDatabase:
         cur.execute(
             "SELECT * FROM power_rails WHERE t0=?",
             (int(t0.strftime("%Y%m%d%H%M%S")),),
+        )
+        return cur.fetchall()
+
+    def triage_start(self, stage, boot_id="", fmt="") -> int:
+        """Start a new triage session and return its id"""
+        assert self.db
+        now = int(datetime.now().strftime("%Y%m%d%H%M%S"))
+        cur = self.db.cursor()
+        cur.execute(
+            """
+            INSERT INTO triage (started, updated, stage, status, boot_id, outcome, fmt)
+            VALUES (?, ?, ?, 'ready', ?, NULL, ?)
+            """,
+            (now, now, stage, boot_id, fmt),
+        )
+        self.db.commit()
+        return cur.lastrowid
+
+    def triage_update(self, session, stage=None, status=None, boot_id=None) -> None:
+        """Update the progress indicator of a triage session
+
+        The change is committed immediately so that it survives a hang.
+        """
+        assert self.db
+        cur = self.db.cursor()
+        now = int(datetime.now().strftime("%Y%m%d%H%M%S"))
+        for column, value in (
+            ("stage", stage),
+            ("status", status),
+            ("boot_id", boot_id),
+        ):
+            if value is not None:
+                cur.execute(
+                    f"UPDATE triage SET {column}=? WHERE id=?", (value, session)
+                )
+        cur.execute("UPDATE triage SET updated=? WHERE id=?", (now, session))
+        self.db.commit()
+
+    def triage_complete(self, session, outcome) -> None:
+        """Mark a triage session as finished"""
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            "UPDATE triage SET status='done', outcome=? WHERE id=?",
+            (outcome, session),
+        )
+        self.db.commit()
+
+    def triage_get(self, session=None):
+        """Fetch a triage session (default: the unfinished one)
+
+        Returns a dict with id, started, updated, stage, status, boot_id,
+        outcome and fmt or None when there is no matching session.
+        """
+        assert self.db
+        cur = self.db.cursor()
+        columns = "id, started, updated, stage, status, boot_id, outcome, fmt"
+        if session is None:
+            cur.execute(
+                f"SELECT {columns} FROM triage WHERE status != 'done' "
+                "ORDER BY id DESC LIMIT 1"
+            )
+        else:
+            cur.execute(f"SELECT {columns} FROM triage WHERE id=?", (session,))
+        row = cur.fetchone()
+        if row is None:
+            return None
+        keys = [
+            "id",
+            "started",
+            "updated",
+            "stage",
+            "status",
+            "boot_id",
+            "outcome",
+            "fmt",
+        ]
+        return dict(zip(keys, row))
+
+    def triage_abandon_all(self) -> None:
+        """Close any unfinished triage sessions"""
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            "UPDATE triage SET status='done', outcome='abandoned' WHERE status != 'done'"
+        )
+        self.db.commit()
+
+    def triage_log(self, session, kind, message, answer=None) -> None:
+        """Record an event (info, question, action, result) for a session"""
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            "SELECT COALESCE(MAX(id) + 1, 0) FROM triage_event WHERE session=?",
+            (session,),
+        )
+        idx = cur.fetchone()[0]
+        cur.execute(
+            """
+            INSERT INTO triage_event (session, id, ts, kind, message, answer)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session,
+                idx,
+                int(datetime.now().strftime("%Y%m%d%H%M%S")),
+                kind,
+                message,
+                answer,
+            ),
+        )
+        self.db.commit()
+
+    def triage_events(self, session) -> list:
+        """Fetch the events of a session as (ts, kind, message, answer)"""
+        assert self.db
+        cur = self.db.cursor()
+        cur.execute(
+            "SELECT ts, kind, message, answer FROM triage_event "
+            "WHERE session=? ORDER BY id",
+            (session,),
         )
         return cur.fetchall()
 
